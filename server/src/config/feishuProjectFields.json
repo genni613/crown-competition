@@ -1,0 +1,33 @@
+{
+  "story": {
+    "productOwner": "field_product_owner",
+    "designer": "field_designer",
+    "developer": "field_developer",
+    "standardHours": "field_standard_hours",
+    "pd": "field_pd",
+    "clientPd": "field_client_pd",
+    "reviewPlanAt": "field_review_plan_at",
+    "reviewDoneAt": "field_review_done_at",
+    "launchPlanAt": "field_launch_plan_at",
+    "launchDoneAt": "field_launch_done_at",
+    "isCore": "field_is_core",
+    "changePd": "field_change_pd",
+    "designComplexity": "field_design_complexity",
+    "designPlanAt": "field_design_plan_at",
+    "designDoneAt": "field_design_done_at",
+    "designReworkPd": "field_design_rework_pd"
+  },
+  "issue": {
+    "owner": "field_owner",
+    "resolver": "field_resolver",
+    "severity": "field_severity",
+    "rootCause": "field_root_cause",
+    "closedAt": "field_closed_at",
+    "source": "field_source"
+  },
+  "defect": {
+    "owner": "field_owner",
+    "testResult": "field_test_result",
+    "failedAt": "field_failed_at"
+  }
+}

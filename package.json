@@ -1,0 +1,14 @@
+{
+  "name": "crown-competition",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "cd server && npm run build",
+    "test": "cd server && npm run test"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "admins": [
+    "ou_118a8bf9bec42819e3d68c846d7e05a3"
+  ],
+  "loginRestriction": {
+    "mode": "none",
+    "allowedDepartments": [],
+    "allowedTenants": []
+  }
+}
