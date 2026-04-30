@@ -1,4 +1,4 @@
-import fieldMappings from '../config/workHourFields.json'
+import fieldMappings from '../config/storyFields.json'
 import { config } from '../config'
 import { getDb } from '../db'
 import { feishuProject } from './feishuProject.service'
@@ -20,7 +20,7 @@ interface SyncResult {
 
 const mappings: Record<string, Mapping> = fieldMappings as Record<string, Mapping>
 
-const WORK_ITEM_TYPE_KEY = config.feishuProject.workHourType
+const WORK_ITEM_TYPE_KEY = config.feishuProject.storyType
 
 function extractTopLevel(item: any, path: string): any {
   const parts = path.split('.')
@@ -103,7 +103,6 @@ function parseWorkItem(item: any): Record<string, any> {
     row[column] = parseFieldValue(raw, mapping.type ?? 'text')
   }
 
-  // 额外提取 update_time（飞书顶层字段 updated_at，毫秒时间戳）
   const updatedAt = extractTopLevel(item, 'updated_at')
   row.update_time = typeof updatedAt === 'number' ? new Date(updatedAt) : new Date()
 
@@ -112,54 +111,32 @@ function parseWorkItem(item: any): Record<string, any> {
 
 async function upsertRow(db: any, row: Record<string, any>): Promise<'inserted' | 'updated'> {
   const result = await db.execute(`
-    INSERT INTO feishu_workitem_gongshi (
-      work_item_id, work_description, work_item_type, work_item_status,
-      create_time, work_hour_reporter, actual_work_hours, pd_count,
-      work_date, related_project, related_requirement, specific_work_hour_type,
-      role, business_domain_belonging, belonging_month, work_start_time,
-      work_content_description, description, priority,
-      is_completed, is_auto_generated, is_quality_related,
-      update_time
+    INSERT INTO feishu_workitem_story (
+      work_item_id, name, owner, start_time, finish_time,
+      work_item_type_key, work_item_status, finish_status, related_project,
+      current_status_operator, template_type, sub_stage, update_time
     ) VALUES (
+      ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?,
-      ?, ?, ?, ?,
-      ?, ?, ?, ?,
-      ?, ?, ?,
-      ?, ?, ?,
-      ?
+      ?, ?, ?, ?
     )
     ON DUPLICATE KEY UPDATE
-      work_description = VALUES(work_description),
-      work_item_type = VALUES(work_item_type),
+      name = VALUES(name),
+      owner = VALUES(owner),
+      start_time = VALUES(start_time),
+      finish_time = VALUES(finish_time),
+      work_item_type_key = VALUES(work_item_type_key),
       work_item_status = VALUES(work_item_status),
-      create_time = VALUES(create_time),
-      work_hour_reporter = VALUES(work_hour_reporter),
-      actual_work_hours = VALUES(actual_work_hours),
-      pd_count = VALUES(pd_count),
-      work_date = VALUES(work_date),
+      finish_status = VALUES(finish_status),
       related_project = VALUES(related_project),
-      related_requirement = VALUES(related_requirement),
-      specific_work_hour_type = VALUES(specific_work_hour_type),
-      role = VALUES(role),
-      business_domain_belonging = VALUES(business_domain_belonging),
-      belonging_month = VALUES(belonging_month),
-      work_start_time = VALUES(work_start_time),
-      work_content_description = VALUES(work_content_description),
-      description = VALUES(description),
-      priority = VALUES(priority),
-      is_completed = VALUES(is_completed),
-      is_auto_generated = VALUES(is_auto_generated),
-      is_quality_related = VALUES(is_quality_related),
+      current_status_operator = VALUES(current_status_operator),
+      template_type = VALUES(template_type),
+      sub_stage = VALUES(sub_stage),
       update_time = VALUES(update_time)
   `, [
-    row.work_item_id, row.work_description, row.work_item_type, row.work_item_status,
-    row.create_time, row.work_hour_reporter, row.actual_work_hours, row.pd_count,
-    row.work_date, row.related_project, row.related_requirement, row.specific_work_hour_type,
-    row.role, row.business_domain_belonging, row.belonging_month, row.work_start_time,
-    row.work_content_description, row.description, row.priority,
-    row.is_completed, row.is_auto_generated, row.is_quality_related,
-    row.update_time || new Date(),
+    row.work_item_id, row.name, row.owner, row.start_time, row.finish_time,
+    row.work_item_type_key, row.work_item_status, row.finish_status, row.related_project,
+    row.current_status_operator, row.template_type, row.sub_stage, row.update_time || new Date(),
   ])
 
   return result.affectedRows === 1 ? 'inserted' : 'updated'
@@ -212,66 +189,7 @@ function getUniqueFieldKeys(): string[] {
   )]
 }
 
-function uniqueItems(items: any[]): any[] {
-  const seen = new Set<string>()
-  const result: any[] = []
-  for (const item of items) {
-    const id = item?.id ?? item?.work_item_id ?? item?.workItemId ?? item?.name ?? JSON.stringify(item)
-    const key = String(id)
-    if (seen.has(key)) continue
-    seen.add(key)
-    result.push(item)
-  }
-  return result
-}
-
-function readUpdatedAtMs(item: any): number | null {
-  const candidates = [
-    item?.updated_at,
-    item?.updatedAt,
-    item?.fields?.updated_at,
-    item?.field_value_map?.updated_at,
-    item?.fieldValueMap?.updated_at,
-  ]
-
-  for (const candidate of candidates) {
-    if (candidate == null || candidate === '') continue
-    if (typeof candidate === 'number') {
-      return candidate > 1_000_000_000_000 ? candidate : candidate * 1000
-    }
-    if (typeof candidate === 'string') {
-      const parsed = Number(candidate)
-      if (Number.isFinite(parsed) && parsed > 1_000_000_000) {
-        return parsed < 10_000_000_000 ? parsed * 1000 : parsed
-      }
-      const time = new Date(candidate).getTime()
-      if (!Number.isNaN(time)) return time
-    }
-  }
-
-  const fields = Array.isArray(item?.fields) ? item.fields : []
-  const updatedField = fields.find((field: any) =>
-    field?.field_key === 'updated_at' ||
-    field?.field_alias === 'updated_at' ||
-    field?.key === 'updated_at'
-  )
-  const raw = updatedField?.field_value ?? updatedField?.value ?? updatedField
-  if (typeof raw === 'number') {
-    return raw > 1_000_000_000_000 ? raw : raw * 1000
-  }
-  if (typeof raw === 'string') {
-    const parsed = Number(raw)
-    if (Number.isFinite(parsed) && parsed > 1_000_000_000) {
-      return parsed < 10_000_000_000 ? parsed * 1000 : parsed
-    }
-    const time = new Date(raw).getTime()
-    if (!Number.isNaN(time)) return time
-  }
-
-  return null
-}
-
-async function fetchWorkHourItems(workItemTypeKey?: string, startDate?: string, endDate?: string): Promise<any[]> {
+async function fetchStoryItems(workItemTypeKey?: string, startDate?: string, endDate?: string): Promise<any[]> {
   feishuProject.assertConfigured()
 
   const rawTypeKey = workItemTypeKey || WORK_ITEM_TYPE_KEY
@@ -280,7 +198,6 @@ async function fetchWorkHourItems(workItemTypeKey?: string, startDate?: string, 
 
   const allItems: any[] = []
 
-  // 先拉第一页拿总数
   const firstRaw = await feishuProject.listWorkItemsByFilter({
     work_item_type_keys: [rawTypeKey],
     fields: uniqueFieldKeys,
@@ -294,9 +211,8 @@ async function fetchWorkHourItems(workItemTypeKey?: string, startDate?: string, 
   const total = Number(firstPagination?.total || firstRaw?.data?.total || 0)
   const totalPages = Math.ceil(total / pageSize)
 
-  console.log('[work-hour-import] first page done', { total, totalPages, pageSize })
+  console.log('[story-import] first page done', { total, totalPages, pageSize })
 
-  // 并发拉剩余页
   if (totalPages > 1) {
     const concurrency = 5
     for (let batchStart = 2; batchStart <= totalPages; batchStart += concurrency) {
@@ -322,7 +238,7 @@ async function fetchWorkHourItems(workItemTypeKey?: string, startDate?: string, 
         allItems.push(...items)
       }
 
-      console.log('[work-hour-import] batch done', {
+      console.log('[story-import] batch done', {
         pages: `${batchStart}-${batchEnd}`,
         fetched: results.reduce((sum, r) => sum + r.items.length, 0),
         totalSoFar: allItems.length,
@@ -330,31 +246,14 @@ async function fetchWorkHourItems(workItemTypeKey?: string, startDate?: string, 
     }
   }
 
-  console.log('[work-hour-import] all pages done', { typeKey: rawTypeKey, total: allItems.length })
+  console.log('[story-import] all pages done', { typeKey: rawTypeKey, total: allItems.length })
 
-  // 全量拿到后，如果有时间范围，按日期字段过滤
-  if (startDate && endDate && allItems.length > 0) {
-    const dateFieldKey = config.feishuProject.workHourDateField
-    const startMs = new Date(`${startDate}T00:00:00`).getTime()
-    const endMs = new Date(`${endDate}T23:59:59.999`).getTime()
-    const filtered = allItems.filter(item => {
-      const dateValue = extractFieldValue(item.fields || [], dateFieldKey)
-        ?? extractTopLevel(item, 'created_at')
-      if (dateValue == null) return false
-      const ts = typeof dateValue === 'number' ? dateValue : 0
-      return ts >= startMs && ts <= endMs
-    })
-    console.log('[work-hour-import] date range filter', { total: allItems.length, filtered: filtered.length })
-    return filtered
-  }
-
-  // 打印第一条数据的字段情况，方便排查
   if (allItems.length > 0) {
     const sample = allItems[0]
     const sampleFields = Array.isArray(sample?.fields) ? sample.fields : []
     const foundKeys = sampleFields.map((f: any) => f.field_key).filter(Boolean)
     const missingKeys = uniqueFieldKeys.filter(k => !foundKeys.includes(k))
-    console.log('[work-hour-import] sample field check', {
+    console.log('[story-import] sample field check', {
       requestedFields: uniqueFieldKeys.length,
       foundFields: foundKeys.length,
       missingFields: missingKeys.length > 0 ? missingKeys : 'none',
@@ -362,20 +261,34 @@ async function fetchWorkHourItems(workItemTypeKey?: string, startDate?: string, 
     })
   }
 
+  if (startDate && endDate && allItems.length > 0) {
+    const startMs = new Date(`${startDate}T00:00:00`).getTime()
+    const endMs = new Date(`${endDate}T23:59:59.999`).getTime()
+    const filtered = allItems.filter(item => {
+      const dateValue = extractFieldValue(item.fields || [], 'start_time')
+        ?? extractTopLevel(item, 'created_at')
+      if (dateValue == null) return false
+      const ts = typeof dateValue === 'number' ? dateValue : 0
+      return ts >= startMs && ts <= endMs
+    })
+    console.log('[story-import] date range filter', { total: allItems.length, filtered: filtered.length })
+    return filtered
+  }
+
   return allItems
 }
 
-/** 全量同步：拉取所有工时数据并入库 */
-export async function syncAllWorkHours(workItemTypeKey?: string): Promise<SyncResult> {
-  const items = await fetchWorkHourItems(workItemTypeKey)
+/** 全量同步：拉取所有需求数据并入库 */
+export async function syncAllStories(workItemTypeKey?: string): Promise<SyncResult> {
+  const items = await fetchStoryItems(workItemTypeKey)
   if (items.length === 0) {
     return { total: 0, inserted: 0, updated: 0, skipped: 0, errors: [] }
   }
   return importItems(items)
 }
 
-/** 按时间范围同步：用 search API 在飞书端按时间段过滤，只拉取指定范围的数据 */
-export async function syncWorkHoursByDateRange(startDate: string, endDate: string, workItemTypeKey?: string): Promise<SyncResult> {
+/** 按时间范围同步：用 filter API 在飞书端按时间段过滤，只拉取指定范围的数据 */
+export async function syncStoriesByDateRange(startDate: string, endDate: string, workItemTypeKey?: string): Promise<SyncResult> {
   feishuProject.assertConfigured()
 
   const rawTypeKey = workItemTypeKey || WORK_ITEM_TYPE_KEY
@@ -383,7 +296,7 @@ export async function syncWorkHoursByDateRange(startDate: string, endDate: strin
   const endMs = new Date(`${endDate}T23:59:59.999`).getTime()
   const uniqueFieldKeys = getUniqueFieldKeys()
 
-  console.log('[work-hour-import] date range sync', { startDate, endDate, typeKey: rawTypeKey })
+  console.log('[story-import] date range sync', { startDate, endDate, typeKey: rawTypeKey })
 
   const items = await feishuProject.listAllWorkItemsByFilter({
     work_item_type_keys: [rawTypeKey],
@@ -392,7 +305,7 @@ export async function syncWorkHoursByDateRange(startDate: string, endDate: strin
     expand: { need_workflow: false },
   })
 
-  console.log('[work-hour-import] date range sync done', { filtered: items.length })
+  console.log('[story-import] date range sync done', { filtered: items.length })
 
   if (items.length === 0) {
     return { total: 0, inserted: 0, updated: 0, skipped: 0, errors: [] }
@@ -401,46 +314,57 @@ export async function syncWorkHoursByDateRange(startDate: string, endDate: strin
   return importItems(items)
 }
 
-/** 手动导入：接收前端传来的 response 数据 */
-export async function importWorkHourItems(items: any[]): Promise<SyncResult> {
+/** 手动导入：接收前端传来的数据 */
+export async function importStoryItems(items: any[]): Promise<SyncResult> {
   return importItems(items)
 }
 
-/** 增量同步：用 updated_at 时间戳在飞书 API 端过滤，只拉取新增/更新的数据 */
-export async function syncIncrementalWorkHours(workItemTypeKey?: string): Promise<SyncResult> {
+/** 增量同步：用 search API 按时间范围只拉新增/更新的数据 */
+export async function syncIncrementalStories(workItemTypeKey?: string): Promise<SyncResult> {
   feishuProject.assertConfigured()
   const db = getDb()
 
   const rawTypeKey = workItemTypeKey || WORK_ITEM_TYPE_KEY
 
   const row = await db.queryOne<{ max_updated: string }>(
-    'SELECT MAX(update_time) AS max_updated FROM feishu_workitem_gongshi'
+    'SELECT MAX(update_time) AS max_updated FROM feishu_workitem_story'
   )
   const localMaxUpdated = row?.max_updated ? new Date(row.max_updated).getTime() : 0
 
   if (!localMaxUpdated) {
-    console.log('[work-hour-import] incremental: no local data, fallback to full sync')
-    return syncAllWorkHours(workItemTypeKey)
+    console.log('[story-import] incremental: no local data, fallback to full sync')
+    return syncAllStories(workItemTypeKey)
   }
 
-  // 多往前取 5 分钟，防止边界附近的数据遗漏
-  const safeLowerBound = localMaxUpdated - 300_000
+  console.log('[story-import] incremental sync', {
+    localMaxUpdated: new Date(localMaxUpdated).toISOString(),
+  })
+
   const nowMs = Date.now()
   const uniqueFieldKeys = getUniqueFieldKeys()
 
-  console.log('[work-hour-import] incremental sync', {
-    localMaxUpdated: new Date(localMaxUpdated).toISOString(),
-    safeLowerBound: new Date(safeLowerBound).toISOString(),
-  })
+  let items: any[] = []
 
-  const items = await feishuProject.listAllWorkItemsByFilter({
-    work_item_type_keys: [rawTypeKey],
-    fields: uniqueFieldKeys,
-    updated_at: { start: safeLowerBound, end: nowMs },
-    expand: { need_workflow: false },
-  })
-
-  console.log('[work-hour-import] incremental sync done', { filtered: items.length })
+  const searchFields = ['updated_at', 'start_time', 'created_at']
+  for (const searchField of searchFields) {
+    if (items.length > 0) break
+    try {
+      items = await feishuProject.searchAllWorkItems(rawTypeKey, {
+        fields: uniqueFieldKeys,
+        search_group: {
+          conjunction: 'AND',
+          search_params: [
+            { param_key: searchField, operator: 'BETWEEN', value: [localMaxUpdated, nowMs] },
+          ],
+        },
+      })
+      console.log(`[story-import] incremental search by ${searchField} done`, { items: items.length })
+    } catch (err) {
+      console.warn(`[story-import] search by ${searchField} failed`, {
+        reason: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   if (items.length === 0) {
     return { total: 0, inserted: 0, updated: 0, skipped: 0, errors: [] }

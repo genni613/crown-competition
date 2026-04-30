@@ -173,3 +173,25 @@ CREATE TABLE IF NOT EXISTS feishu_workitem_gongshi (
   KEY idx_create_time (create_time),
   KEY idx_reporter (work_hour_reporter)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 需求管理表
+CREATE TABLE IF NOT EXISTS feishu_workitem_story (
+  work_item_id BIGINT NOT NULL COMMENT '工作项ID',
+  name VARCHAR(255) NULL COMMENT '需求名称',
+  owner VARCHAR(64) NULL COMMENT '创建者',
+  start_time DATETIME NULL COMMENT '提出时间',
+  finish_time DATETIME NULL COMMENT '完成日期',
+  work_item_type_key VARCHAR(64) NULL COMMENT '工作项类型',
+  work_item_status VARCHAR(64) NULL COMMENT '需求状态',
+  finish_status TINYINT(1) NULL COMMENT '是否完成',
+  related_project VARCHAR(64) NULL COMMENT '关联项目',
+  current_status_operator VARCHAR(512) NULL COMMENT '需求负责人',
+  template_type VARCHAR(128) NULL COMMENT '需求类型',
+  sub_stage VARCHAR(64) NULL COMMENT '需求状态(细分)',
+  update_time DATETIME NULL COMMENT '更新时间',
+  PRIMARY KEY (work_item_id),
+  UNIQUE KEY u_work_item_id_index (work_item_id),
+  KEY idx_start_time (start_time),
+  KEY idx_owner (owner),
+  KEY idx_related_project (related_project)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书需求工作项表';

@@ -1,7 +1,9 @@
 import { BuiltInAgent, defineTool } from '@copilotkit/runtime/v2'
+import { createOpenAI } from '@ai-sdk/openai'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { z } from 'zod'
+import { config } from '../config'
 
 function loadScoringRules(): string {
   const rulesPath = resolve(process.cwd(), '../docs/scoring-rules.md')
@@ -43,8 +45,57 @@ const matchScoringPointsTool = defineTool({
   },
 })
 
+function parseJsonObject(value: string, envName: string): Record<string, any> | undefined {
+  const text = value.trim()
+  if (!text) return undefined
+  try {
+    const parsed = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('must be a JSON object')
+    }
+    return parsed as Record<string, any>
+  } catch (error) {
+    throw new Error(`${envName} must be a valid JSON object string`)
+  }
+}
+
+function createModel() {
+  const baseURL = config.copilotkit.openaiBaseUrl.trim()
+  if (!baseURL) {
+    return config.copilotkit.model
+  }
+
+  const apiKey = config.copilotkit.openaiApiKey.trim()
+  if (!apiKey) {
+    throw new Error(
+      'Missing COPILOTKIT_OPENAI_API_KEY or OPENAI_API_KEY while COPILOTKIT_OPENAI_BASE_URL is set',
+    )
+  }
+
+  const defaultHeaders = parseJsonObject(
+    config.copilotkit.openaiDefaultHeaders,
+    'COPILOTKIT_OPENAI_DEFAULT_HEADERS',
+  )
+
+  const provider = createOpenAI({
+    baseURL,
+    apiKey,
+    name: 'openai',
+    organization: config.copilotkit.openaiOrganization.trim() || undefined,
+    project: config.copilotkit.openaiProject.trim() || undefined,
+    headers: defaultHeaders,
+  })
+
+  console.log('[copilotkit] using OpenAI-compatible chat model config', {
+    baseURL,
+    model: config.copilotkit.openaiModel,
+  })
+
+  return provider.chat(config.copilotkit.openaiModel)
+}
+
 export const scoringAgent = new BuiltInAgent({
-  model: 'openai/gpt-4o',
+  model: createModel(),
   prompt: SYSTEM_PROMPT,
   tools: [matchScoringPointsTool],
 })

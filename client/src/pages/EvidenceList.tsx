@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, Empty, Image, Space, Table, Tag, Timeline, Typography, message } from 'antd'
-import { getSeasons } from '../api/seasons'
 import { getEvidenceDetail, getMyEvidence } from '../api/evidence'
-import type { EvidenceReview, EvidenceSubmission, Season } from '../types/models'
+import type { EvidenceReview, EvidenceSubmission } from '../types/models'
 import { formatDateTime } from '../utils/datetime'
 
 const statusMap: Record<string, { color: string; label: string }> = {
@@ -26,13 +25,7 @@ export default function EvidenceList() {
   async function loadInitial() {
     setLoading(true)
     try {
-      const seasonsRes = await getSeasons()
-      const active = seasonsRes.data.find((s: Season) => s.status === 'active')
-      if (!active) {
-        setData([])
-        return
-      }
-      const evidenceRes = await getMyEvidence(active.id)
+      const evidenceRes = await getMyEvidence()
       setData(evidenceRes.data)
     } catch (error: any) {
       message.error(error.response?.data?.error || '加载举证记录失败')
@@ -55,6 +48,11 @@ export default function EvidenceList() {
   }
 
   const columns = [
+    {
+      title: '赛季',
+      dataIndex: 'season_name',
+      render: (value: string | null | undefined) => value || <Typography.Text type="secondary">未知赛季</Typography.Text>,
+    },
     { title: '标题', dataIndex: 'title' },
     { title: '描述', dataIndex: 'description', ellipsis: true },
     {

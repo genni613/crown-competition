@@ -794,7 +794,9 @@ seasons ──1:N──> feishu_source_snapshots
 | 方法 | 路径 | 说明 | 角色 |
 |------|------|------|------|
 | GET | `/pending` | 待审核列表 | admin |
-| GET | `/mine/:seasonId` | 我的举证 | participant |
+| GET | `/reviewed` | 已审核记录 | admin |
+| GET | `/mine` | 我的举证（全部赛季） | participant |
+| GET | `/mine/:seasonId` | 我的举证（指定赛季，兼容旧调用） | participant |
 | POST | `/` | 提交举证 | participant |
 | PUT | `/:id/status` | 审核通过/驳回 | admin |
 | GET | `/:id` | 举证详情 | 已登录 |

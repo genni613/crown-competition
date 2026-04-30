@@ -17,6 +17,16 @@ export const config = {
     appId: process.env.FEISHU_APP_ID || '',
     appSecret: process.env.FEISHU_APP_SECRET || '',
   },
+  copilotkit: {
+    model: process.env.COPILOTKIT_MODEL || 'openai/gpt-4o',
+    openaiModel: process.env.COPILOTKIT_OPENAI_MODEL || process.env.OPENAI_MODEL || 'gpt-4o',
+    openaiApiKey: process.env.COPILOTKIT_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '',
+    openaiBaseUrl: process.env.COPILOTKIT_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL || '',
+    openaiOrganization:
+      process.env.COPILOTKIT_OPENAI_ORGANIZATION || process.env.OPENAI_ORG_ID || '',
+    openaiProject: process.env.COPILOTKIT_OPENAI_PROJECT || process.env.OPENAI_PROJECT_ID || '',
+    openaiDefaultHeaders: process.env.COPILOTKIT_OPENAI_DEFAULT_HEADERS || '',
+  },
   feishuProject: {
     baseUrl: process.env.FEISHU_PROJECT_BASE_URL || 'https://project.feishu.cn',
     pluginId: process.env.FEISHU_PROJECT_PLUGIN_ID || '',

@@ -93,7 +93,14 @@ export default function SeasonManager() {
 
       <Modal title="创建赛季" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={() => form.submit()}>
         <Form form={form} layout="vertical" onFinish={onCreate}>
-          <Form.Item name="name" label="赛季名称" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item
+            name="name"
+            label="赛季名称"
+            extra="建议使用统一格式，例如 2026-Q2，方便后续检索和归档。"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="例如：2026-Q2" />
+          </Form.Item>
           <Form.Item name="dates" label="时间范围" rules={[{ required: true }]}><DatePicker.RangePicker style={{ width: '100%' }} /></Form.Item>
         </Form>
       </Modal>

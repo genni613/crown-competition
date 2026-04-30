@@ -16,7 +16,9 @@ export function AppCopilotProvider({ children }: AppCopilotProviderProps) {
       agent={copilotConfig.agent}
       credentials="include"
       runtimeUrl={copilotConfig.runtimeUrl}
-      showDevConsole={import.meta.env.DEV}
+      useSingleEndpoint={false}
+      enableInspector={copilotConfig.enableInspector}
+      showDevConsole={copilotConfig.showDevConsole}
     >
       {children}
     </CopilotKit>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Image, Input, Modal, Space, Table, Tag, Typography, message } from 'antd'
-import { getPendingEvidence, reviewEvidence } from '../../api/evidence'
+import { getPendingEvidence, getReviewedEvidence, reviewEvidence } from '../../api/evidence'
 import type { EvidenceSubmission } from '../../types/models'
 
 const statusMap: Record<string, { color: string; label: string }> = {
@@ -11,6 +11,7 @@ const statusMap: Record<string, { color: string; label: string }> = {
 
 export default function EvidenceReview() {
   const [data, setData] = useState<EvidenceSubmission[]>([])
+  const [tab, setTab] = useState<'pending' | 'reviewed'>('pending')
   const [loading, setLoading] = useState(false)
   const [previewImage, setPreviewImage] = useState<string>('')
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -22,15 +23,19 @@ export default function EvidenceReview() {
   const [resultTitle, setResultTitle] = useState('审核结果')
   const [resultContent, setResultContent] = useState('')
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    void load(tab)
+  }, [tab])
 
-  async function load() {
+  async function load(view: 'pending' | 'reviewed') {
     setLoading(true)
     try {
-      const res = await getPendingEvidence()
+      const res = view === 'pending'
+        ? await getPendingEvidence()
+        : await getReviewedEvidence()
       setData(res.data)
     } catch (error: any) {
-      message.error(error.response?.data?.error || '加载待审核举证失败')
+      message.error(error.response?.data?.error || (view === 'pending' ? '加载待审核举证失败' : '加载审核记录失败'))
     } finally {
       setLoading(false)
     }
@@ -43,7 +48,7 @@ export default function EvidenceReview() {
         setResultTitle('审核结果')
         setResultContent('已通过')
         setResultOpen(true)
-        await load()
+        await load(tab)
       } catch (error: any) {
         message.error(error.response?.data?.error || '审核失败')
       }
@@ -66,15 +71,15 @@ export default function EvidenceReview() {
     }
 
     setRejectSubmitting(true)
-    try {
-      await reviewEvidence(rejectTargetId, 'rejected', comment)
-      setResultTitle('审核结果')
-      setResultContent('已驳回')
-      setResultOpen(true)
-      await load()
-      setRejectOpen(false)
-      setRejectTargetId(null)
-      setRejectReason('')
+      try {
+        await reviewEvidence(rejectTargetId, 'rejected', comment)
+        setResultTitle('审核结果')
+        setResultContent('已驳回')
+        setResultOpen(true)
+        await load(tab)
+        setRejectOpen(false)
+        setRejectTargetId(null)
+        setRejectReason('')
     } catch (error: any) {
       message.error(error.response?.data?.error || '审核失败')
     } finally {
@@ -84,6 +89,7 @@ export default function EvidenceReview() {
 
   const columns = [
     { title: '提交人', dataIndex: 'user_name' },
+    { title: '赛季', dataIndex: 'season_name' },
     { title: '标题', dataIndex: 'title' },
     { title: '描述', dataIndex: 'description', ellipsis: true },
     {
@@ -115,10 +121,16 @@ export default function EvidenceReview() {
       dataIndex: 'review_comment',
       render: (value: string | null) => value ? value : <Typography.Text type="secondary">无</Typography.Text>,
     },
+    { title: '审核人', dataIndex: 'reviewer_name', render: (value: string | null) => value || <Typography.Text type="secondary">-</Typography.Text> },
+    {
+      title: '审核时间',
+      dataIndex: 'reviewed_at',
+      render: (value: string | null) => value ? new Date(value).toLocaleString() : <Typography.Text type="secondary">-</Typography.Text>,
+    },
     { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={statusMap[s]?.color}>{statusMap[s]?.label}</Tag> },
     {
       title: '操作',
-      render: (_: unknown, r: EvidenceSubmission) => r.status === 'pending' ? (
+      render: (_: unknown, r: EvidenceSubmission) => tab === 'pending' && r.status === 'pending' ? (
         <Space>
           <Button size="small" type="primary" onClick={() => { void handleReview(r.id, 'approved') }}>通过</Button>
           <Button size="small" danger onClick={() => openRejectModal(r.id)}>驳回</Button>
@@ -130,6 +142,10 @@ export default function EvidenceReview() {
   return (
     <div>
       <Typography.Title level={4}>举证审核</Typography.Title>
+      <Space style={{ marginBottom: 16 }}>
+        <Button type={tab === 'pending' ? 'primary' : 'default'} onClick={() => setTab('pending')}>待审核</Button>
+        <Button type={tab === 'reviewed' ? 'primary' : 'default'} onClick={() => setTab('reviewed')}>审核记录</Button>
+      </Space>
       <Table dataSource={data} columns={columns} rowKey="id" loading={loading} size="middle" />
       <Image
         style={{ display: 'none' }}

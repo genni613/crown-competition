@@ -1,0 +1,14 @@
+{
+  "work_item_id": { "source": "top", "path": "id" },
+  "name": { "source": "top", "path": "name" },
+  "owner": { "source": "field", "key": "owner", "type": "user" },
+  "start_time": { "source": "field", "key": "start_time", "type": "date" },
+  "finish_time": { "source": "field", "key": "finish_time", "type": "date" },
+  "work_item_type_key": { "source": "top", "path": "work_item_type_key" },
+  "work_item_status": { "source": "top", "path": "work_item_status.state_key" },
+  "finish_status": { "source": "field", "key": "archiving_status", "type": "bool" },
+  "related_project": { "source": "field", "key": "field_5fd493", "type": "related" },
+  "current_status_operator": { "source": "field", "key": "current_status_operator", "type": "user" },
+  "template_type": { "source": "field", "key": "template_type", "type": "select" },
+  "sub_stage": { "source": "field", "key": "sub_stage", "type": "select" }
+}

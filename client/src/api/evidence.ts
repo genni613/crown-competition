@@ -19,7 +19,9 @@ export interface UploadEvidenceAttachmentResponse {
 }
 
 export const getPendingEvidence = () => api.get<EvidenceSubmission[]>('/evidence/pending')
-export const getMyEvidence = (seasonId: number) => api.get<EvidenceSubmission[]>(`/evidence/mine/${seasonId}`)
+export const getReviewedEvidence = () => api.get<EvidenceSubmission[]>('/evidence/reviewed')
+export const getMyEvidence = (seasonId?: number) =>
+  api.get<EvidenceSubmission[]>(seasonId ? `/evidence/mine/${seasonId}` : '/evidence/mine')
 export const submitEvidence = (data: SubmitEvidencePayload) => api.post('/evidence', data)
 export const uploadEvidenceAttachment = (file: File) => {
   const formData = new FormData()

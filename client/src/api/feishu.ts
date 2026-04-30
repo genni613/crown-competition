@@ -168,8 +168,17 @@ export const importWorkHourItems = (data: unknown) =>
 export const syncAllWorkHours = (workItemTypeKey?: string) =>
   api.post<WorkHourImportResult>('/feishu/work-hours/sync', { workItemTypeKey })
 
+export const syncIncrementalWorkHours = (workItemTypeKey?: string) =>
+  api.post<WorkHourImportResult>('/feishu/work-hours/sync-incremental', { workItemTypeKey })
+
 export const syncWorkHoursByDateRange = (startDate: string, endDate: string, workItemTypeKey?: string) =>
   api.post<WorkHourImportResult>('/feishu/work-hours/sync-range', { startDate, endDate, workItemTypeKey })
 
-export const syncIncrementalWorkHours = (workItemTypeKey?: string) =>
-  api.post<WorkHourImportResult>('/feishu/work-hours/sync-incremental', { workItemTypeKey })
+export const syncAllStories = (workItemTypeKey?: string) =>
+  api.post<WorkHourImportResult>('/feishu/story/sync', { workItemTypeKey })
+
+export const syncIncrementalStories = (workItemTypeKey?: string) =>
+  api.post<WorkHourImportResult>('/feishu/story/sync-incremental', { workItemTypeKey })
+
+export const syncStoriesByDateRange = (startDate: string, endDate: string, workItemTypeKey?: string) =>
+  api.post<WorkHourImportResult>('/feishu/story/sync-range', { startDate, endDate, workItemTypeKey })

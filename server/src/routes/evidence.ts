@@ -183,26 +183,59 @@ evidenceRouter.get('/pending', adminMiddleware, asyncHandler(async (_req: Reques
   res.json(list.map(item => normalizeEvidenceRecord(item as Record<string, unknown>)))
 }))
 
-// GET /api/evidence/mine/:seasonId — 我的举证
-evidenceRouter.get('/mine/:seasonId', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+// GET /api/evidence/reviewed — 已审核记录
+evidenceRouter.get('/reviewed', adminMiddleware, asyncHandler(async (_req: Request, res: Response) => {
   const db = getDb()
-  const member = await db.queryOne<{ id: number }>(
-    'SELECT id FROM season_members WHERE user_id = ? AND season_id = ?',
-    [req.currentUser.id, req.params.seasonId]
-  )
+  const list = await db.query(`
+    SELECT es.*, sm.user_id, sm.season_id, s.name as season_name, u.name as user_name,
+           lr.comment as review_comment, lr.created_at as reviewed_at,
+           lr.snapshot_json as review_snapshot_json, reviewer.name as reviewer_name
+    FROM evidence_submissions es
+    JOIN season_members sm ON es.season_member_id = sm.id
+    JOIN seasons s ON sm.season_id = s.id
+    JOIN users u ON sm.user_id = u.id
+    ${latestReviewJoin}
+    WHERE es.status IN ('approved', 'rejected')
+    ORDER BY COALESCE(lr.created_at, es.updated_at) DESC, es.id DESC
+  `)
+  res.json(list.map(item => normalizeEvidenceRecord(item as Record<string, unknown>)))
+}))
 
-  if (!member) { res.json([]); return }
+async function listMyEvidence(req: Request, res: Response, seasonId?: string) {
+  const db = getDb()
+
+  const params: Array<string | number> = [req.currentUser.id]
+  let seasonFilter = ''
+
+  if (seasonId) {
+    seasonFilter = ' AND sm.season_id = ?'
+    params.push(seasonId)
+  }
 
   const list = await db.query(
-    `SELECT es.*, lr.comment as review_comment, lr.created_at as reviewed_at,
+    `SELECT es.*, sm.season_id, s.name as season_name,
+            lr.comment as review_comment, lr.created_at as reviewed_at,
             lr.snapshot_json as review_snapshot_json, reviewer.name as reviewer_name
      FROM evidence_submissions es
+     JOIN season_members sm ON es.season_member_id = sm.id
+     JOIN seasons s ON sm.season_id = s.id
      ${latestReviewJoin}
-     WHERE es.season_member_id = ?
+     WHERE sm.user_id = ?${seasonFilter}
      ORDER BY es.created_at DESC`,
-    [member.id]
+    params
   )
+
   res.json(list.map(item => normalizeEvidenceRecord(item as Record<string, unknown>)))
+}
+
+// GET /api/evidence/mine — 我的举证（全部赛季）
+evidenceRouter.get('/mine', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  await listMyEvidence(req, res)
+}))
+
+// GET /api/evidence/mine/:seasonId — 我的举证（指定赛季，兼容旧调用）
+evidenceRouter.get('/mine/:seasonId', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  await listMyEvidence(req, res, req.params.seasonId)
 }))
 
 // POST /api/evidence — 提交举证

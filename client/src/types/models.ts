@@ -89,6 +89,8 @@ export interface OrgScore {
 export interface EvidenceSubmission {
   id: number
   season_member_id: number
+  season_id?: number
+  season_name?: string
   target_type: string
   target_id: number | null
   title: string
@@ -98,6 +100,7 @@ export interface EvidenceSubmission {
   review_comment: string | null
   review_snapshot_json?: Record<string, unknown> | null
   reviewed_at?: string | null
+  reviewer_name?: string
   attachment_urls: string[]
   user_name?: string
   created_at?: string

@@ -26,8 +26,11 @@ import {
   getFeishuProjectUsersByKeys,
   importWorkHourItems,
   syncAllWorkHours,
-  syncWorkHoursByDateRange,
   syncIncrementalWorkHours,
+  syncWorkHoursByDateRange,
+  syncAllStories,
+  syncIncrementalStories,
+  syncStoriesByDateRange,
   queryFeishuWorkItemDetails,
   type FeishuProjectField,
   type FeishuRawFilterResponse,
@@ -393,7 +396,11 @@ export default function FeishuManager() {
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<WorkHourImportResult>()
   const [importTypeKey, setImportTypeKey] = useState<string>()
+  const [storyLoading, setStoryLoading] = useState(false)
+  const [storyResult, setStoryResult] = useState<WorkHourImportResult>()
+  const [storyTypeKey, setStoryTypeKey] = useState<string>()
   const [importDateRange, setImportDateRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const [storyDateRange, setStoryDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const selectedType = Form.useWatch('workItemTypeKey', form)
   const selectedPersonType = Form.useWatch('workItemTypeKey', personForm)
   const rawItems = useMemo(() => Array.isArray(result?.data) ? result.data : [], [result])
@@ -976,7 +983,7 @@ export default function FeishuManager() {
                 <Card title="同步飞书工时数据到本地">
                   <Space direction="vertical" size={12}>
                     <Typography.Text type="secondary">
-                      后端直接调用飞书 OpenAPI 拉取工时数据，解析后写入 feishu_work_hour_management 表。重复 work_item_id 会自动更新。
+                      后端直接调用飞书 OpenAPI 拉取工时数据，解析后写入 feishu_workitem_gongshi 表。重复 work_item_id 会自动更新。
                     </Typography.Text>
                     <Space wrap align="start">
                       <div>
@@ -994,13 +1001,6 @@ export default function FeishuManager() {
                               label: `${type.name || type.type_key} (${type.type_key})`,
                               value: type.type_key,
                             }))}
-                        />
-                      </div>
-                      <div>
-                        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>时间范围（可选）</Typography.Text>
-                        <DatePicker.RangePicker
-                          value={importDateRange}
-                          onChange={value => setImportDateRange(value as [Dayjs, Dayjs] | null)}
                         />
                       </div>
                     </Space>
@@ -1024,27 +1024,6 @@ export default function FeishuManager() {
                       }}>
                         全量同步
                       </Button>
-                      <Button loading={importLoading} disabled={!importTypeKey || !importDateRange} onClick={async () => {
-                        if (!importTypeKey || !importDateRange) {
-                          message.warning('请先选择工作项类型和时间范围')
-                          return
-                        }
-                        setImportLoading(true)
-                        setImportResult(undefined)
-                        try {
-                          const startDate = importDateRange[0].format('YYYY-MM-DD')
-                          const endDate = importDateRange[1].format('YYYY-MM-DD')
-                          const res = await syncWorkHoursByDateRange(startDate, endDate, importTypeKey)
-                          setImportResult(res.data)
-                          message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
-                        } catch (err: any) {
-                          message.error(err?.response?.data?.error || err?.message || '同步失败')
-                        } finally {
-                          setImportLoading(false)
-                        }
-                      }}>
-                        按时间范围同步
-                      </Button>
                       <Button loading={importLoading} disabled={!importTypeKey} onClick={async () => {
                         if (!importTypeKey) {
                           message.warning('请先选择工作项类型')
@@ -1065,8 +1044,40 @@ export default function FeishuManager() {
                         增量同步
                       </Button>
                     </Space>
+                    <div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>按时间段同步</Typography.Text>
+                      <Space>
+                        <DatePicker.RangePicker
+                          value={importDateRange}
+                          onChange={value => setImportDateRange(value as [Dayjs, Dayjs] | null)}
+                        />
+                        <Button loading={importLoading} disabled={!importTypeKey || !importDateRange} onClick={async () => {
+                          if (!importTypeKey || !importDateRange) {
+                            message.warning('请先选择工作项类型和时间范围')
+                            return
+                          }
+                          setImportLoading(true)
+                          setImportResult(undefined)
+                          try {
+                            const res = await syncWorkHoursByDateRange(
+                              importDateRange[0].format('YYYY-MM-DD'),
+                              importDateRange[1].format('YYYY-MM-DD'),
+                              importTypeKey,
+                            )
+                            setImportResult(res.data)
+                            message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                          } catch (err: any) {
+                            message.error(err?.response?.data?.error || err?.message || '同步失败')
+                          } finally {
+                            setImportLoading(false)
+                          }
+                        }}>
+                          按时间段同步
+                        </Button>
+                      </Space>
+                    </div>
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      全量同步：拉所有数据覆盖入库；按时间范围同步：全量拉后按日期筛再入库；增量同步：全量拉后只入库比本地更新的记录。
+                      全量同步：拉所有数据覆盖入库；增量同步：只拉比本地 update_time 更新的记录入库；按时间段同步：只拉选定时间范围内的数据入库。
                     </Typography.Text>
                   </Space>
                 </Card>
@@ -1088,6 +1099,141 @@ export default function FeishuManager() {
                         description={
                           <ul style={{ margin: 0, paddingLeft: 20 }}>
                             {importResult.errors.slice(0, 20).map((err, i) => (
+                              <li key={i}>#{err.index}: {err.reason}</li>
+                            ))}
+                          </ul>
+                        }
+                      />
+                    )}
+                  </Card>
+                )}
+              </Space>
+            ),
+          },
+          {
+            key: 'story-sync',
+            label: '需求同步',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="同步飞书需求数据到本地">
+                  <Space direction="vertical" size={12}>
+                    <Typography.Text type="secondary">
+                      后端直接调用飞书 OpenAPI 拉取需求数据，解析后写入 feishu_workitem_story 表。重复 work_item_id 会自动更新。
+                    </Typography.Text>
+                    <Space wrap align="start">
+                      <div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>工作项类型</Typography.Text>
+                        <Select
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="选择需求工作项类型"
+                          style={{ width: 320 }}
+                          value={storyTypeKey}
+                          onChange={setStoryTypeKey}
+                          options={workItemTypes
+                            .filter(type => type.type_key)
+                            .map(type => ({
+                              label: `${type.name || type.type_key} (${type.type_key})`,
+                              value: type.type_key,
+                            }))}
+                        />
+                      </div>
+                    </Space>
+                    <Space wrap>
+                      <Button type="primary" loading={storyLoading} disabled={!storyTypeKey} onClick={async () => {
+                        if (!storyTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setStoryLoading(true)
+                        setStoryResult(undefined)
+                        try {
+                          const res = await syncAllStories(storyTypeKey)
+                          setStoryResult(res.data)
+                          message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setStoryLoading(false)
+                        }
+                      }}>
+                        全量同步
+                      </Button>
+                      <Button loading={storyLoading} disabled={!storyTypeKey} onClick={async () => {
+                        if (!storyTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setStoryLoading(true)
+                        setStoryResult(undefined)
+                        try {
+                          const res = await syncIncrementalStories(storyTypeKey)
+                          setStoryResult(res.data)
+                          message.success(`增量同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setStoryLoading(false)
+                        }
+                      }}>
+                        增量同步
+                      </Button>
+                    </Space>
+                    <div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>按时间段同步</Typography.Text>
+                      <Space>
+                        <DatePicker.RangePicker
+                          value={storyDateRange}
+                          onChange={value => setStoryDateRange(value as [Dayjs, Dayjs] | null)}
+                        />
+                        <Button loading={storyLoading} disabled={!storyTypeKey || !storyDateRange} onClick={async () => {
+                          if (!storyTypeKey || !storyDateRange) {
+                            message.warning('请先选择工作项类型和时间范围')
+                            return
+                          }
+                          setStoryLoading(true)
+                          setStoryResult(undefined)
+                          try {
+                            const res = await syncStoriesByDateRange(
+                              storyDateRange[0].format('YYYY-MM-DD'),
+                              storyDateRange[1].format('YYYY-MM-DD'),
+                              storyTypeKey,
+                            )
+                            setStoryResult(res.data)
+                            message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                          } catch (err: any) {
+                            message.error(err?.response?.data?.error || err?.message || '同步失败')
+                          } finally {
+                            setStoryLoading(false)
+                          }
+                        }}>
+                          按时间段同步
+                        </Button>
+                      </Space>
+                    </div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      全量同步：拉所有数据覆盖入库；增量同步：只拉比本地 update_time 更新的记录入库；按时间段同步：只拉选定时间范围内的数据入库。
+                    </Typography.Text>
+                  </Space>
+                </Card>
+
+                {storyResult && (
+                  <Card title="同步结果">
+                    <Descriptions size="small" column={4}>
+                      <Descriptions.Item label="总条数">{storyResult.total}</Descriptions.Item>
+                      <Descriptions.Item label="新增">{storyResult.inserted}</Descriptions.Item>
+                      <Descriptions.Item label="更新">{storyResult.updated}</Descriptions.Item>
+                      <Descriptions.Item label="跳过">{storyResult.skipped}</Descriptions.Item>
+                    </Descriptions>
+                    {storyResult.errors.length > 0 && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                        message={`${storyResult.errors.length} 条数据同步失败`}
+                        description={
+                          <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            {storyResult.errors.slice(0, 20).map((err, i) => (
                               <li key={i}>#{err.index}: {err.reason}</li>
                             ))}
                           </ul>
