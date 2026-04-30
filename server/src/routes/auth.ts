@@ -76,7 +76,7 @@ authRouter.get('/callback', asyncHandler(async (req: Request, res: Response) => 
     session.accessToken = result.accessToken
     await session.save()
 
-    res.redirect('/')
+    res.redirect(new URL('/', config.clientUrl).toString())
   } catch (err: any) {
     console.error('Auth callback error:', err)
     res.status(500).json({ error: `登录失败: ${err.message}` })

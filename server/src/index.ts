@@ -45,6 +45,15 @@ async function start() {
   await initDb()
   await seed()
 
+  if (process.env.NODE_ENV === 'production') {
+    const localhostUrls = ['http://localhost:3001', 'http://localhost:5173']
+    if (localhostUrls.includes(config.siteUrl) || localhostUrls.includes(config.clientUrl)) {
+      console.warn(
+        'Production config reminder: please set SITE_URL and CLIENT_URL to your deployed backend and frontend URLs.'
+      )
+    }
+  }
+
   server = app.listen(config.port, () => {
     console.log(`Server running at ${config.siteUrl}`)
   })

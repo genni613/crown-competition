@@ -99,11 +99,20 @@ export interface EvidenceSubmission {
   title: string
   description: string | null
   attachment_urls: string // JSON array string
+  snapshot_json: string | null
   status: 'pending' | 'approved' | 'rejected'
-  review_comment: string | null
-  reviewed_by: string | null
   created_at: string
   updated_at: string
+}
+
+export interface EvidenceReview {
+  id: number
+  evidence_submission_id: number
+  reviewer_id: string
+  action: 'approved' | 'rejected'
+  comment: string | null
+  snapshot_json: string | null
+  created_at: string
 }
 
 export interface FeishuDataCache {

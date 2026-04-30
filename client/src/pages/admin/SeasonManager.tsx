@@ -5,6 +5,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, createSeason, activateSeason, endSeason, getMembers, addMember, removeMember } from '../../api/seasons'
 import { getUsers } from '../../api/users'
 import type { Season, SeasonMember, User } from '../../types/models'
+import { formatDate } from '../../utils/datetime'
 
 const statusColors: Record<string, string> = { draft: 'default', active: 'green', ended: 'red' }
 const statusLabels: Record<string, string> = { draft: '草稿', active: '进行中', ended: '已结束' }
@@ -57,7 +58,7 @@ export default function SeasonManager() {
 
   const columns = [
     { title: '赛季名称', dataIndex: 'name' },
-    { title: '时间', render: (_: any, r: Season) => `${r.start_date} ~ ${r.end_date}` },
+    { title: '时间', render: (_: any, r: Season) => `${formatDate(r.start_date)} ~ ${formatDate(r.end_date)}` },
     { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={statusColors[s]}>{statusLabels[s]}</Tag> },
     { title: '操作', render: (_: any, r: Season) => (
       <Space>

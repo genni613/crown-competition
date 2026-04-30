@@ -93,10 +93,26 @@ export interface EvidenceSubmission {
   target_id: number | null
   title: string
   description: string | null
+  snapshot_json?: Record<string, unknown> | null
   status: 'pending' | 'approved' | 'rejected'
   review_comment: string | null
+  review_snapshot_json?: Record<string, unknown> | null
+  reviewed_at?: string | null
+  attachment_urls: string[]
   user_name?: string
   created_at?: string
+  review_history?: EvidenceReview[]
+}
+
+export interface EvidenceReview {
+  id: number
+  evidence_submission_id: number
+  reviewer_id: string
+  reviewer_name?: string
+  action: 'approved' | 'rejected'
+  comment: string | null
+  snapshot_json?: Record<string, unknown> | null
+  created_at: string
 }
 
 export type JobRole = 'product' | 'design' | 'tech'

@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@copilotkit/runtime": "^1.56.4",
+    "@types/multer": "^2.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "iron-session": "^8.0.4",
+    "multer": "^2.1.1",
     "mysql2": "^3.15.2",
     "openai": "^4.104.0",
     "zod": "^3.24.3"

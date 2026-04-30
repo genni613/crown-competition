@@ -37,7 +37,7 @@ function wrapExecutor(executor: Pool | PoolConnection): DbExecutor {
 async function applySchema(currentPool: Pool): Promise<void> {
   const distSchemaPath = path.resolve(__dirname, 'schema.mysql.sql')
   const srcSchemaPath = path.resolve(__dirname, '../../src/db/schema.mysql.sql')
-  const schemaPath = fs.existsSync(distSchemaPath) ? distSchemaPath : srcSchemaPath
+  const schemaPath = fs.existsSync(srcSchemaPath) ? srcSchemaPath : distSchemaPath
   const schema = fs.readFileSync(schemaPath, 'utf-8')
   const statements = schema
     .split(/;\s*\n/g)
@@ -47,6 +47,118 @@ async function applySchema(currentPool: Pool): Promise<void> {
   for (const statement of statements) {
     await currentPool.query(statement)
   }
+
+  await ensureEvidenceAuditColumns(currentPool)
+  await ensureEvidenceReviewTable(currentPool)
+}
+
+async function columnExists(currentPool: Pool, tableName: string, columnName: string): Promise<boolean> {
+  const [rows] = await currentPool.query<RowDataPacket[]>(
+    `SELECT 1
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ?
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?
+     LIMIT 1`,
+    [config.mysql.database, tableName, columnName]
+  )
+  return rows.length > 0
+}
+
+async function ensureEvidenceAuditColumns(currentPool: Pool): Promise<void> {
+  const tableName = 'evidence_submissions'
+  const columnStatements: Array<{ name: string; sql: string }> = [
+    {
+      name: 'snapshot_json',
+      sql: 'ALTER TABLE evidence_submissions ADD COLUMN snapshot_json JSON NULL AFTER attachment_urls',
+    },
+    {
+      name: 'review_snapshot_json',
+      sql: 'ALTER TABLE evidence_submissions ADD COLUMN review_snapshot_json JSON NULL AFTER review_comment',
+    },
+    {
+      name: 'reviewed_at',
+      sql: 'ALTER TABLE evidence_submissions ADD COLUMN reviewed_at DATETIME NULL AFTER reviewed_by',
+    },
+  ]
+
+  for (const column of columnStatements) {
+    if (!(await columnExists(currentPool, tableName, column.name))) {
+      await currentPool.query(column.sql)
+    }
+  }
+}
+
+async function tableExists(currentPool: Pool, tableName: string): Promise<boolean> {
+  const [rows] = await currentPool.query<RowDataPacket[]>(
+    `SELECT 1
+     FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = ?
+       AND TABLE_NAME = ?
+     LIMIT 1`,
+    [config.mysql.database, tableName]
+  )
+  return rows.length > 0
+}
+
+async function ensureEvidenceReviewTable(currentPool: Pool): Promise<void> {
+  if (await tableExists(currentPool, 'evidence_reviews')) {
+    await ensureEvidenceReviewReviewerCollation(currentPool)
+    return
+  }
+
+  await currentPool.query(`
+    CREATE TABLE IF NOT EXISTS evidence_reviews (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      evidence_submission_id BIGINT NOT NULL,
+      reviewer_id VARCHAR(191) NOT NULL,
+      action ENUM('approved', 'rejected') NOT NULL,
+      comment TEXT NULL,
+      snapshot_json JSON NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_evidence_reviews_submission (evidence_submission_id),
+      KEY idx_evidence_reviews_reviewer (reviewer_id),
+      CONSTRAINT fk_evidence_reviews_submission FOREIGN KEY (evidence_submission_id) REFERENCES evidence_submissions(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
+
+  await ensureEvidenceReviewReviewerCollation(currentPool)
+}
+
+async function getColumnCollation(
+  currentPool: Pool,
+  tableName: string,
+  columnName: string
+): Promise<string | null> {
+  const [rows] = await currentPool.query<RowDataPacket[]>(
+    `SELECT COLLATION_NAME
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ?
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?
+     LIMIT 1`,
+    [config.mysql.database, tableName, columnName]
+  )
+
+  const value = rows[0]?.COLLATION_NAME
+  return typeof value === 'string' && value ? value : null
+}
+
+async function ensureEvidenceReviewReviewerCollation(currentPool: Pool): Promise<void> {
+  const usersIdCollation = await getColumnCollation(currentPool, 'users', 'id')
+  const reviewerIdCollation = await getColumnCollation(currentPool, 'evidence_reviews', 'reviewer_id')
+
+  if (!usersIdCollation || !reviewerIdCollation || usersIdCollation === reviewerIdCollation) {
+    return
+  }
+
+  await currentPool.query(`
+    ALTER TABLE evidence_reviews
+    MODIFY reviewer_id VARCHAR(191)
+    CHARACTER SET utf8mb4
+    COLLATE ${usersIdCollation}
+    NOT NULL
+  `)
 }
 
 export async function initDb(): Promise<void> {

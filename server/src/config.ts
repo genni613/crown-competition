@@ -40,4 +40,5 @@ export const config = {
     secret: process.env.SESSION_SECRET || 'change-me-in-production-env-!!!',
   },
   siteUrl: process.env.SITE_URL || 'http://localhost:3001',
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
 } as const

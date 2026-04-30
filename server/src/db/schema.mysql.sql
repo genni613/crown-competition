@@ -111,14 +111,25 @@ CREATE TABLE IF NOT EXISTS evidence_submissions (
   title VARCHAR(255) NOT NULL,
   description TEXT NULL,
   attachment_urls JSON NULL,
+  snapshot_json JSON NULL,
   status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
-  review_comment TEXT NULL,
-  reviewed_by VARCHAR(191) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_evidence_member (season_member_id),
-  CONSTRAINT fk_evidence_member FOREIGN KEY (season_member_id) REFERENCES season_members(id) ON DELETE CASCADE,
-  CONSTRAINT fk_evidence_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id)
+  CONSTRAINT fk_evidence_member FOREIGN KEY (season_member_id) REFERENCES season_members(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS evidence_reviews (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  evidence_submission_id BIGINT NOT NULL,
+  reviewer_id VARCHAR(191) NOT NULL,
+  action ENUM('approved', 'rejected') NOT NULL,
+  comment TEXT NULL,
+  snapshot_json JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_evidence_reviews_submission (evidence_submission_id),
+  KEY idx_evidence_reviews_reviewer (reviewer_id),
+  CONSTRAINT fk_evidence_reviews_submission FOREIGN KEY (evidence_submission_id) REFERENCES evidence_submissions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS feishu_data_cache (
@@ -130,6 +141,5 @@ CREATE TABLE IF NOT EXISTS feishu_data_cache (
   fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_feishu_cache (season_id, user_id, metric_key),
   KEY idx_feishu_cache_season_user (season_id, user_id),
-  CONSTRAINT fk_feishu_cache_season FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
-  CONSTRAINT fk_feishu_cache_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_feishu_cache_season FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
