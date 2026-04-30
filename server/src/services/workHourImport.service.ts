@@ -388,68 +388,41 @@ export async function importWorkHourItems(items: any[]): Promise<SyncResult> {
   return importItems(items)
 }
 
-/** 增量同步：拉全量后按更新时间做本地过滤，避免飞书 search 时间条件不兼容 */
+/** 增量同步：用 updated_at 时间戳在飞书 API 端过滤，只拉取新增/更新的数据 */
 export async function syncIncrementalWorkHours(workItemTypeKey?: string): Promise<SyncResult> {
   feishuProject.assertConfigured()
   const db = getDb()
 
   const rawTypeKey = workItemTypeKey || WORK_ITEM_TYPE_KEY
 
-  // 查本地表最新的 update_time
   const row = await db.queryOne<{ max_updated: string }>(
     'SELECT MAX(update_time) AS max_updated FROM feishu_workitem_gongshi'
   )
   const localMaxUpdated = row?.max_updated ? new Date(row.max_updated).getTime() : 0
 
-  // 本地没数据，走全量同步
   if (!localMaxUpdated) {
     console.log('[work-hour-import] incremental: no local data, fallback to full sync')
     return syncAllWorkHours(workItemTypeKey)
   }
 
-  console.log('[work-hour-import] incremental sync', {
-    localMaxUpdated: new Date(localMaxUpdated).toISOString(),
-  })
-
+  // 多往前取 5 分钟，防止边界附近的数据遗漏
   const safeLowerBound = localMaxUpdated - 300_000
   const nowMs = Date.now()
   const uniqueFieldKeys = getUniqueFieldKeys()
 
-  let items: any[] = []
-  try {
-    items = await feishuProject.listAllWorkItemsByFilter({
-      work_item_type_keys: [rawTypeKey],
-      fields: uniqueFieldKeys,
-      search_group: {
-        conjunction: 'AND',
-        search_params: [
-          { param_key: 'updated_at', operator: 'BETWEEN', value: [safeLowerBound, nowMs] },
-        ],
-      },
-    })
-    console.log('[work-hour-import] incremental filter query done', {
-      filtered: items.length,
-      safeLowerBound: new Date(safeLowerBound).toISOString(),
-      nowMs: new Date(nowMs).toISOString(),
-    })
-  } catch (err) {
-    console.warn('[work-hour-import] incremental filter query failed, fallback to local scan', {
-      reason: err instanceof Error ? err.message : String(err),
-    })
+  console.log('[work-hour-import] incremental sync', {
+    localMaxUpdated: new Date(localMaxUpdated).toISOString(),
+    safeLowerBound: new Date(safeLowerBound).toISOString(),
+  })
 
-    const allItems = await fetchWorkHourItems(rawTypeKey)
-    items = uniqueItems(allItems).filter(item => {
-      const updatedAt = readUpdatedAtMs(item)
-      return updatedAt != null && updatedAt >= safeLowerBound
-    })
+  const items = await feishuProject.listAllWorkItemsByFilter({
+    work_item_type_keys: [rawTypeKey],
+    fields: uniqueFieldKeys,
+    updated_at: { start: safeLowerBound, end: nowMs },
+    expand: { need_workflow: false },
+  })
 
-    console.log('[work-hour-import] incremental local filter done', {
-      total: allItems.length,
-      unique: uniqueItems(allItems).length,
-      filtered: items.length,
-      safeLowerBound: new Date(safeLowerBound).toISOString(),
-    })
-  }
+  console.log('[work-hour-import] incremental sync done', { filtered: items.length })
 
   if (items.length === 0) {
     return { total: 0, inserted: 0, updated: 0, skipped: 0, errors: [] }
