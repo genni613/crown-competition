@@ -48,6 +48,10 @@ export interface ScoringDimension {
   score_type: 'threshold' | 'deduction'
   threshold_100: number | null
   threshold_60: number | null
+  deduction_per_unit: number | null
+  deduction_cap: number | null
+  deduction_divisor: number | null
+  sort_order: number
 }
 
 export interface IndicatorScore {

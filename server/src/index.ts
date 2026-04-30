@@ -13,6 +13,7 @@ import { scoringRouter } from './routes/scoring'
 import { evidenceRouter } from './routes/evidence'
 import { orgScoresRouter } from './routes/orgScores'
 import { feishuRouter } from './routes/feishu'
+import { dimensionsRouter } from './routes/dimensions'
 import { copilotkitRouter } from './routes/copilotkit'
 
 const app = express()
@@ -29,6 +30,7 @@ app.use('/api/scoring', scoringRouter)
 app.use('/api/evidence', evidenceRouter)
 app.use('/api/org-scores', orgScoresRouter)
 app.use('/api/feishu', feishuRouter)
+app.use('/api/dimensions', dimensionsRouter)
 app.use(copilotkitRouter)
 
 // 健康检查

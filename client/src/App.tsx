@@ -14,6 +14,7 @@ import OrgScoreManager from './pages/admin/OrgScoreManager'
 import FeishuManager from './pages/admin/FeishuManager'
 import AdminScoringHub from './pages/admin/AdminScoringHub'
 import AdminDataSyncHub from './pages/admin/AdminDataSyncHub'
+import DimensionManager from './pages/admin/DimensionManager'
 
 export default function App() {
   const { user, loading, fetchUser } = useAuthStore()
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/admin/evidence" element={<EvidenceReview />} />
             <Route path="/admin/org-scores/:seasonId" element={<OrgScoreManager />} />
             <Route path="/admin/data-sync" element={<AdminDataSyncHub />} />
+            <Route path="/admin/dimensions" element={<DimensionManager />} />
             <Route path="/admin/feishu/:seasonId" element={<FeishuManager />} />
           </>
         )}

@@ -4,7 +4,7 @@ import type { MenuProps } from 'antd'
 import {
   DashboardOutlined, TrophyOutlined, FileTextOutlined,
   SettingOutlined, FormOutlined, AuditOutlined,
-  TeamOutlined, CloudServerOutlined,
+  TeamOutlined, CloudServerOutlined, ControlOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../store/authStore'
 
@@ -27,6 +27,7 @@ export default function Sidebar() {
         { key: '/admin/seasons', icon: <SettingOutlined />, label: '赛季管理' },
         { key: '/admin/scoring', icon: <TeamOutlined />, label: '评分管理' },
         { key: '/admin/data-sync', icon: <CloudServerOutlined />, label: '数据同步' },
+        { key: '/admin/dimensions', icon: <ControlOutlined />, label: '维度规则' },
         { key: '/admin/evidence', icon: <AuditOutlined />, label: '举证审核' },
       ]},
     )
@@ -39,6 +40,7 @@ export default function Sidebar() {
     if (pathname.startsWith('/admin/feishu/') || pathname === '/admin/data-sync') {
       return '/admin/data-sync'
     }
+    if (pathname.startsWith('/admin/dimensions')) return '/admin/dimensions'
     if (pathname.startsWith('/admin/seasons')) return '/admin/seasons'
     if (pathname.startsWith('/admin/evidence')) return '/admin/evidence'
     return pathname
