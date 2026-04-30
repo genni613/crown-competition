@@ -1,0 +1,15 @@
+{
+  "work_item_id": { "source": "top", "path": "id" },
+  "name": { "source": "top", "path": "name" },
+  "owner": { "source": "field", "key": "owner", "type": "user" },
+  "start_time": { "source": "field", "key": "start_time", "type": "date" },
+  "current_status_operator": { "source": "field", "key": "current_status_operator", "type": "user" },
+  "business": { "source": "field", "key": "business", "type": "select" },
+  "rd_business_domain": { "source": "field", "key": "field_13b392", "type": "select" },
+  "project_level": { "source": "field", "key": "field_756485", "type": "select" },
+  "estimated_pd": { "source": "field", "key": "field_00fbf0", "type": "number" },
+  "planned_pd": { "source": "field", "key": "field_52cf0c", "type": "number" },
+  "scheduled_pd": { "source": "field", "key": "field_e65389", "type": "number" },
+  "total_registered_pd": { "source": "field", "key": "field_f776a9", "type": "number" },
+  "feishu_total_registered_pd": { "source": "field", "key": "field_1ce1e2", "type": "number" }
+}

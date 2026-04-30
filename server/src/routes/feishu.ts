@@ -5,6 +5,9 @@ import { feishuProject } from '../services/feishuProject.service'
 import { queryDepartmentWorkHours, queryPersonProjectWorkHours } from '../services/feishuWorkHours.service'
 import { importWorkHourItems, syncAllWorkHours, syncIncrementalWorkHours, syncWorkHoursByDateRange } from '../services/workHourImport.service'
 import { importStoryItems, syncAllStories, syncIncrementalStories, syncStoriesByDateRange } from '../services/storyImport.service'
+import { importIssueItems, syncAllIssues, syncIncrementalIssues, syncIssuesByDateRange } from '../services/issueImport.service'
+import { syncAllProjects, syncIncrementalProjects, syncProjectsByDateRange } from '../services/projectImport.service'
+import { syncAllUsers } from '../services/userImport.service'
 import {
   expectedFeishuMetricNames,
   previewMemberFeishuData,
@@ -309,6 +312,80 @@ feishuRouter.post('/story/sync-range', adminMiddleware, asyncHandler(async (req,
     return
   }
   const result = await syncStoriesByDateRange(startDate, endDate, workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/issue/import — 接收飞书OpenAPI response，解析入库
+feishuRouter.post('/issue/import', adminMiddleware, asyncHandler(async (req, res) => {
+  const payload = req.body
+  if (!payload || typeof payload !== 'object') {
+    res.status(400).json({ error: '请求体不能为空' })
+    return
+  }
+
+  const items = extractWorkItems(payload)
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ error: '未找到工作项数据，请确认 response 格式' })
+    return
+  }
+
+  const result = await importIssueItems(items)
+  res.json(result)
+}))
+
+// POST /api/feishu/issue/sync — 全量同步缺陷数据
+feishuRouter.post('/issue/sync', adminMiddleware, asyncHandler(async (req, res) => {
+  const workItemTypeKey = req.body?.workItemTypeKey || undefined
+  const result = await syncAllIssues(workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/issue/sync-incremental — 增量同步缺陷数据
+feishuRouter.post('/issue/sync-incremental', adminMiddleware, asyncHandler(async (req, res) => {
+  const workItemTypeKey = req.body?.workItemTypeKey || undefined
+  const result = await syncIncrementalIssues(workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/issue/sync-range — 按时间范围同步缺陷数据
+feishuRouter.post('/issue/sync-range', adminMiddleware, asyncHandler(async (req, res) => {
+  const { startDate, endDate, workItemTypeKey } = req.body
+  if (!startDate || !endDate) {
+    res.status(400).json({ error: '缺少 startDate 或 endDate' })
+    return
+  }
+  const result = await syncIssuesByDateRange(startDate, endDate, workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/project-data/sync — 全量同步项目数据
+feishuRouter.post('/project-data/sync', adminMiddleware, asyncHandler(async (req, res) => {
+  const workItemTypeKey = req.body?.workItemTypeKey || undefined
+  const result = await syncAllProjects(workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/project-data/sync-incremental — 增量同步项目数据
+feishuRouter.post('/project-data/sync-incremental', adminMiddleware, asyncHandler(async (req, res) => {
+  const workItemTypeKey = req.body?.workItemTypeKey || undefined
+  const result = await syncIncrementalProjects(workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/project-data/sync-range — 按时间范围同步项目数据
+feishuRouter.post('/project-data/sync-range', adminMiddleware, asyncHandler(async (req, res) => {
+  const { startDate, endDate, workItemTypeKey } = req.body
+  if (!startDate || !endDate) {
+    res.status(400).json({ error: '缺少 startDate 或 endDate' })
+    return
+  }
+  const result = await syncProjectsByDateRange(startDate, endDate, workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/user-data/sync — 全量同步用户数据
+feishuRouter.post('/user-data/sync', adminMiddleware, asyncHandler(async (_req, res) => {
+  const result = await syncAllUsers()
   res.json(result)
 }))
 

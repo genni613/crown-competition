@@ -216,6 +216,19 @@ export class FeishuProjectService {
     })
   }
 
+  async searchUsers(query?: string): Promise<any[]> {
+    const body: Record<string, string> = {
+      project_key: this.options.projectKey,
+    }
+    if (query) body.query = query
+
+    const json = await this.request('/open_api/user/search', {
+      method: 'POST',
+      body,
+    })
+    return this.extractList(json, ['data', 'users', 'list'])
+  }
+
   async queryUsersByOutIds(outIds: string[]): Promise<any> {
     const ids = Array.from(new Set(outIds.map(item => item.trim()).filter(Boolean)))
     return this.request('/open_api/user/query', {

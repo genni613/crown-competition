@@ -195,3 +195,66 @@ CREATE TABLE IF NOT EXISTS feishu_workitem_story (
   KEY idx_owner (owner),
   KEY idx_related_project (related_project)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书需求工作项表';
+
+-- 项目管理表
+CREATE TABLE IF NOT EXISTS feishu_workitem_project (
+  work_item_id BIGINT NOT NULL COMMENT '工作项ID',
+  name VARCHAR(255) NULL COMMENT '项目名称',
+  owner VARCHAR(64) NULL COMMENT '创建者',
+  start_time DATETIME NULL COMMENT '创建时间',
+  updated_at DATETIME NULL COMMENT '更新时间',
+  current_status_operator VARCHAR(512) NULL COMMENT '当前负责人',
+  business VARCHAR(64) NULL COMMENT '业务线',
+  rd_business_domain VARCHAR(64) NULL COMMENT '产研业务域（原field_key: field_13b392）',
+  project_level VARCHAR(64) NULL COMMENT '项目级别（原field_key: field_756485）',
+  estimated_pd DECIMAL(10, 2) NULL COMMENT '精估PD（原field_key: field_00fbf0）',
+  planned_pd DECIMAL(10, 2) NULL COMMENT '规划PD（原field_key: field_52cf0c）',
+  scheduled_pd DECIMAL(10, 2) NULL COMMENT '排期PD（原field_key: field_e65389）',
+  total_registered_pd DECIMAL(10, 2) NULL COMMENT '总登记工时PD（原field_key: field_f776a9）',
+  feishu_total_registered_pd DECIMAL(10, 2) NULL COMMENT '飞书总登记工时PD（原field_key: field_1ce1e2）',
+  PRIMARY KEY (work_item_id),
+  UNIQUE KEY u_work_item_id_index (work_item_id),
+  KEY idx_start_time (start_time),
+  KEY idx_owner (owner)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书项目表';
+
+-- 缺陷管理表
+CREATE TABLE IF NOT EXISTS feishu_workitem_issue (
+  work_item_id BIGINT NOT NULL COMMENT '工作项ID',
+  name VARCHAR(255) NULL COMMENT '名称',
+  description TEXT NULL COMMENT '描述',
+  owner VARCHAR(64) NULL COMMENT '创建者',
+  resolver VARCHAR(64) NULL COMMENT '解决者(field_982094)',
+  severity VARCHAR(32) NULL COMMENT '严重程度',
+  start_time DATETIME NULL COMMENT '提出时间',
+  archiving_date DATETIME NULL COMMENT '完成日期',
+  work_item_status VARCHAR(64) NULL COMMENT '状态',
+  source VARCHAR(64) NULL COMMENT '缺陷来源(field_859a97)',
+  root_cause VARCHAR(64) NULL COMMENT '问题原因(field_5040b1)',
+  is_online_defect VARCHAR(32) NULL COMMENT '是否线上缺陷(field_f31c6f)',
+  updated_by VARCHAR(64) NULL COMMENT '更新人',
+  update_time DATETIME NULL COMMENT '更新时间',
+  PRIMARY KEY (work_item_id),
+  UNIQUE KEY u_work_item_id_index (work_item_id),
+  KEY idx_start_time (start_time),
+  KEY idx_owner (owner),
+  KEY idx_resolver (resolver),
+  KEY idx_archiving_date (archiving_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书缺陷工作项表';
+
+-- 飞书用户表
+CREATE TABLE IF NOT EXISTS feishu_user (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_key VARCHAR(64) NOT NULL COMMENT '用户唯一标识',
+  user_id BIGINT NOT NULL DEFAULT 0 COMMENT '用户ID',
+  username VARCHAR(64) DEFAULT '' COMMENT '用户名',
+  out_id VARCHAR(64) DEFAULT '' COMMENT '外部ID',
+  name VARCHAR(255) DEFAULT '' COMMENT '中文名(name.zh_cn)',
+  name_cn VARCHAR(255) DEFAULT '' COMMENT '中文名',
+  name_en VARCHAR(255) DEFAULT '' COMMENT '英文名',
+  email VARCHAR(255) DEFAULT '' COMMENT '邮箱',
+  avatar_url TEXT NULL COMMENT '头像URL',
+  status VARCHAR(32) DEFAULT '' COMMENT '状态',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_user_key (user_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书用户表';

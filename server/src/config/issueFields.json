@@ -1,0 +1,16 @@
+{
+  "work_item_id": { "source": "top", "path": "id" },
+  "name": { "source": "top", "path": "name" },
+  "description": { "source": "field", "key": "description", "type": "text" },
+  "owner": { "source": "field", "key": "owner", "type": "user" },
+  "resolver": { "source": "field", "key": "field_982094", "type": "user" },
+  "severity": { "source": "field", "key": "severity", "type": "select" },
+  "start_time": { "source": "field", "key": "start_time", "type": "date" },
+  "archiving_date": { "source": "field", "key": "archiving_date", "type": "date" },
+  "work_item_status": { "source": "top", "path": "work_item_status.state_key" },
+  "source": { "source": "field", "key": "field_859a97", "type": "select" },
+  "root_cause": { "source": "field", "key": "field_5040b1", "type": "select" },
+  "is_online_defect": { "source": "field", "key": "field_f31c6f", "type": "select" },
+  "updated_by": { "source": "field", "key": "updated_by", "type": "user" },
+  "update_time": { "source": "top", "path": "updated_at" }
+}

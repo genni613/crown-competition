@@ -66,7 +66,8 @@ export default function SeasonManager() {
         {r.status === 'draft' && <Button size="small" type="primary" onClick={async () => { await activateSeason(r.id); message.success('已激活'); loadSeasons() }}>激活</Button>}
         {r.status === 'active' && <Button size="small" danger onClick={async () => { await endSeason(r.id); message.success('已结束'); loadSeasons() }}>结束</Button>}
         {r.status === 'active' && <Button size="small" onClick={() => navigate(`/admin/scores/${r.id}`)}>录入分数</Button>}
-        <Button size="small" onClick={() => navigate(`/admin/feishu/${r.id}`)}>飞书工时</Button>
+        <Button size="small" onClick={() => navigate(`/admin/org-scores/${r.id}`)}>组织分管理</Button>
+        <Button size="small" onClick={() => navigate(`/admin/feishu/${r.id}`)}>飞书数据同步</Button>
       </Space>
     )},
   ]

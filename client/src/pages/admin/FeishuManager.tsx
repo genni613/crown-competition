@@ -31,6 +31,13 @@ import {
   syncAllStories,
   syncIncrementalStories,
   syncStoriesByDateRange,
+  syncAllIssues,
+  syncIncrementalIssues,
+  syncIssuesByDateRange,
+  syncAllProjects,
+  syncIncrementalProjects,
+  syncProjectsByDateRange,
+  syncAllUsers,
   queryFeishuWorkItemDetails,
   type FeishuProjectField,
   type FeishuRawFilterResponse,
@@ -401,6 +408,17 @@ export default function FeishuManager() {
   const [storyTypeKey, setStoryTypeKey] = useState<string>()
   const [importDateRange, setImportDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [storyDateRange, setStoryDateRange] = useState<[Dayjs, Dayjs] | null>(null)
+
+  const [issueLoading, setIssueLoading] = useState(false)
+  const [issueResult, setIssueResult] = useState<WorkHourImportResult>()
+  const [issueTypeKey, setIssueTypeKey] = useState<string>()
+  const [issueDateRange, setIssueDateRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const [projectLoading, setProjectLoading] = useState(false)
+  const [projectResult, setProjectResult] = useState<WorkHourImportResult>()
+  const [projectTypeKey, setProjectTypeKey] = useState<string>()
+  const [projectDateRange, setProjectDateRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const [userLoading, setUserLoading] = useState(false)
+  const [userResult, setUserResult] = useState<WorkHourImportResult>()
   const selectedType = Form.useWatch('workItemTypeKey', form)
   const selectedPersonType = Form.useWatch('workItemTypeKey', personForm)
   const rawItems = useMemo(() => Array.isArray(result?.data) ? result.data : [], [result])
@@ -889,93 +907,6 @@ export default function FeishuManager() {
             ),
           },
           {
-            key: 'person-project-hours',
-            label: '个人工时统计',
-            children: (
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Card title="统计条件">
-                  <Form form={personForm} layout="vertical" onFinish={onPersonProjectSubmit}>
-                    <Form.Item
-                      name="userId"
-                      label="人员"
-                      rules={[{ required: true, message: '请选择一个人' }]}
-                    >
-                      <Select
-                        showSearch
-                        optionFilterProp="label"
-                        placeholder="选择本地用户"
-                        options={localUserOptions}
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name="workItemTypeKey"
-                      label="工时工作项类型"
-                      rules={[{ required: true, message: '请选择工时工作项类型' }]}
-                    >
-                      <Select
-                        showSearch
-                        optionFilterProp="label"
-                        options={workItemTypes
-                          .filter(type => type.type_key)
-                          .map(type => ({
-                            label: `${type.name || type.type_key} (${type.type_key})`,
-                            value: type.type_key,
-                          }))}
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name="dateRange"
-                      label="时间段"
-                      rules={[{ required: true, message: '请选择时间段' }]}
-                    >
-                      <DatePicker.RangePicker />
-                    </Form.Item>
-                    <Button type="primary" htmlType="submit" loading={personLoading}>
-                      开始统计
-                    </Button>
-                  </Form>
-                </Card>
-
-                <Card title="统计结果">
-                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                    <Typography.Text type="secondary">
-                      会按"项目关联字段"汇总工时。如果一条工时记录关联多个项目，这条记录会同时计入这些项目。
-                    </Typography.Text>
-                    {personProjectResult && (
-                      <Descriptions size="small" column={3}>
-                        <Descriptions.Item label="人员">{personProjectResult.user.name}</Descriptions.Item>
-                        <Descriptions.Item label="总工时">{personProjectResult.totalHours.toFixed(2)} h</Descriptions.Item>
-                        <Descriptions.Item label="关联项目数">{personProjectResult.projectCount}</Descriptions.Item>
-                      </Descriptions>
-                    )}
-                    <Table
-                      rowKey={(record) => record.projectId}
-                      dataSource={personProjectResult?.projects || []}
-                      columns={personProjectColumns}
-                      loading={personLoading}
-                      pagination={{ pageSize: 10 }}
-                    />
-                    {personProjectResult?.warnings?.length ? (
-                      <Alert
-                        type="warning"
-                        showIcon
-                        message="统计警告"
-                        description={personProjectResult.warnings.join('；')}
-                      />
-                    ) : null}
-                    {personProjectResult && (
-                      <Card size="small" title="原始响应">
-                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                          {prettyJson(personProjectResult)}
-                        </pre>
-                      </Card>
-                    )}
-                  </Space>
-                </Card>
-              </Space>
-            ),
-          },
-          {
             key: 'import',
             label: '工时同步',
             children: (
@@ -1246,76 +1177,326 @@ export default function FeishuManager() {
             ),
           },
           {
-            key: 'dept-work-hours',
-            label: '工时查询',
+            key: 'issue-sync',
+            label: '缺陷同步',
             children: (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Card title="查询条件">
-                  <Form form={deptForm} layout="vertical" onFinish={onDeptWorkHoursSubmit}>
-                    <Form.Item
-                      name="workItemTypeKey"
-                      label="工时工作项类型"
-                      rules={[{ required: true, message: '请选择工时工作项类型' }]}
-                    >
-                      <Select
-                        showSearch
-                        optionFilterProp="label"
-                        options={workItemTypes
-                          .filter(type => type.type_key)
-                          .map(type => ({
-                            label: `${type.name || type.type_key} (${type.type_key})`,
-                            value: type.type_key,
-                          }))}
-                      />
-                    </Form.Item>
-                    <Button type="primary" htmlType="submit" loading={deptLoading}>
-                      拉取全部工时数据
-                    </Button>
-                  </Form>
+                <Card title="同步飞书缺陷数据到本地">
+                  <Space direction="vertical" size={12}>
+                    <Typography.Text type="secondary">
+                      后端直接调用飞书 OpenAPI 拉取缺陷数据，解析后写入 feishu_workitem_issue 表。重复 work_item_id 会自动更新。
+                    </Typography.Text>
+                    <Space wrap align="start">
+                      <div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>工作项类型</Typography.Text>
+                        <Select
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="选择缺陷工作项类型"
+                          style={{ width: 320 }}
+                          value={issueTypeKey}
+                          onChange={setIssueTypeKey}
+                          options={workItemTypes
+                            .filter(type => type.type_key)
+                            .map(type => ({
+                              label: `${type.name || type.type_key} (${type.type_key})`,
+                              value: type.type_key,
+                            }))}
+                        />
+                      </div>
+                    </Space>
+                    <Space wrap>
+                      <Button type="primary" loading={issueLoading} disabled={!issueTypeKey} onClick={async () => {
+                        if (!issueTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setIssueLoading(true)
+                        setIssueResult(undefined)
+                        try {
+                          const res = await syncAllIssues(issueTypeKey)
+                          setIssueResult(res.data)
+                          message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setIssueLoading(false)
+                        }
+                      }}>
+                        全量同步
+                      </Button>
+                      <Button loading={issueLoading} disabled={!issueTypeKey} onClick={async () => {
+                        if (!issueTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setIssueLoading(true)
+                        setIssueResult(undefined)
+                        try {
+                          const res = await syncIncrementalIssues(issueTypeKey)
+                          setIssueResult(res.data)
+                          message.success(`增量同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setIssueLoading(false)
+                        }
+                      }}>
+                        增量同步
+                      </Button>
+                    </Space>
+                    <div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>按时间段同步</Typography.Text>
+                      <Space>
+                        <DatePicker.RangePicker
+                          value={issueDateRange}
+                          onChange={value => setIssueDateRange(value as [Dayjs, Dayjs] | null)}
+                        />
+                        <Button loading={issueLoading} disabled={!issueTypeKey || !issueDateRange} onClick={async () => {
+                          if (!issueTypeKey || !issueDateRange) {
+                            message.warning('请先选择工作项类型和时间范围')
+                            return
+                          }
+                          setIssueLoading(true)
+                          setIssueResult(undefined)
+                          try {
+                            const res = await syncIssuesByDateRange(
+                              issueDateRange[0].format('YYYY-MM-DD'),
+                              issueDateRange[1].format('YYYY-MM-DD'),
+                              issueTypeKey,
+                            )
+                            setIssueResult(res.data)
+                            message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                          } catch (err: any) {
+                            message.error(err?.response?.data?.error || err?.message || '同步失败')
+                          } finally {
+                            setIssueLoading(false)
+                          }
+                        }}>
+                          按时间段同步
+                        </Button>
+                      </Space>
+                    </div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      全量同步：拉所有数据覆盖入库；增量同步：只拉比本地 update_time 更新的记录入库；按时间段同步：只拉选定时间范围内的数据入库。
+                    </Typography.Text>
+                  </Space>
                 </Card>
 
-                {deptResult && (
-                  <Card title={`查询结果（共 ${rawDeptItems.length} 条）`}>
-                    <Space style={{ marginBottom: 16 }} wrap>
-                      <Select
-                        allowClear
-                        showSearch
-                        placeholder="按人名筛选"
-                        style={{ width: 260 }}
-                        value={deptNameFilter}
-                        onChange={value => setDeptNameFilter(value)}
-                        options={deptOwnerOptions}
+                {issueResult && (
+                  <Card title="同步结果">
+                    <Descriptions size="small" column={4}>
+                      <Descriptions.Item label="总条数">{issueResult.total}</Descriptions.Item>
+                      <Descriptions.Item label="新增">{issueResult.inserted}</Descriptions.Item>
+                      <Descriptions.Item label="更新">{issueResult.updated}</Descriptions.Item>
+                      <Descriptions.Item label="跳过">{issueResult.skipped}</Descriptions.Item>
+                    </Descriptions>
+                    {issueResult.errors.length > 0 && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                        message={`${issueResult.errors.length} 条数据同步失败`}
+                        description={
+                          <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            {issueResult.errors.slice(0, 20).map((err, i) => (
+                              <li key={i}>#{err.index}: {err.reason}</li>
+                            ))}
+                          </ul>
+                        }
                       />
-                      <DatePicker.RangePicker
-                        value={deptDateRange}
-                        onChange={value => setDeptDateRange(value as [Dayjs, Dayjs] | null)}
-                      />
-                      <Button onClick={() => {
-                        setDeptNameFilter(undefined)
-                        setDeptDateRange(null)
-                      }}>
-                        清空筛选
-                      </Button>
-                      <Typography.Text type="secondary">
-                        当前展示 {filteredDeptItems.length} / {rawDeptItems.length} 条
-                      </Typography.Text>
-                    </Space>
-                    <Table
-                      rowKey={(record) => String(record.work_item_id ?? record.id ?? Math.random())}
-                      dataSource={filteredDeptItems}
-                      columns={columns}
-                      loading={deptLoading}
-                      scroll={{ x: 1500 }}
-                      pagination={{ pageSize: 20 }}
-                    />
+                    )}
                   </Card>
                 )}
+              </Space>
+            ),
+          },
+          {
+            key: 'project-sync',
+            label: '项目同步',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="同步飞书项目数据到本地">
+                  <Space direction="vertical" size={12}>
+                    <Typography.Text type="secondary">
+                      后端直接调用飞书 OpenAPI 拉取项目数据，解析后写入 feishu_workitem_project 表。重复 work_item_id 会自动更新。
+                    </Typography.Text>
+                    <Space wrap align="start">
+                      <div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>工作项类型</Typography.Text>
+                        <Select
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="选择项目工作项类型"
+                          style={{ width: 320 }}
+                          value={projectTypeKey}
+                          onChange={setProjectTypeKey}
+                          options={workItemTypes
+                            .filter(type => type.type_key)
+                            .map(type => ({
+                              label: `${type.name || type.type_key} (${type.type_key})`,
+                              value: type.type_key,
+                            }))}
+                        />
+                      </div>
+                    </Space>
+                    <Space wrap>
+                      <Button type="primary" loading={projectLoading} disabled={!projectTypeKey} onClick={async () => {
+                        if (!projectTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setProjectLoading(true)
+                        setProjectResult(undefined)
+                        try {
+                          const res = await syncAllProjects(projectTypeKey)
+                          setProjectResult(res.data)
+                          message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setProjectLoading(false)
+                        }
+                      }}>
+                        全量同步
+                      </Button>
+                      <Button loading={projectLoading} disabled={!projectTypeKey} onClick={async () => {
+                        if (!projectTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setProjectLoading(true)
+                        setProjectResult(undefined)
+                        try {
+                          const res = await syncIncrementalProjects(projectTypeKey)
+                          setProjectResult(res.data)
+                          message.success(`增量同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setProjectLoading(false)
+                        }
+                      }}>
+                        增量同步
+                      </Button>
+                    </Space>
+                    <div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>按时间段同步</Typography.Text>
+                      <Space>
+                        <DatePicker.RangePicker
+                          value={projectDateRange}
+                          onChange={value => setProjectDateRange(value as [Dayjs, Dayjs] | null)}
+                        />
+                        <Button loading={projectLoading} disabled={!projectTypeKey || !projectDateRange} onClick={async () => {
+                          if (!projectTypeKey || !projectDateRange) {
+                            message.warning('请先选择工作项类型和时间范围')
+                            return
+                          }
+                          setProjectLoading(true)
+                          setProjectResult(undefined)
+                          try {
+                            const res = await syncProjectsByDateRange(
+                              projectDateRange[0].format('YYYY-MM-DD'),
+                              projectDateRange[1].format('YYYY-MM-DD'),
+                              projectTypeKey,
+                            )
+                            setProjectResult(res.data)
+                            message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                          } catch (err: any) {
+                            message.error(err?.response?.data?.error || err?.message || '同步失败')
+                          } finally {
+                            setProjectLoading(false)
+                          }
+                        }}>
+                          按时间段同步
+                        </Button>
+                      </Space>
+                    </div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      全量同步：拉所有数据覆盖入库；增量同步：只拉比本地 updated_at 更新的记录入库；按时间段同步：只拉选定时间范围内的数据入库。
+                    </Typography.Text>
+                  </Space>
+                </Card>
 
-                {deptResult && (
-                  <Card size="small" title="原始响应（调试用）">
-                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto' }}>
-                      {prettyJson(deptResult)}
-                    </pre>
+                {projectResult && (
+                  <Card title="同步结果">
+                    <Descriptions size="small" column={4}>
+                      <Descriptions.Item label="总条数">{projectResult.total}</Descriptions.Item>
+                      <Descriptions.Item label="新增">{projectResult.inserted}</Descriptions.Item>
+                      <Descriptions.Item label="更新">{projectResult.updated}</Descriptions.Item>
+                      <Descriptions.Item label="跳过">{projectResult.skipped}</Descriptions.Item>
+                    </Descriptions>
+                    {projectResult.errors.length > 0 && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                        message={`${projectResult.errors.length} 条数据同步失败`}
+                        description={
+                          <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            {projectResult.errors.slice(0, 20).map((err, i) => (
+                              <li key={i}>#{err.index}: {err.reason}</li>
+                            ))}
+                          </ul>
+                        }
+                      />
+                    )}
+                  </Card>
+                )}
+              </Space>
+            ),
+          },
+          {
+            key: 'user-sync',
+            label: '用户同步',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="同步飞书用户数据到本地">
+                  <Space direction="vertical" size={12}>
+                    <Typography.Text type="secondary">
+                      后端调用飞书 OpenAPI 搜索租户内所有用户，解析后写入 feishu_user 表。重复 user_key 会自动更新。
+                    </Typography.Text>
+                    <Button type="primary" loading={userLoading} onClick={async () => {
+                      setUserLoading(true)
+                      setUserResult(undefined)
+                      try {
+                        const res = await syncAllUsers()
+                        setUserResult(res.data)
+                        message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                      } catch (err: any) {
+                        message.error(err?.response?.data?.error || err?.message || '同步失败')
+                      } finally {
+                        setUserLoading(false)
+                      }
+                    }}>
+                      全量同步
+                    </Button>
+                  </Space>
+                </Card>
+
+                {userResult && (
+                  <Card title="同步结果">
+                    <Descriptions size="small" column={4}>
+                      <Descriptions.Item label="总条数">{userResult.total}</Descriptions.Item>
+                      <Descriptions.Item label="新增">{userResult.inserted}</Descriptions.Item>
+                      <Descriptions.Item label="更新">{userResult.updated}</Descriptions.Item>
+                      <Descriptions.Item label="跳过">{userResult.skipped}</Descriptions.Item>
+                    </Descriptions>
+                    {userResult.errors.length > 0 && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                        message={`${userResult.errors.length} 条数据同步失败`}
+                        description={
+                          <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            {userResult.errors.slice(0, 20).map((err, i) => (
+                              <li key={i}>#{err.index}: {err.reason}</li>
+                            ))}
+                          </ul>
+                        }
+                      />
+                    )}
                   </Card>
                 )}
               </Space>
