@@ -24,6 +24,10 @@ import {
   getFeishuProjectStatus,
   getFeishuProjectWorkItemTypes,
   getFeishuProjectUsersByKeys,
+  importWorkHourItems,
+  syncAllWorkHours,
+  syncWorkHoursByDateRange,
+  syncIncrementalWorkHours,
   queryFeishuWorkItemDetails,
   type FeishuProjectField,
   type FeishuRawFilterResponse,
@@ -31,6 +35,7 @@ import {
   type FeishuProjectWorkItemType,
   type FeishuProjectUser,
   type FeishuPersonProjectWorkHourResponse,
+  type WorkHourImportResult,
 } from '../../api/feishu'
 import { getUsers } from '../../api/users'
 import type { User } from '../../types/models'
@@ -385,6 +390,10 @@ export default function FeishuManager() {
   const [resolvedUsers, setResolvedUsers] = useState<Map<string, ResolvedUser>>(new Map())
   const [resolvedRelatedNames, setResolvedRelatedNames] = useState<Map<string, string>>(new Map())
   const [users, setUsers] = useState<User[]>([])
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<WorkHourImportResult>()
+  const [importTypeKey, setImportTypeKey] = useState<string>()
+  const [importDateRange, setImportDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const selectedType = Form.useWatch('workItemTypeKey', form)
   const selectedPersonType = Form.useWatch('workItemTypeKey', personForm)
   const rawItems = useMemo(() => Array.isArray(result?.data) ? result.data : [], [result])
@@ -847,7 +856,24 @@ export default function FeishuManager() {
                   />
                 </Card>
 
-                <Card title="原始响应">
+                <Card title="原始响应" extra={
+                  result ? (
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        const blob = new Blob([prettyJson(result)], { type: 'application/json' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `feishu-response-${Date.now()}.json`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      }}
+                    >
+                      导出 JSON
+                    </Button>
+                  ) : null
+                }>
                   <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
                     {prettyJson(result || {})}
                   </pre>
@@ -939,6 +965,137 @@ export default function FeishuManager() {
                     )}
                   </Space>
                 </Card>
+              </Space>
+            ),
+          },
+          {
+            key: 'import',
+            label: '工时同步',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="同步飞书工时数据到本地">
+                  <Space direction="vertical" size={12}>
+                    <Typography.Text type="secondary">
+                      后端直接调用飞书 OpenAPI 拉取工时数据，解析后写入 feishu_work_hour_management 表。重复 work_item_id 会自动更新。
+                    </Typography.Text>
+                    <Space wrap align="start">
+                      <div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>工作项类型</Typography.Text>
+                        <Select
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="选择工时工作项类型"
+                          style={{ width: 320 }}
+                          value={importTypeKey}
+                          onChange={setImportTypeKey}
+                          options={workItemTypes
+                            .filter(type => type.type_key)
+                            .map(type => ({
+                              label: `${type.name || type.type_key} (${type.type_key})`,
+                              value: type.type_key,
+                            }))}
+                        />
+                      </div>
+                      <div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>时间范围（可选）</Typography.Text>
+                        <DatePicker.RangePicker
+                          value={importDateRange}
+                          onChange={value => setImportDateRange(value as [Dayjs, Dayjs] | null)}
+                        />
+                      </div>
+                    </Space>
+                    <Space wrap>
+                      <Button type="primary" loading={importLoading} disabled={!importTypeKey} onClick={async () => {
+                        if (!importTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setImportLoading(true)
+                        setImportResult(undefined)
+                        try {
+                          const res = await syncAllWorkHours(importTypeKey)
+                          setImportResult(res.data)
+                          message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setImportLoading(false)
+                        }
+                      }}>
+                        全量同步
+                      </Button>
+                      <Button loading={importLoading} disabled={!importTypeKey || !importDateRange} onClick={async () => {
+                        if (!importTypeKey || !importDateRange) {
+                          message.warning('请先选择工作项类型和时间范围')
+                          return
+                        }
+                        setImportLoading(true)
+                        setImportResult(undefined)
+                        try {
+                          const startDate = importDateRange[0].format('YYYY-MM-DD')
+                          const endDate = importDateRange[1].format('YYYY-MM-DD')
+                          const res = await syncWorkHoursByDateRange(startDate, endDate, importTypeKey)
+                          setImportResult(res.data)
+                          message.success(`同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setImportLoading(false)
+                        }
+                      }}>
+                        按时间范围同步
+                      </Button>
+                      <Button loading={importLoading} disabled={!importTypeKey} onClick={async () => {
+                        if (!importTypeKey) {
+                          message.warning('请先选择工作项类型')
+                          return
+                        }
+                        setImportLoading(true)
+                        setImportResult(undefined)
+                        try {
+                          const res = await syncIncrementalWorkHours(importTypeKey)
+                          setImportResult(res.data)
+                          message.success(`增量同步完成：新增 ${res.data.inserted} 条，更新 ${res.data.updated} 条`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setImportLoading(false)
+                        }
+                      }}>
+                        增量同步
+                      </Button>
+                    </Space>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      全量同步：拉所有数据覆盖入库；按时间范围同步：全量拉后按日期筛再入库；增量同步：全量拉后只入库比本地更新的记录。
+                    </Typography.Text>
+                  </Space>
+                </Card>
+
+                {importResult && (
+                  <Card title="同步结果">
+                    <Descriptions size="small" column={4}>
+                      <Descriptions.Item label="总条数">{importResult.total}</Descriptions.Item>
+                      <Descriptions.Item label="新增">{importResult.inserted}</Descriptions.Item>
+                      <Descriptions.Item label="更新">{importResult.updated}</Descriptions.Item>
+                      <Descriptions.Item label="跳过">{importResult.skipped}</Descriptions.Item>
+                    </Descriptions>
+                    {importResult.errors.length > 0 && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                        message={`${importResult.errors.length} 条数据同步失败`}
+                        description={
+                          <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            {importResult.errors.slice(0, 20).map((err, i) => (
+                              <li key={i}>#{err.index}: {err.reason}</li>
+                            ))}
+                          </ul>
+                        }
+                      />
+                    )}
+                  </Card>
+                )}
               </Space>
             ),
           },

@@ -153,3 +153,23 @@ export const getFeishuProjectPersonWorkHours = (params: Record<string, string>) 
 
 export const getFeishuProjectDepartmentWorkHours = (params: Record<string, string>) =>
   api.get<FeishuDepartmentWorkHourResponse>('/feishu/project/work-hours', { params })
+
+export interface WorkHourImportResult {
+  total: number
+  inserted: number
+  updated: number
+  skipped: number
+  errors: Array<{ index: number; reason: string }>
+}
+
+export const importWorkHourItems = (data: unknown) =>
+  api.post<WorkHourImportResult>('/feishu/work-hours/import', data)
+
+export const syncAllWorkHours = (workItemTypeKey?: string) =>
+  api.post<WorkHourImportResult>('/feishu/work-hours/sync', { workItemTypeKey })
+
+export const syncWorkHoursByDateRange = (startDate: string, endDate: string, workItemTypeKey?: string) =>
+  api.post<WorkHourImportResult>('/feishu/work-hours/sync-range', { startDate, endDate, workItemTypeKey })
+
+export const syncIncrementalWorkHours = (workItemTypeKey?: string) =>
+  api.post<WorkHourImportResult>('/feishu/work-hours/sync-incremental', { workItemTypeKey })

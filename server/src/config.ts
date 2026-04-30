@@ -26,7 +26,7 @@ export const config = {
     storyType: process.env.FEISHU_PROJECT_STORY_TYPE || 'story',
     issueType: process.env.FEISHU_PROJECT_ISSUE_TYPE || 'issue',
     defectType: process.env.FEISHU_PROJECT_DEFECT_TYPE || process.env.FEISHU_PROJECT_TASK_TYPE || 'defect',
-    pageSize: parseInt(process.env.FEISHU_PROJECT_PAGE_SIZE || '100', 10),
+    pageSize: parseInt(process.env.FEISHU_PROJECT_PAGE_SIZE || '200', 10),
     workHourType: process.env.FEISHU_PROJECT_WORK_HOUR_TYPE || 'gongshi',
     workHourTypeCandidates: process.env.FEISHU_PROJECT_WORK_HOUR_TYPE_CANDIDATES || '',
     workHourUserField: process.env.FEISHU_PROJECT_WORK_HOUR_USER_FIELD || 'owner',

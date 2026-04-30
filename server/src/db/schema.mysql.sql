@@ -143,3 +143,33 @@ CREATE TABLE IF NOT EXISTS feishu_data_cache (
   KEY idx_feishu_cache_season_user (season_id, user_id),
   CONSTRAINT fk_feishu_cache_season FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS feishu_workitem_gongshi (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  work_item_id BIGINT NOT NULL COMMENT '飞书工作项ID',
+  work_description VARCHAR(255) NOT NULL DEFAULT '' COMMENT '工作描述(name)',
+  work_item_type VARCHAR(64) NOT NULL DEFAULT '' COMMENT '工作项类型',
+  work_item_status VARCHAR(32) NOT NULL DEFAULT '' COMMENT '状态',
+  create_time DATETIME NULL COMMENT '创建时间(start_time)',
+  work_hour_reporter VARCHAR(64) NOT NULL DEFAULT '' COMMENT '填报人(owner user_key)',
+  actual_work_hours DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '实际投入时长(小时)',
+  pd_count DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT 'PD数',
+  work_date DATETIME NULL COMMENT '工作时间',
+  related_project VARCHAR(64) DEFAULT '' COMMENT '关联项目ID',
+  related_requirement VARCHAR(64) DEFAULT '' COMMENT '关联需求ID',
+  specific_work_hour_type TEXT NULL COMMENT '工时具体类型',
+  role VARCHAR(32) DEFAULT '' COMMENT '角色',
+  business_domain_belonging VARCHAR(32) DEFAULT '' COMMENT '人员归属业务域',
+  belonging_month VARCHAR(32) DEFAULT '' COMMENT '所属月份',
+  work_start_time DATETIME NULL COMMENT '开始工作时间',
+  work_content_description VARCHAR(512) DEFAULT '' COMMENT '工作内容描述',
+  description TEXT NULL COMMENT '描述',
+  priority VARCHAR(16) DEFAULT '' COMMENT '优先级',
+  is_completed TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否完成',
+  is_auto_generated TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否自动生成',
+  is_quality_related TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否属于质量',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间(updated_at)',
+  UNIQUE KEY uk_work_item_id (work_item_id),
+  KEY idx_create_time (create_time),
+  KEY idx_reporter (work_hour_reporter)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -3,6 +3,7 @@ import { adminMiddleware } from '../middleware/auth'
 import { config } from '../config'
 import { feishuProject } from '../services/feishuProject.service'
 import { queryDepartmentWorkHours, queryPersonProjectWorkHours } from '../services/feishuWorkHours.service'
+import { importWorkHourItems, syncAllWorkHours, syncWorkHoursByDateRange, syncIncrementalWorkHours } from '../services/workHourImport.service'
 import {
   expectedFeishuMetricNames,
   previewMemberFeishuData,
@@ -223,6 +224,49 @@ async function enrichProjectRelations(payload: any) {
 
   return payload
 }
+
+// POST /api/feishu/work-hours/import — 接收飞书OpenAPI response，解析入库（备用）
+feishuRouter.post('/work-hours/import', adminMiddleware, asyncHandler(async (req, res) => {
+  const payload = req.body
+  if (!payload || typeof payload !== 'object') {
+    res.status(400).json({ error: '请求体不能为空' })
+    return
+  }
+
+  const items = extractWorkItems(payload)
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ error: '未找到工作项数据，请确认 response 格式。支持 data[] / data.items[] / data.work_items[]' })
+    return
+  }
+
+  const result = await importWorkHourItems(items)
+  res.json(result)
+}))
+
+// POST /api/feishu/work-hours/sync — 后端直接拉飞书数据入库（全量）
+feishuRouter.post('/work-hours/sync', adminMiddleware, asyncHandler(async (req, res) => {
+  const workItemTypeKey = req.body?.workItemTypeKey || undefined
+  const result = await syncAllWorkHours(workItemTypeKey)
+  res.json(result)
+}))
+
+// POST /api/feishu/work-hours/sync-range — 按时间范围拉取并入库
+feishuRouter.post('/work-hours/sync-range', adminMiddleware, asyncHandler(async (req, res) => {
+  const { startDate, endDate, workItemTypeKey } = req.body
+  if (!startDate || !endDate) {
+    res.status(400).json({ error: '缺少 startDate 或 endDate' })
+    return
+  }
+  const result = await syncWorkHoursByDateRange(startDate, endDate, workItemTypeKey || undefined)
+  res.json(result)
+}))
+
+// POST /api/feishu/work-hours/sync-incremental — 增量同步（只入库新增/更新的数据）
+feishuRouter.post('/work-hours/sync-incremental', adminMiddleware, asyncHandler(async (req, res) => {
+  const workItemTypeKey = req.body?.workItemTypeKey || undefined
+  const result = await syncIncrementalWorkHours(workItemTypeKey)
+  res.json(result)
+}))
 
 // GET /api/feishu/project/status — 检查飞书项目 OpenAPI 配置
 feishuRouter.get('/project/status', adminMiddleware, (req: Request, res: Response) => {
