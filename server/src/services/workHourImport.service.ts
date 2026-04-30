@@ -382,13 +382,24 @@ export async function syncWorkHoursByDateRange(startDate: string, endDate: strin
   const startMs = new Date(`${startDate}T00:00:00`).getTime()
   const endMs = new Date(`${endDate}T23:59:59.999`).getTime()
   const uniqueFieldKeys = getUniqueFieldKeys()
+  const dateFieldKey = config.feishuProject.workHourDateField
 
-  console.log('[work-hour-import] date range sync', { startDate, endDate, typeKey: rawTypeKey })
+  console.log('[work-hour-import] date range sync', {
+    startDate,
+    endDate,
+    typeKey: rawTypeKey,
+    dateFieldKey,
+  })
 
-  const items = await feishuProject.listAllWorkItemsByFilter({
-    work_item_type_keys: [rawTypeKey],
+  const items = await feishuProject.searchAllWorkItems(rawTypeKey, {
     fields: uniqueFieldKeys,
-    updated_at: { start: startMs, end: endMs },
+    search_group: {
+      conjunction: 'AND',
+      search_params: [
+        { param_key: dateFieldKey, operator: '>=', value: startMs },
+        { param_key: dateFieldKey, operator: '<=', value: endMs },
+      ],
+    },
     expand: { need_workflow: false },
   })
 

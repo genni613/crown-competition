@@ -8,6 +8,7 @@ import { importStoryItems, syncAllStories, syncIncrementalStories, syncStoriesBy
 import { importIssueItems, syncAllIssues, syncIncrementalIssues, syncIssuesByDateRange } from '../services/issueImport.service'
 import { syncAllProjects, syncIncrementalProjects, syncProjectsByDateRange } from '../services/projectImport.service'
 import { syncAllUsers } from '../services/userImport.service'
+import { listFeishuUsers, queryPdSummaryByDateRange } from '../services/pdAggregation.service'
 import {
   expectedFeishuMetricNames,
   previewMemberFeishuData,
@@ -269,6 +270,22 @@ feishuRouter.post('/work-hours/sync-range', adminMiddleware, asyncHandler(async 
     return
   }
   const result = await syncWorkHoursByDateRange(startDate, endDate, workItemTypeKey)
+  res.json(result)
+}))
+
+// GET /api/feishu/work-hours/pd-summary-local?startDate=2026-05-01&endDate=2026-06-30
+// 基于本地工时落库结果，统计每个人在时间范围内消耗的总 PD
+feishuRouter.get('/work-hours/pd-summary-local', adminMiddleware, asyncHandler(async (req, res) => {
+  const startDate = typeof req.query.startDate === 'string' ? req.query.startDate : undefined
+  const endDate = typeof req.query.endDate === 'string' ? req.query.endDate : undefined
+  const projectUserKey = typeof req.query.projectUserKey === 'string' ? req.query.projectUserKey : undefined
+  const result = await queryPdSummaryByDateRange(startDate, endDate, projectUserKey)
+  res.json(result)
+}))
+
+// GET /api/feishu/local-users — 读取本地 feishu_user 表，用于 reporter/user_key 维度筛选
+feishuRouter.get('/local-users', adminMiddleware, asyncHandler(async (_req, res) => {
+  const result = await listFeishuUsers()
   res.json(result)
 }))
 

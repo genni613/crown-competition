@@ -121,6 +121,37 @@ export interface FeishuDepartmentWorkHourResponse {
   fieldDiagnostics: Array<Record<string, unknown>>
 }
 
+export interface LocalPdSummaryPerson {
+  project_user_key: string
+  user_id: string | null
+  name: string
+  email: string | null
+  department_name: string | null
+  total_pd: number
+  total_hours: number
+  item_count: number
+  first_work_date: string | null
+  last_work_date: string | null
+  requirement_names: string[]
+  project_names: string[]
+}
+
+export interface LocalPdSummaryResponse {
+  startDate: string
+  endDate: string
+  projectUserKey: string | null
+  totalPd: number
+  totalHours: number
+  peopleCount: number
+  people: LocalPdSummaryPerson[]
+}
+
+export interface LocalFeishuUser {
+  user_key: string
+  name: string
+  email: string
+}
+
 export const getFeishuProjectStatus = () =>
   api.get<FeishuProjectStatus>('/feishu/project/status')
 
@@ -153,6 +184,12 @@ export const getFeishuProjectPersonWorkHours = (params: Record<string, string>) 
 
 export const getFeishuProjectDepartmentWorkHours = (params: Record<string, string>) =>
   api.get<FeishuDepartmentWorkHourResponse>('/feishu/project/work-hours', { params })
+
+export const getLocalPdSummary = (params: { startDate: string; endDate: string; projectUserKey?: string }) =>
+  api.get<LocalPdSummaryResponse>('/feishu/work-hours/pd-summary-local', { params })
+
+export const getLocalFeishuUsers = () =>
+  api.get<LocalFeishuUser[]>('/feishu/local-users')
 
 export interface WorkHourImportResult {
   total: number

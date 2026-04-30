@@ -465,7 +465,7 @@ export class FeishuProjectService {
   }
 
   async searchAllWorkItems(workItemTypeKey: string, body: Record<string, any>): Promise<any[]> {
-    const pageSize = config.feishuProject.pageSize
+    const pageSize = Math.min(config.feishuProject.pageSize, 50)
     const all: any[] = []
     let pageNum = 1
 

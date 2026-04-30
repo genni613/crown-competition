@@ -77,6 +77,48 @@ CREATE TABLE IF NOT EXISTS indicator_scores (
   CONSTRAINT fk_indicator_scores_dimension FOREIGN KEY (dimension_id) REFERENCES scoring_dimensions(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS season_indicator_scores (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  season_id BIGINT NOT NULL,
+  season_member_id BIGINT NOT NULL,
+  scoring_dimension_id BIGINT NOT NULL,
+  job_role ENUM('product', 'design', 'tech') NOT NULL,
+  dimension_name VARCHAR(255) NOT NULL,
+  indicator_name VARCHAR(255) NOT NULL,
+  raw_value DOUBLE NULL,
+  threshold_score DOUBLE NULL,
+  final_score DOUBLE NULL,
+  source ENUM('feishu', 'admin', 'evidence') NOT NULL,
+  approved TINYINT(1) NOT NULL DEFAULT 0,
+  calc_snapshot_json JSON NULL,
+  notes TEXT NULL,
+  calculated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_season_member_dimension_result (season_member_id, scoring_dimension_id),
+  KEY idx_sis_season_member (season_id, season_member_id),
+  KEY idx_sis_dimension (scoring_dimension_id),
+  CONSTRAINT fk_sis_season FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sis_member FOREIGN KEY (season_member_id) REFERENCES season_members(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sis_dimension FOREIGN KEY (scoring_dimension_id) REFERENCES scoring_dimensions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS season_dimension_scores (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  season_id BIGINT NOT NULL,
+  season_member_id BIGINT NOT NULL,
+  job_role ENUM('product', 'design', 'tech') NOT NULL,
+  dimension_name VARCHAR(255) NOT NULL,
+  dimension_weight DOUBLE NOT NULL,
+  raw_dimension_score DOUBLE NOT NULL,
+  weighted_dimension_score DOUBLE NOT NULL,
+  calculated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_member_dimension_name (season_member_id, dimension_name),
+  KEY idx_sds_season_member (season_id, season_member_id),
+  CONSTRAINT fk_sds_season FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sds_member FOREIGN KEY (season_member_id) REFERENCES season_members(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS org_score_types (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(191) NOT NULL UNIQUE,
