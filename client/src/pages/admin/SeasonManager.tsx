@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, createSeason, activateSeason, endSeason, getMembers, addMember, removeMember } from '../../api/seasons'
@@ -17,7 +16,6 @@ const jobRoleOptions = [
 ]
 
 export default function SeasonManager() {
-  const navigate = useNavigate()
   const [seasons, setSeasons] = useState<Season[]>([])
   const [members, setMembers] = useState<SeasonMember[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -65,9 +63,6 @@ export default function SeasonManager() {
         <Button size="small" onClick={() => showMembers(r.id)}>成员</Button>
         {r.status === 'draft' && <Button size="small" type="primary" onClick={async () => { await activateSeason(r.id); message.success('已激活'); loadSeasons() }}>激活</Button>}
         {r.status === 'active' && <Button size="small" danger onClick={async () => { await endSeason(r.id); message.success('已结束'); loadSeasons() }}>结束</Button>}
-        {r.status === 'active' && <Button size="small" onClick={() => navigate(`/admin/scores/${r.id}`)}>录入分数</Button>}
-        <Button size="small" onClick={() => navigate(`/admin/org-scores/${r.id}`)}>组织分管理</Button>
-        <Button size="small" onClick={() => navigate(`/admin/feishu/${r.id}`)}>飞书数据同步</Button>
       </Space>
     )},
   ]
@@ -86,7 +81,12 @@ export default function SeasonManager() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>赛季管理</Typography.Title>
+        <div>
+          <Typography.Title level={4} style={{ margin: 0 }}>赛季管理</Typography.Title>
+          <Typography.Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+            这里仅处理赛季生命周期和成员管理。评分录入、组织分和数据同步已拆到独立后台入口。
+          </Typography.Paragraph>
+        </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建赛季</Button>
       </div>
 
