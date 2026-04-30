@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Button, Card, Col, Empty, InputNumber, Row, Select, Space, Tag, Typography, message } from 'antd'
+import { Avatar, Button, Card, Col, Empty, InputNumber, Row, Select, Space, Tag, Typography, message } from 'antd'
+import { UserOutlined } from '@ant-design/icons'
 import { calculateSeason, getDimensions } from '../../api/scoring'
 import { getMembers } from '../../api/seasons'
 import { batchUpdateScores, getScores } from '../../api/scores'
@@ -146,10 +147,18 @@ export default function ScoreEntry() {
         <Space wrap>
           <Select value={jobRole} onChange={setJobRole} options={jobRoleOptions} style={{ width: 110 }} />
           <Select
+            showSearch
+            optionFilterProp="label"
             value={selectedMemberId}
             onChange={setSelectedMemberId}
-            options={members.map(member => ({ value: member.id, label: member.user_name || member.user_id }))}
-            style={{ width: 180 }}
+            options={members.map(member => ({ value: member.id, label: member.user_name || member.user_id, avatarUrl: member.user_avatar_url }))}
+            optionRender={({ data }) => (
+              <Space>
+                <Avatar src={(data as any).avatarUrl} size="small" icon={<UserOutlined />} />
+                <span>{data.label}</span>
+              </Space>
+            )}
+            style={{ width: 220 }}
           />
           <Button onClick={saveCurrentMember} loading={saving}>保存当前成员</Button>
           <Button type="primary" onClick={recalculate} loading={recalculating}>重新计算</Button>

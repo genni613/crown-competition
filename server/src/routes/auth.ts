@@ -74,6 +74,7 @@ authRouter.get('/callback', asyncHandler(async (req: Request, res: Response) => 
       role: user.role,
     }
     session.accessToken = result.accessToken
+    session.refreshToken = result.refreshToken
     await session.save()
 
     res.redirect(new URL('/', config.clientUrl).toString())
@@ -96,7 +97,16 @@ authRouter.get('/me', authMiddleware, asyncHandler(async (req: Request, res: Res
   const currentUser = req.currentUser as any
   if (session.accessToken && currentUser && !currentUser.email) {
     try {
-      const tokenUserInfo = await feishuAuth.getUserInfo(session.accessToken)
+      let accessToken = session.accessToken
+      let tokenUserInfo = await feishuAuth.getUserInfo(accessToken)
+      if (!tokenUserInfo && session.refreshToken) {
+        const refreshed = await feishuAuth.refreshUserAccessToken(session.refreshToken)
+        accessToken = refreshed.access_token
+        session.accessToken = accessToken
+        session.refreshToken = refreshed.refresh_token
+        await session.save()
+        tokenUserInfo = await feishuAuth.getUserInfo(accessToken)
+      }
       const userDetail = await feishuAuth.getUserDetail(tokenUserInfo.open_id)
       const updated = await upsertUser({
         id: currentUser.id,

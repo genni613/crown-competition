@@ -84,6 +84,23 @@ export class FeishuAuthService {
     return data.data!
   }
 
+  async refreshUserAccessToken(refreshToken: string): Promise<FeishuTokenResponse> {
+    const appAccessToken = await this.getAppAccessToken()
+    const response = await fetch(`${FEISHU_API_BASE}/authen/v1/oidc/refresh_access_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${appAccessToken}`,
+      },
+      body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    })
+    const data = await response.json() as FeishuApiResponse<FeishuTokenResponse>
+    if (data.code !== 0) {
+      throw new Error(`Feishu token refresh error: ${data.msg}`)
+    }
+    return data.data!
+  }
+
   async getUserInfo(userAccessToken: string): Promise<FeishuUserInfo> {
     const response = await fetch(`${FEISHU_API_BASE}/authen/v1/user_info`, {
       headers: { Authorization: `Bearer ${userAccessToken}` },
@@ -148,6 +165,7 @@ export class FeishuAuthService {
   async loginWithCode(code: string): Promise<{
     user: { id: string; name: string; avatar_url?: string | null; department_name?: string | null; role: string }
     accessToken: string
+    refreshToken: string
     tenantKey?: string
     departmentIds?: string[]
     email?: string | null
@@ -190,6 +208,7 @@ export class FeishuAuthService {
         role,
       },
       accessToken: userAccessToken,
+      refreshToken: tokenData.refresh_token,
       tenantKey,
       departmentIds,
       email,

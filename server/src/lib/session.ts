@@ -10,12 +10,14 @@ export interface SessionData {
     role: string
   }
   accessToken?: string
+  refreshToken?: string
   state?: string
 }
 
 export const defaultSession: SessionData = {
   user: undefined,
   accessToken: undefined,
+  refreshToken: undefined,
   state: undefined,
 }
 

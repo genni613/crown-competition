@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express'
-import { adminMiddleware } from '../middleware/auth'
+import { adminMiddleware, authMiddleware } from '../middleware/auth'
 import { config } from '../config'
+import { getDb } from '../db'
 import { feishuProject } from '../services/feishuProject.service'
 import { queryDepartmentWorkHours, queryPersonProjectWorkHours } from '../services/feishuWorkHours.service'
 import { importWorkHourItems, syncAllWorkHours, syncIncrementalWorkHours, syncWorkHoursByDateRange } from '../services/workHourImport.service'
@@ -281,6 +282,33 @@ feishuRouter.get('/work-hours/pd-summary-local', adminMiddleware, asyncHandler(a
   const projectUserKey = typeof req.query.projectUserKey === 'string' ? req.query.projectUserKey : undefined
   const result = await queryPdSummaryByDateRange(startDate, endDate, projectUserKey)
   res.json(result)
+}))
+
+// GET /api/feishu/my-work-summary?seasonId=xxx — 用户查看自己在某赛季的工时概况
+feishuRouter.get('/my-work-summary', authMiddleware, asyncHandler(async (req, res) => {
+  const seasonId = Number(req.query.seasonId)
+  if (!seasonId) { res.status(400).json({ error: '缺少 seasonId' }); return }
+
+  const db = getDb()
+  const user = req.currentUser
+  if (!user) { res.status(401).json({ error: '请先登录' }); return }
+
+  const season = await db.queryOne<{ start_date: string; end_date: string }>('SELECT start_date, end_date FROM seasons WHERE id = ?', [seasonId])
+  if (!season) { res.status(404).json({ error: '赛季不存在' }); return }
+
+  // 通过 name 匹配飞书 user_key
+  const feishuUser = await db.queryOne<{ user_key: string }>(
+    'SELECT user_key FROM feishu_user WHERE name = ? LIMIT 1',
+    [user.name]
+  )
+  if (!feishuUser) { res.json({ found: false, startDate: season.start_date, endDate: season.end_date }); return }
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const fmtDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const startDate = fmtDate(new Date(season.start_date))
+  const endDate = fmtDate(new Date(season.end_date))
+  const result = await queryPdSummaryByDateRange(startDate, endDate, feishuUser.user_key)
+  res.json({ found: true, ...result })
 }))
 
 // GET /api/feishu/local-users — 读取本地 feishu_user 表，用于 reporter/user_key 维度筛选

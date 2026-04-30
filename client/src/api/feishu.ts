@@ -150,6 +150,7 @@ export interface LocalFeishuUser {
   user_key: string
   name: string
   email: string
+  avatar_url?: string | null
 }
 
 export const getFeishuProjectStatus = () =>
@@ -240,3 +241,16 @@ export const syncProjectsByDateRange = (startDate: string, endDate: string, work
 
 export const syncAllUsers = () =>
   api.post<WorkHourImportResult>('/feishu/user-data/sync')
+
+export interface MyWorkSummaryResponse {
+  found: boolean
+  startDate?: string
+  endDate?: string
+  totalPd?: number
+  totalHours?: number
+  peopleCount?: number
+  people?: LocalPdSummaryPerson[]
+}
+
+export const getMyWorkSummary = (seasonId: number) =>
+  api.get<MyWorkSummaryResponse>('/feishu/my-work-summary', { params: { seasonId } })

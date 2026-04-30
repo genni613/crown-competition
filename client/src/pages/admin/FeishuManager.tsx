@@ -645,20 +645,20 @@ export default function FeishuManager() {
   }
 
   const ownerOptions = useMemo(() => {
-    const ownerMap = new Map<string, string>()
+    const ownerMap = new Map<string, { label: string; avatarUrl?: string }>()
     for (const item of rawItems) {
       for (const owner of readOwners(fieldValue(item, userFieldKey))) {
         const resolved = resolvedUsers.get(owner.id)
-        if (!ownerMap.has(owner.id)) ownerMap.set(owner.id, resolved?.name || owner.name)
+        if (!ownerMap.has(owner.id)) ownerMap.set(owner.id, { label: resolved?.name || owner.name, avatarUrl: resolved?.avatarUrl })
       }
     }
-    return Array.from(ownerMap.entries()).map(([value, label]) => ({ value, label }))
+    return Array.from(ownerMap.entries()).map(([value, { label, avatarUrl }]) => ({ value, label, avatarUrl }))
   }, [rawItems, userFieldKey, resolvedUsers])
 
   const localUserOptions = useMemo(() => {
     return users.map(user => ({
       value: user.id,
-      label: `${user.name}${user.email ? ` (${user.email})` : ''}`,
+      label: user.name,
     }))
   }, [users])
 
@@ -935,11 +935,19 @@ export default function FeishuManager() {
                   <Space style={{ marginBottom: 16 }} wrap>
                     <Select
                       allowClear
+                      showSearch
+                      optionFilterProp="label"
                       placeholder={`按 ${fieldLabelMap.get(userFieldKey) || userFieldKey} 筛选`}
                       style={{ width: 260 }}
                       value={ownerFilter}
                       onChange={value => setOwnerFilter(value)}
-                      options={ownerOptions}
+                      options={ownerOptions.map(o => ({ value: o.value, label: o.label, avatarUrl: o.avatarUrl }))}
+                      optionRender={({ data }) => (
+                        <Space>
+                          <Avatar src={(data as any).avatarUrl} size="small" icon={<UserOutlined />} />
+                          <span>{data.label}</span>
+                        </Space>
+                      )}
                     />
                     <DatePicker.RangePicker
                       value={dateRange}
@@ -987,6 +995,104 @@ export default function FeishuManager() {
                     {prettyJson(result || {})}
                   </pre>
                 </Card>
+              </Space>
+            ),
+          },
+          {
+            key: 'pd-summary',
+            label: '工时总览',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="按时间范围查看每个人的工时概况">
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <Typography.Text type="secondary">
+                      基于本地已同步的工时数据，按人汇总 PD 消耗、工时、关联项目和需求。时间字段口径为 COALESCE(work_date, work_start_time, create_time, update_time)。
+                    </Typography.Text>
+                    <Space wrap>
+                      <Select
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="选择飞书项目用户"
+                        style={{ width: 320 }}
+                        value={pdSummaryProjectUserKey}
+                        onChange={value => setPdSummaryProjectUserKey(value)}
+                        options={feishuUsers.map(user => ({
+                          value: user.user_key,
+                          label: user.name || user.user_key,
+                          avatarUrl: user.avatar_url,
+                        }))}
+                        optionRender={({ data }) => (
+                          <Space>
+                            <Avatar src={(data as any).avatarUrl} size="small" icon={<UserOutlined />} />
+                            <span>{data.label}</span>
+                          </Space>
+                        )}
+                      />
+                      <DatePicker.RangePicker
+                        value={pdSummaryRange}
+                        onChange={value => setPdSummaryRange(value as [Dayjs, Dayjs] | null)}
+                      />
+                      <Button
+                        type="primary"
+                        loading={pdSummaryLoading}
+                        disabled={!pdSummaryRange}
+                        onClick={async () => {
+                          if (!pdSummaryRange) {
+                            message.warning('请先选择时间范围')
+                            return
+                          }
+                          setPdSummaryLoading(true)
+                          try {
+                            const res = await getLocalPdSummary({
+                              startDate: pdSummaryRange[0].format('YYYY-MM-DD'),
+                              endDate: pdSummaryRange[1].format('YYYY-MM-DD'),
+                              projectUserKey: pdSummaryProjectUserKey,
+                            })
+                            setPdSummaryResult(res.data)
+                            message.success(`统计完成，共 ${res.data.peopleCount} 人`)
+                          } catch (err: any) {
+                            message.error(err?.response?.data?.error || err?.message || '查询工时总览失败')
+                          } finally {
+                            setPdSummaryLoading(false)
+                          }
+                        }}
+                      >
+                        查询
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setPdSummaryRange(null)
+                          setPdSummaryProjectUserKey(undefined)
+                          setPdSummaryResult(undefined)
+                        }}
+                      >
+                        清空
+                      </Button>
+                    </Space>
+                  </Space>
+                </Card>
+
+                {pdSummaryResult && (
+                  <Card title="统计结果">
+                    <Descriptions size="small" column={3} style={{ marginBottom: 16 }}>
+                      <Descriptions.Item label="开始日期">{pdSummaryResult.startDate}</Descriptions.Item>
+                      <Descriptions.Item label="结束日期">{pdSummaryResult.endDate}</Descriptions.Item>
+                      <Descriptions.Item label="筛选用户">{pdSummaryResult.projectUserKey || '全部'}</Descriptions.Item>
+                      <Descriptions.Item label="人数">{pdSummaryResult.peopleCount}</Descriptions.Item>
+                      <Descriptions.Item label="总 PD">{pdSummaryResult.totalPd.toFixed(2)}</Descriptions.Item>
+                      <Descriptions.Item label="总工时">{pdSummaryResult.totalHours.toFixed(2)} h</Descriptions.Item>
+                    </Descriptions>
+                    <Table
+                      rowKey={(record) => `${record.project_user_key}:${record.user_id || 'unknown'}`}
+                      dataSource={pdSummaryResult.people}
+                      columns={pdSummaryColumns}
+                      loading={pdSummaryLoading}
+                      scroll={{ x: 1700 }}
+                      pagination={{ pageSize: 20 }}
+                    />
+                  </Card>
+                )}
               </Space>
             ),
           },
@@ -1120,97 +1226,6 @@ export default function FeishuManager() {
                         }
                       />
                     )}
-                  </Card>
-                )}
-              </Space>
-            ),
-          },
-          {
-            key: 'pd-summary',
-            label: 'PD 汇总',
-            children: (
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Card title="按时间范围统计每个人消耗的总 PD">
-                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    <Typography.Text type="secondary">
-                      基于本地表 `feishu_workitem_gongshi` 聚合 `pd_count`。时间字段口径为 `COALESCE(work_date, work_start_time, create_time, update_time)`。
-                    </Typography.Text>
-                    <Space wrap>
-                      <Select
-                        allowClear
-                        showSearch
-                        optionFilterProp="label"
-                        placeholder="选择飞书项目用户"
-                        style={{ width: 320 }}
-                        value={pdSummaryProjectUserKey}
-                        onChange={value => setPdSummaryProjectUserKey(value)}
-                        options={feishuUsers.map(user => ({
-                          value: user.user_key,
-                          label: `${user.name || user.user_key}${user.email ? ` (${user.email})` : ''}`,
-                        }))}
-                      />
-                      <DatePicker.RangePicker
-                        value={pdSummaryRange}
-                        onChange={value => setPdSummaryRange(value as [Dayjs, Dayjs] | null)}
-                      />
-                      <Button
-                        type="primary"
-                        loading={pdSummaryLoading}
-                        disabled={!pdSummaryRange}
-                        onClick={async () => {
-                          if (!pdSummaryRange) {
-                            message.warning('请先选择时间范围')
-                            return
-                          }
-                          setPdSummaryLoading(true)
-                          try {
-                            const res = await getLocalPdSummary({
-                              startDate: pdSummaryRange[0].format('YYYY-MM-DD'),
-                              endDate: pdSummaryRange[1].format('YYYY-MM-DD'),
-                              projectUserKey: pdSummaryProjectUserKey,
-                            })
-                            setPdSummaryResult(res.data)
-                            message.success(`统计完成，共 ${res.data.peopleCount} 人`)
-                          } catch (err: any) {
-                            message.error(err?.response?.data?.error || err?.message || '查询 PD 汇总失败')
-                          } finally {
-                            setPdSummaryLoading(false)
-                          }
-                        }}
-                      >
-                        查询
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setPdSummaryRange(null)
-                          setPdSummaryProjectUserKey(undefined)
-                          setPdSummaryResult(undefined)
-                        }}
-                      >
-                        清空
-                      </Button>
-                    </Space>
-                  </Space>
-                </Card>
-
-                {pdSummaryResult && (
-                  <Card title="汇总结果">
-                    <Descriptions size="small" column={3} style={{ marginBottom: 16 }}>
-                      <Descriptions.Item label="开始日期">{pdSummaryResult.startDate}</Descriptions.Item>
-                      <Descriptions.Item label="结束日期">{pdSummaryResult.endDate}</Descriptions.Item>
-                      <Descriptions.Item label="用户 Key">{pdSummaryResult.projectUserKey || '全部'}</Descriptions.Item>
-                      <Descriptions.Item label="人数">{pdSummaryResult.peopleCount}</Descriptions.Item>
-                      <Descriptions.Item label="总 PD">{pdSummaryResult.totalPd.toFixed(2)}</Descriptions.Item>
-                      <Descriptions.Item label="总工时">{pdSummaryResult.totalHours.toFixed(2)} h</Descriptions.Item>
-                    </Descriptions>
-                    <Table
-                      rowKey={(record) => `${record.project_user_key}:${record.user_id || 'unknown'}`}
-                      dataSource={pdSummaryResult.people}
-                      columns={pdSummaryColumns}
-                      loading={pdSummaryLoading}
-                      scroll={{ x: 1700 }}
-                      pagination={{ pageSize: 20 }}
-                    />
                   </Card>
                 )}
               </Space>
