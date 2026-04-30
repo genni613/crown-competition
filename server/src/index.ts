@@ -1,6 +1,6 @@
 import express from 'express'
 import { config } from './config'
-import { getDb, closeDb } from './db'
+import { initDb, closeDb } from './db'
 import { seed } from './db/seed'
 import { errorHandler } from './middleware/errorHandler'
 
@@ -16,10 +16,6 @@ import { feishuRouter } from './routes/feishu'
 import { copilotkitRouter } from './routes/copilotkit'
 
 const app = express()
-
-// 初始化数据库
-getDb()
-seed()
 
 // 中间件
 app.use(express.json())
@@ -43,14 +39,27 @@ app.get('/api/health', (_req, res) => {
 // 错误处理
 app.use(errorHandler)
 
-// 启动服务
-const server = app.listen(config.port, () => {
-  console.log(`Server running at ${config.siteUrl}`)
+let server: ReturnType<typeof app.listen>
+
+async function start() {
+  await initDb()
+  await seed()
+
+  server = app.listen(config.port, () => {
+    console.log(`Server running at ${config.siteUrl}`)
+  })
+}
+
+start().catch(error => {
+  console.error('Failed to start server:', error)
+  process.exit(1)
 })
 
 process.on('SIGTERM', () => {
-  server.close()
-  closeDb()
+  if (server) {
+    server.close()
+  }
+  void closeDb()
 })
 
 export { app, server }

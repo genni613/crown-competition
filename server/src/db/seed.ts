@@ -1,16 +1,16 @@
 import { getDb } from './index'
 
-export function seed(): void {
+export async function seed(): Promise<void> {
   const db = getDb()
 
   // 检查是否已有种子数据
-  const count = (db.prepare('SELECT COUNT(*) as cnt FROM org_score_types').get() as any).cnt
+  const count = (await db.queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM org_score_types'))?.cnt ?? 0
   if (count > 0) return
 
-  const insertOrg = db.prepare(`
+  const insertOrg = `
     INSERT INTO org_score_types (name, display_name, points_per_unit, max_per_season, sort_order)
     VALUES (?, ?, ?, ?, ?)
-  `)
+  `
 
   const orgTypes = [
     ['mentor', '带教伙伴（>50天，每人在职）', 2, null, 1],
@@ -29,17 +29,17 @@ export function seed(): void {
   ] as const
 
   for (const t of orgTypes) {
-    insertOrg.run(...t)
+    await db.execute(insertOrg, [...t])
   }
 
   // 评分维度配置
-  const insertDim = db.prepare(`
+  const insertDim = `
     INSERT INTO scoring_dimensions (
       job_role, dimension_name, dimension_weight, indicator_name, indicator_weight,
       data_source, score_type, threshold_100, threshold_60,
       deduction_per_unit, deduction_cap, deduction_divisor, sort_order
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
+  `
 
   const dimensions = [
     // ===== 产品岗 =====
@@ -92,7 +92,7 @@ export function seed(): void {
   ] as const
 
   for (const d of dimensions) {
-    insertDim.run(...d)
+    await db.execute(insertDim, [...d])
   }
 
   console.log('Seed data inserted successfully')

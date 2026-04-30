@@ -5,6 +5,14 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
+  mysql: {
+    host: process.env.MYSQL_HOST || process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || '3306', 10),
+    user: process.env.MYSQL_USER || process.env.DB_USER || 'root',
+    password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || '',
+    database: process.env.MYSQL_DATABASE || process.env.DB_NAME || 'crown_competition',
+    connectionLimit: parseInt(process.env.MYSQL_CONNECTION_LIMIT || '10', 10),
+  },
   feishu: {
     appId: process.env.FEISHU_APP_ID || '',
     appSecret: process.env.FEISHU_APP_SECRET || '',
@@ -32,5 +40,4 @@ export const config = {
     secret: process.env.SESSION_SECRET || 'change-me-in-production-env-!!!',
   },
   siteUrl: process.env.SITE_URL || 'http://localhost:3001',
-  dbPath: path.resolve(__dirname, '../data/crown.db'),
 } as const

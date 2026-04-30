@@ -1,23 +1,24 @@
 import { Router, Request, Response } from 'express'
 import { adminMiddleware } from '../middleware/auth'
+import { asyncHandler } from '../middleware/asyncHandler'
 import { getAllUsers, getUserById, updateUser } from '../services/auth.service'
 
 export const usersRouter = Router()
 
 // GET /api/users — 用户列表
-usersRouter.get('/', adminMiddleware, (_req: Request, res: Response) => {
-  res.json(getAllUsers())
-})
+usersRouter.get('/', adminMiddleware, asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await getAllUsers())
+}))
 
 // GET /api/users/:id — 用户详情
-usersRouter.get('/:id', adminMiddleware, (req: Request, res: Response) => {
-  const user = getUserById(req.params.id)
+usersRouter.get('/:id', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const user = await getUserById(req.params.id)
   if (!user) { res.status(404).json({ error: '用户不存在' }); return }
   res.json(user)
-})
+}))
 
 // PUT /api/users/:id — 编辑用户
-usersRouter.put('/:id', adminMiddleware, (req: Request, res: Response) => {
+usersRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { role, job_role } = req.body
   if (role && !['ADMIN', 'MEMBER'].includes(role)) {
     res.status(400).json({ error: '无效的角色' })
@@ -27,6 +28,6 @@ usersRouter.put('/:id', adminMiddleware, (req: Request, res: Response) => {
     res.status(400).json({ error: '无效的岗位' })
     return
   }
-  const user = updateUser(req.params.id, { role, job_role })
+  const user = await updateUser(req.params.id, { role, job_role })
   res.json(user)
-})
+}))

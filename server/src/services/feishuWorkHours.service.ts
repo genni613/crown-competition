@@ -402,8 +402,8 @@ function extractUsers(value: unknown): Array<{ key: string; name: string; email:
   return []
 }
 
-function getLocalUserMap(): Map<string, LocalUserLite> {
-  const users = getDb().prepare('SELECT id, name, email, department_name FROM users').all() as LocalUserLite[]
+async function getLocalUserMap(): Promise<Map<string, LocalUserLite>> {
+  const users = await getDb().query<LocalUserLite>('SELECT id, name, email, department_name FROM users')
   const map = new Map<string, LocalUserLite>()
   for (const user of users) {
     map.set(user.id, user)
@@ -751,8 +751,9 @@ export async function queryDepartmentWorkHours(query: WorkHourQuery) {
   const dateFieldKey = query.dateFieldKey || config.feishuProject.workHourDateField
   const startMs = toStartMs(query.startDate)
   const endMs = toEndMs(query.endDate)
-  const localUsers = getLocalUserMap()
+  const localUsers = await getLocalUserMap()
   const attempts: FetchAttempt[] = []
+  const globalWarnings: string[] = []
   const resolvedCandidateTypes = await resolveWorkItemTypeCandidates(candidateTypes)
   const fieldDiagnostics: FieldDiagnostic[] = await diagnoseWorkHourFields(
     resolvedCandidateTypes,
@@ -919,38 +920,88 @@ export async function queryDepartmentWorkHours(query: WorkHourQuery) {
       }
     }
   }
-  if (items.length === 0 && startMs == null && endMs == null) {
-    const source = 'filter:unscoped-with-required-fields'
+  if (items.length === 0) {
+    const source = 'filter-by-all-users'
     const startedAt = Date.now()
     console.log('[feishu-work-hours] attempt start', { source })
     try {
-      const unscopedItems = await feishuProject.listAllWorkItemsByFilter({ fields })
-      items = unscopedItems.filter(item => hasRequiredWorkHourFields(item, userFieldKey, hoursFieldKey))
-      attempts.push({
-        source,
-        itemCount: items.length,
-        durationMs: Date.now() - startedAt,
-      })
-      console.log('[feishu-work-hours] attempt done', {
-        source,
-        itemCount: items.length,
-        durationMs: Date.now() - startedAt,
-      })
+      const allLocalUsers = await getDb().query<LocalUserLite>(
+        'SELECT id, name, email, department_name FROM users'
+      )
+      let projectUserKeys: string[]
+      try {
+        const batchRes = await feishuProject.queryUsersByOutIds(allLocalUsers.map(u => u.id))
+        const batchUsers = batchRes.data?.users || batchRes.data?.user_list || batchRes.data || []
+        const resolvedUsers = Array.isArray(batchUsers) ? batchUsers : [batchUsers]
+        projectUserKeys = resolvedUsers
+          .map((u: any) => u?.user_key || u?.userKey || u?.key || '')
+          .filter(Boolean)
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        globalWarnings.push(`批量解析用户失败：${reason}，尝试逐个解析`)
+        console.warn('[feishu-work-hours] batch resolve failed, fallback to individual', { reason })
+        projectUserKeys = []
+        for (const user of allLocalUsers) {
+          try {
+            const key = user.email
+              ? await resolveProjectUserKeyByEmail(user.email)
+              : await resolveProjectUserKeyByUserId(user.id)
+            projectUserKeys.push(key)
+          } catch {
+            console.warn('[feishu-work-hours] skip user, cannot resolve project key', {
+              userId: user.id,
+              userName: user.name,
+            })
+          }
+        }
+      }
+      if (projectUserKeys.length === 0) {
+        attempts.push({ source, error: '未能解析到任何飞书项目用户', durationMs: Date.now() - startedAt })
+      } else {
+        for (const candidateType of searchableTypes) {
+          for (const queryKey of candidateType.queryKeys) {
+            const subSource = `${source}:${candidateType.requestedKey}:${queryKey}`
+            const subStartedAt = Date.now()
+            try {
+              const candidateItems = await feishuProject.listAllWorkItemsByFilter({
+                work_item_type_keys: [queryKey],
+                user_keys: projectUserKeys,
+                fields,
+              })
+              const usableItems = queryKey === workItemTypeKey
+                ? candidateItems
+                : candidateItems.filter(item => hasRequiredWorkHourFields(item, userFieldKey, hoursFieldKey))
+              const durationMs = Date.now() - subStartedAt
+              attempts.push({ source: subSource, itemCount: usableItems.length, durationMs })
+              console.log('[feishu-work-hours] attempt done', {
+                source: subSource,
+                itemCount: usableItems.length,
+                durationMs,
+              })
+              if (usableItems.length > 0) {
+                items = usableItems
+                break
+              }
+            } catch (error) {
+              const durationMs = Date.now() - subStartedAt
+              const reason = error instanceof Error ? error.message : String(error)
+              attempts.push({ source: subSource, error: reason, durationMs })
+              console.warn('[feishu-work-hours] attempt failed', { source: subSource, durationMs, reason })
+            }
+          }
+          if (items.length > 0) break
+        }
+      }
     } catch (error) {
       const durationMs = Date.now() - startedAt
       const reason = error instanceof Error ? error.message : String(error)
-      attempts.push({
-        source,
-        error: reason,
-        durationMs,
-      })
+      attempts.push({ source, error: reason, durationMs })
       console.warn('[feishu-work-hours] attempt failed', { source, durationMs, reason })
     }
   }
   items = uniqueItems(items)
   const filteredItems = items.filter(item => isInDateRange(item, dateFieldKey, startMs, endMs))
   const peopleMap = new Map<string, WorkHourPerson>()
-  const globalWarnings: string[] = []
 
   console.log('[feishu-work-hours] fetched items', {
     fetchedItemCount: items.length,
@@ -1081,9 +1132,10 @@ export async function queryDepartmentWorkHours(query: WorkHourQuery) {
 
 export async function queryPersonProjectWorkHours(query: PersonProjectWorkHourQuery) {
   feishuProject.assertConfigured()
-  const localUser = getDb().prepare(
-    'SELECT id, name, email, department_name FROM users WHERE id = ?'
-  ).get(query.userId) as LocalUserLite | undefined
+  const localUser = await getDb().queryOne<LocalUserLite>(
+    'SELECT id, name, email, department_name FROM users WHERE id = ?',
+    [query.userId]
+  )
   if (!localUser) throw new Error(`未找到本地用户：${query.userId}`)
   let projectUserKey: string
   if (localUser.email) {

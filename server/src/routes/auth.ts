@@ -6,6 +6,7 @@ import { sessionOptions, SessionData } from '../lib/session'
 import { config } from '../config'
 import { upsertUser } from '../services/auth.service'
 import { authMiddleware } from '../middleware/auth'
+import { asyncHandler } from '../middleware/asyncHandler'
 
 export const authRouter = Router()
 
@@ -22,7 +23,7 @@ authRouter.get('/login', async (req: Request, res: Response) => {
 })
 
 // GET /api/auth/callback — 飞书回调
-authRouter.get('/callback', async (req: Request, res: Response) => {
+authRouter.get('/callback', asyncHandler(async (req: Request, res: Response) => {
   const session = await getIronSession<SessionData>(req, res, sessionOptions)
   const { code, state } = req.query as { code?: string; state?: string }
 
@@ -53,7 +54,7 @@ authRouter.get('/callback', async (req: Request, res: Response) => {
 
     // 创建/更新本地用户
     const extra = result as any
-    const user = upsertUser({
+    const user = await upsertUser({
       id: result.user.id,
       name: result.user.name,
       avatar_url: result.user.avatar_url,
@@ -80,7 +81,7 @@ authRouter.get('/callback', async (req: Request, res: Response) => {
     console.error('Auth callback error:', err)
     res.status(500).json({ error: `登录失败: ${err.message}` })
   }
-})
+}))
 
 // POST /api/auth/logout
 authRouter.post('/logout', async (req: Request, res: Response) => {
@@ -90,14 +91,14 @@ authRouter.post('/logout', async (req: Request, res: Response) => {
 })
 
 // GET /api/auth/me — 当前用户信息
-authRouter.get('/me', authMiddleware, async (req: Request, res: Response) => {
+authRouter.get('/me', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const session = await getIronSession<SessionData>(req, res, sessionOptions)
   const currentUser = req.currentUser as any
   if (session.accessToken && currentUser && !currentUser.email) {
     try {
       const tokenUserInfo = await feishuAuth.getUserInfo(session.accessToken)
       const userDetail = await feishuAuth.getUserDetail(tokenUserInfo.open_id)
-      const updated = upsertUser({
+      const updated = await upsertUser({
         id: currentUser.id,
         name: userDetail?.name || tokenUserInfo.name || currentUser.name,
         avatar_url: tokenUserInfo.avatar_middle || tokenUserInfo.avatar_url || currentUser.avatar_url,
@@ -115,4 +116,4 @@ authRouter.get('/me', authMiddleware, async (req: Request, res: Response) => {
     }
   }
   res.json({ user: req.currentUser })
-})
+}))

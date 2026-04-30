@@ -1,6 +1,6 @@
 import fieldsConfig from '../config/feishuProjectFields.json'
 import { config } from '../config'
-import { getDb } from '../db'
+import { getDb, withTransaction } from '../db'
 import { feishuProject } from './feishuProject.service'
 import { calculateSeasonScores } from './scoring.service'
 import type { JobRole, ScoringDimension, Season } from '../types/entities'
@@ -391,47 +391,44 @@ async function aggregateMemberMetrics(member: SyncMember, season: Season): Promi
   }
 }
 
-function writeIndicatorScores(member: SyncMember, metrics: MetricMap): number {
+async function writeIndicatorScores(member: SyncMember, metrics: MetricMap): Promise<number> {
   if (!member.job_role) return 0
   const db = getDb()
-  const dimensions = db.prepare(`
+  const dimensions = await db.query<ScoringDimension>(`
     SELECT * FROM scoring_dimensions
     WHERE job_role = ? AND data_source = 'feishu'
-  `).all(member.job_role) as ScoringDimension[]
+  `, [member.job_role])
 
   const dimensionByName = new Map(dimensions.map(dim => [dim.indicator_name, dim]))
-  const upsert = db.prepare(`
-    INSERT INTO indicator_scores (
-      season_member_id, dimension_id, raw_value, source, approved, notes
-    ) VALUES (?, ?, ?, 'feishu', 1, ?)
-    ON CONFLICT(season_member_id, dimension_id)
-    DO UPDATE SET
-      raw_value = excluded.raw_value,
-      source = 'feishu',
-      approved = 1,
-      notes = excluded.notes
-  `)
 
   let written = 0
-  const transaction = db.transaction(() => {
+  await withTransaction(async tx => {
     for (const [metricName, rawValue] of Object.entries(metrics)) {
       const dimension = dimensionByName.get(metricName)
       if (!dimension) continue
-      upsert.run(member.season_member_id, dimension.id, rawValue, 'synced from feishu project')
+      await tx.execute(`
+        INSERT INTO indicator_scores (
+          season_member_id, dimension_id, raw_value, source, approved, notes
+        ) VALUES (?, ?, ?, 'feishu', 1, ?)
+        ON DUPLICATE KEY UPDATE
+          raw_value = VALUES(raw_value),
+          source = 'feishu',
+          approved = 1,
+          notes = VALUES(notes)
+      `, [member.season_member_id, dimension.id, rawValue, 'synced from feishu project'])
       written += 1
     }
   })
-  transaction()
   return written
 }
 
-function getSeason(seasonId: number): Season {
-  const season = getDb().prepare('SELECT * FROM seasons WHERE id = ?').get(seasonId) as Season | undefined
+async function getSeason(seasonId: number): Promise<Season> {
+  const season = await getDb().queryOne<Season>('SELECT * FROM seasons WHERE id = ?', [seasonId])
   if (!season) throw new Error('赛季不存在')
   return season
 }
 
-function getMembers(seasonId: number, userId?: string): SyncMember[] {
+async function getMembers(seasonId: number, userId?: string): Promise<SyncMember[]> {
   const params: unknown[] = [seasonId]
   let where = 'WHERE sm.season_id = ?'
   if (userId) {
@@ -439,33 +436,33 @@ function getMembers(seasonId: number, userId?: string): SyncMember[] {
     params.push(userId)
   }
 
-  return getDb().prepare(`
+  return getDb().query<SyncMember>(`
     SELECT sm.id AS season_member_id, sm.user_id, sm.job_role, u.email, u.name
     FROM season_members sm
     JOIN users u ON u.id = sm.user_id
     ${where}
-  `).all(...params) as SyncMember[]
+  `, params)
 }
 
 export async function previewMemberFeishuData(seasonId: number, userId: string): Promise<MemberPreview> {
   feishuProject.assertConfigured()
-  const season = getSeason(seasonId)
-  const member = getMembers(seasonId, userId)[0]
+  const season = await getSeason(seasonId)
+  const member = (await getMembers(seasonId, userId))[0]
   if (!member) throw new Error('赛季成员不存在')
   return aggregateMemberMetrics(member, season)
 }
 
 export async function syncMemberFeishuData(seasonId: number, userId: string): Promise<SyncResult> {
   feishuProject.assertConfigured()
-  const season = getSeason(seasonId)
-  const member = getMembers(seasonId, userId)[0]
+  const season = await getSeason(seasonId)
+  const member = (await getMembers(seasonId, userId))[0]
   if (!member) throw new Error('赛季成员不存在')
 
   const warnings: SyncWarning[] = []
   const preview = await aggregateMemberMetrics(member, season)
   warnings.push(...preview.warnings)
-  const writtenScoreCount = writeIndicatorScores(member, preview.metrics)
-  calculateSeasonScores(seasonId)
+  const writtenScoreCount = await writeIndicatorScores(member, preview.metrics)
+  await calculateSeasonScores(seasonId)
 
   return {
     seasonId,
@@ -479,8 +476,8 @@ export async function syncMemberFeishuData(seasonId: number, userId: string): Pr
 
 export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult> {
   feishuProject.assertConfigured()
-  const season = getSeason(seasonId)
-  const members = getMembers(seasonId)
+  const season = await getSeason(seasonId)
+  const members = await getMembers(seasonId)
   const result: SyncResult = {
     seasonId,
     memberCount: members.length,
@@ -494,7 +491,7 @@ export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult
     try {
       const preview = await aggregateMemberMetrics(member, season)
       result.warnings.push(...preview.warnings)
-      result.writtenScoreCount += writeIndicatorScores(member, preview.metrics)
+      result.writtenScoreCount += await writeIndicatorScores(member, preview.metrics)
       result.syncedCount += 1
     } catch (error) {
       result.skippedCount += 1
@@ -505,7 +502,7 @@ export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult
     }
   }
 
-  if (result.syncedCount > 0) calculateSeasonScores(seasonId)
+  if (result.syncedCount > 0) await calculateSeasonScores(seasonId)
   return result
 }
 

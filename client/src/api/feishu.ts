@@ -92,6 +92,35 @@ export interface FeishuPersonProjectWorkHourResponse {
   fieldDiagnostics: Array<Record<string, unknown>>
 }
 
+export interface FeishuDepartmentWorkHourPerson {
+  userId: string
+  name: string
+  email: string | null
+  departmentName: string | null
+  projectUserKey: string | null
+  itemCount: number
+  fetchedItemCount: number
+  totalHours: number
+  missingHoursFieldCount: number
+  missingDateFieldCount: number
+  warnings: string[]
+}
+
+export interface FeishuDepartmentWorkHourResponse {
+  departmentName: string | null
+  workItemTypeKey: string
+  userFieldKey: string
+  hoursFieldKey: string
+  dateFieldKey: string
+  startDate: string | null
+  endDate: string | null
+  userCount: number
+  totalHours: number
+  people: FeishuDepartmentWorkHourPerson[]
+  attempts: Array<{ source: string; itemCount?: number; error?: string; durationMs?: number }>
+  fieldDiagnostics: Array<Record<string, unknown>>
+}
+
 export const getFeishuProjectStatus = () =>
   api.get<FeishuProjectStatus>('/feishu/project/status')
 
@@ -121,3 +150,6 @@ export const queryFeishuWorkItemDetails = (workItemTypeKey: string, workItemIds:
 
 export const getFeishuProjectPersonWorkHours = (params: Record<string, string>) =>
   api.get<FeishuPersonProjectWorkHourResponse>('/feishu/project/work-hours/by-person-project', { params })
+
+export const getFeishuProjectDepartmentWorkHours = (params: Record<string, string>) =>
+  api.get<FeishuDepartmentWorkHourResponse>('/feishu/project/work-hours', { params })

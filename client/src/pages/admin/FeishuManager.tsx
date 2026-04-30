@@ -367,13 +367,18 @@ export default function FeishuManager() {
   const { seasonId } = useParams()
   const [form] = Form.useForm()
   const [personForm] = Form.useForm()
+  const [deptForm] = Form.useForm()
   const [status, setStatus] = useState<FeishuProjectStatus>()
   const [workItemTypes, setWorkItemTypes] = useState<FeishuProjectWorkItemType[]>([])
   const [fields, setFields] = useState<FeishuProjectField[]>([])
   const [result, setResult] = useState<FeishuRawFilterResponse>()
   const [personProjectResult, setPersonProjectResult] = useState<FeishuPersonProjectWorkHourResponse>()
+  const [deptResult, setDeptResult] = useState<FeishuRawFilterResponse>()
   const [loading, setLoading] = useState(false)
   const [personLoading, setPersonLoading] = useState(false)
+  const [deptLoading, setDeptLoading] = useState(false)
+  const [deptNameFilter, setDeptNameFilter] = useState<string>()
+  const [deptDateRange, setDeptDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [ownerFilter, setOwnerFilter] = useState<string>()
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [personDateRange, setPersonDateRange] = useState<[Dayjs, Dayjs] | null>(null)
@@ -517,6 +522,12 @@ export default function FeishuManager() {
       } else if (!currentPersonTypeValue && enabledTypes[0]?.type_key) {
         personForm.setFieldsValue({ workItemTypeKey: enabledTypes[0].type_key })
       }
+      const currentDeptTypeValue = deptForm.getFieldValue('workItemTypeKey')
+      if (!currentDeptTypeValue && statusRes.data.workHourType) {
+        deptForm.setFieldsValue({ workItemTypeKey: statusRes.data.workHourType })
+      } else if (!currentDeptTypeValue && enabledTypes[0]?.type_key) {
+        deptForm.setFieldsValue({ workItemTypeKey: enabledTypes[0].type_key })
+      }
     } catch (error: any) {
       message.error(error.response?.data?.error || '加载飞书配置失败')
     }
@@ -566,6 +577,23 @@ export default function FeishuManager() {
       message.error(error.response?.data?.error || '统计个人工时失败')
     } finally {
       setPersonLoading(false)
+    }
+  }
+
+  async function onDeptWorkHoursSubmit(values: { workItemTypeKey: string }) {
+    setDeptLoading(true)
+    try {
+      const res = await filterFeishuWorkItems({
+        work_item_type_keys: [values.workItemTypeKey],
+        fields: ['name', ...extraFieldKeys],
+      })
+      setDeptResult(res.data)
+      const count = Array.isArray(res.data.data) ? res.data.data.length : 0
+      message.success(`查询完成，共 ${count} 条工时记录`)
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '查询工时失败')
+    } finally {
+      setDeptLoading(false)
     }
   }
 
@@ -686,6 +714,39 @@ export default function FeishuManager() {
     },
   ]
 
+  const rawDeptItems = useMemo(() => Array.isArray(deptResult?.data) ? deptResult.data : [], [deptResult])
+
+  const deptOwnerOptions = useMemo(() => {
+    const ownerMap = new Map<string, string>()
+    for (const item of rawDeptItems) {
+      for (const owner of readOwners(fieldValue(item, userFieldKey))) {
+        const resolved = resolvedUsers.get(owner.id)
+        if (!ownerMap.has(owner.id)) ownerMap.set(owner.id, resolved?.name || owner.name)
+      }
+    }
+    return Array.from(ownerMap.entries()).map(([value, label]) => ({ value, label }))
+  }, [rawDeptItems, userFieldKey, resolvedUsers])
+
+  const filteredDeptItems = useMemo(() => {
+    return rawDeptItems.filter(item => {
+      const owners = readOwners(fieldValue(item, userFieldKey))
+      const dateMs = readDateMs(fieldValue(item, dateFieldKey))
+
+      if (deptNameFilter && !owners.some(owner => {
+        const resolved = resolvedUsers.get(owner.id)
+        const name = resolved?.name || owner.name
+        return name === deptNameFilter
+      })) return false
+      if (deptDateRange?.[0] && deptDateRange?.[1]) {
+        if (dateMs == null) return false
+        const start = deptDateRange[0].startOf('day').valueOf()
+        const end = deptDateRange[1].endOf('day').valueOf()
+        if (dateMs < start || dateMs > end) return false
+      }
+      return true
+    })
+  }, [rawDeptItems, deptNameFilter, deptDateRange, userFieldKey, dateFieldKey, resolvedUsers])
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Card>
@@ -694,7 +755,7 @@ export default function FeishuManager() {
             飞书工时工作项查询
           </Typography.Title>
           <Typography.Text type="secondary">
-            当前页面包含两个标签：工作项查询和个人工时统计。
+            当前页面包含三个标签：工作项查询、个人工时统计和全员工时汇总。
             {seasonId ? ` 当前入口赛季 ID: ${seasonId}` : ''}
           </Typography.Text>
           {status && (
@@ -845,7 +906,7 @@ export default function FeishuManager() {
                 <Card title="统计结果">
                   <Space direction="vertical" size={8} style={{ width: '100%' }}>
                     <Typography.Text type="secondary">
-                      会按“项目关联字段”汇总工时。如果一条工时记录关联多个项目，这条记录会同时计入这些项目。
+                      会按"项目关联字段"汇总工时。如果一条工时记录关联多个项目，这条记录会同时计入这些项目。
                     </Typography.Text>
                     {personProjectResult && (
                       <Descriptions size="small" column={3}>
@@ -878,6 +939,82 @@ export default function FeishuManager() {
                     )}
                   </Space>
                 </Card>
+              </Space>
+            ),
+          },
+          {
+            key: 'dept-work-hours',
+            label: '工时查询',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="查询条件">
+                  <Form form={deptForm} layout="vertical" onFinish={onDeptWorkHoursSubmit}>
+                    <Form.Item
+                      name="workItemTypeKey"
+                      label="工时工作项类型"
+                      rules={[{ required: true, message: '请选择工时工作项类型' }]}
+                    >
+                      <Select
+                        showSearch
+                        optionFilterProp="label"
+                        options={workItemTypes
+                          .filter(type => type.type_key)
+                          .map(type => ({
+                            label: `${type.name || type.type_key} (${type.type_key})`,
+                            value: type.type_key,
+                          }))}
+                      />
+                    </Form.Item>
+                    <Button type="primary" htmlType="submit" loading={deptLoading}>
+                      拉取全部工时数据
+                    </Button>
+                  </Form>
+                </Card>
+
+                {deptResult && (
+                  <Card title={`查询结果（共 ${rawDeptItems.length} 条）`}>
+                    <Space style={{ marginBottom: 16 }} wrap>
+                      <Select
+                        allowClear
+                        showSearch
+                        placeholder="按人名筛选"
+                        style={{ width: 260 }}
+                        value={deptNameFilter}
+                        onChange={value => setDeptNameFilter(value)}
+                        options={deptOwnerOptions}
+                      />
+                      <DatePicker.RangePicker
+                        value={deptDateRange}
+                        onChange={value => setDeptDateRange(value as [Dayjs, Dayjs] | null)}
+                      />
+                      <Button onClick={() => {
+                        setDeptNameFilter(undefined)
+                        setDeptDateRange(null)
+                      }}>
+                        清空筛选
+                      </Button>
+                      <Typography.Text type="secondary">
+                        当前展示 {filteredDeptItems.length} / {rawDeptItems.length} 条
+                      </Typography.Text>
+                    </Space>
+                    <Table
+                      rowKey={(record) => String(record.work_item_id ?? record.id ?? Math.random())}
+                      dataSource={filteredDeptItems}
+                      columns={columns}
+                      loading={deptLoading}
+                      scroll={{ x: 1500 }}
+                      pagination={{ pageSize: 20 }}
+                    />
+                  </Card>
+                )}
+
+                {deptResult && (
+                  <Card size="small" title="原始响应（调试用）">
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto' }}>
+                      {prettyJson(deptResult)}
+                    </pre>
+                  </Card>
+                )}
               </Space>
             ),
           },
