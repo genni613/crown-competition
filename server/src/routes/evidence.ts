@@ -315,7 +315,7 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
       [req.params.id]
     )
     if (evidence?.target_type === 'indicator' && evidence?.target_id) {
-      const snapshot = evidence.snapshot_json ? JSON.parse(evidence.snapshot_json) : {}
+      const snapshot = typeof evidence.snapshot_json === 'string' ? JSON.parse(evidence.snapshot_json) : (evidence.snapshot_json ?? {})
       const rawValue = snapshot.raw_value ?? null
       const dimensionId = evidence.target_id
 

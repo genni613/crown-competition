@@ -23,7 +23,8 @@
     "severity": "field_severity",
     "rootCause": "field_root_cause",
     "closedAt": "field_closed_at",
-    "source": "field_source"
+    "source": "field_source",
+    "priority": "priority"
   },
   "defect": {
     "owner": "field_owner",

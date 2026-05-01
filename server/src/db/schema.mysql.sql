@@ -266,8 +266,7 @@ CREATE TABLE IF NOT EXISTS feishu_workitem_issue (
   name VARCHAR(255) NULL COMMENT '名称',
   description TEXT NULL COMMENT '描述',
   owner VARCHAR(64) NULL COMMENT '创建者',
-  resolver VARCHAR(64) NULL COMMENT '解决者(field_982094)',
-  severity VARCHAR(32) NULL COMMENT '严重程度',
+  priority VARCHAR(32) NULL COMMENT '优先级',
   start_time DATETIME NULL COMMENT '提出时间',
   archiving_date DATETIME NULL COMMENT '完成日期',
   work_item_status VARCHAR(64) NULL COMMENT '状态',
@@ -280,7 +279,6 @@ CREATE TABLE IF NOT EXISTS feishu_workitem_issue (
   UNIQUE KEY u_work_item_id_index (work_item_id),
   KEY idx_start_time (start_time),
   KEY idx_owner (owner),
-  KEY idx_resolver (resolver),
   KEY idx_archiving_date (archiving_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书缺陷工作项表';
 

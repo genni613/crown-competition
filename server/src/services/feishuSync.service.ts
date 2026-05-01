@@ -295,7 +295,17 @@ function severity(item: any): string {
   return readText(fieldValue(item, issueFields.severity)).toUpperCase()
 }
 
-function aggregateTech(stories: any[], issues: any[], defects: any[], userKey: string, startMs: number, endMs: number): MetricMap {
+function computeDeliveryQuality(p0: number, p1: number, p2: number): number {
+  const total = p0 + p1 + p2
+  if (total === 0) return 100
+  const p0Ratio = p0 / total
+  if (p0Ratio > 0.01) return 0
+  if (p0 === 0 && p1 === 0 && p2 < 10) return 100
+  if (p0 === 0 && p1 === 0 && p2 < 25) return 80
+  return 60
+}
+
+function aggregateTech(stories: any[], issues: any[], defects: any[], userKey: string, startMs: number, endMs: number, issuePriorityCounts: Record<string, number> = {}): MetricMap {
   const ownedStories = stories.filter(item => hasUser(fieldValue(item, storyFields.developer), userKey))
   const ownedIssues = issues.filter(item =>
     (hasUser(fieldValue(item, issueFields.owner), userKey) || hasUser(fieldValue(item, issueFields.resolver), userKey)) &&
@@ -322,7 +332,11 @@ function aggregateTech(stories: any[], issues: any[], defects: any[], userKey: s
 
   return {
     '消耗需求评估标准工时': ownedStories.reduce((sum, item) => sum + readNumber(fieldValue(item, storyFields.standardHours)), 0),
-    '过程问题(P0/P1/P2)': processIssues.length,
+    '过程问题(P0/P1/P2)': computeDeliveryQuality(
+      issuePriorityCounts['P0'] || 0,
+      issuePriorityCounts['P1'] || 0,
+      issuePriorityCounts['P2'] || 0,
+    ),
     '线上故障(P1/P2)': onlineFaults.length,
     '线上问题(仅研发代码)': codeIssues.length,
     '提测不通过': failedTests.length,
@@ -372,11 +386,24 @@ async function aggregateMemberMetrics(member: SyncMember, season: Season): Promi
     })
     : []
 
+  let issuePriorityCounts: Record<string, number> = {}
+  if (member.job_role === 'tech') {
+    const priorityRows = await getDb().query<{ priority: string; count: number }>(`
+      SELECT priority, COUNT(*) as count
+      FROM feishu_workitem_issue
+      WHERE owner = ? AND start_time BETWEEN ? AND ?
+      GROUP BY priority
+    `, [projectUserKey, new Date(startMs), new Date(endMs)])
+    issuePriorityCounts = Object.fromEntries(
+      priorityRows.map((r: any) => [r.priority, Number(r.count)])
+    )
+  }
+
   const metrics = member.job_role === 'product'
     ? aggregateProduct(stories, issues, projectUserKey, startMs, endMs)
     : member.job_role === 'design'
       ? aggregateDesign(stories, issues, projectUserKey, startMs, endMs)
-      : aggregateTech(stories, issues, defects, projectUserKey, startMs, endMs)
+      : aggregateTech(stories, issues, defects, projectUserKey, startMs, endMs, issuePriorityCounts)
 
   return {
     member,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Tag, Spin, Empty, Typography, Button, Progress, Space, Row, Col, Collapse, Popover } from 'antd'
+import { Card, Tag, Spin, Empty, Typography, Button, Progress, Space, Collapse } from 'antd'
 import {
   TrophyOutlined, CrownOutlined, FireOutlined,
   RiseOutlined, TeamOutlined, BulbOutlined,
@@ -86,11 +86,12 @@ export default function Dashboard() {
 
   const radarData = dimensions.map((g: any) => {
     const dimScore = calcDimensionScore(g.items, workSummary, g.name)
-    return { dimension: g.name, score: dimScore ?? 0, fullMark: 100 }
+    const normalized = dimScore != null ? dimScore / g.weight : 0
+    return { dimension: g.name, score: Math.round(normalized), fullMark: 100 }
   })
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div style={{ maxWidth: 1100 }}>
       {/* 顶部总分卡片 */}
       <Card
         style={{
@@ -101,200 +102,192 @@ export default function Dashboard() {
         }}
         styles={{ body: { padding: '28px 32px' } }}
       >
-        <Row align="middle" justify="space-between">
-          <Col>
-            <Space size={40}>
-              <div>
-                <Text type="secondary" style={{ fontSize: 13, letterSpacing: 1 }}>TOTAL</Text>
-                <div style={{
-                  fontSize: 44, fontWeight: 800, lineHeight: 1.15,
-                  color: scoreColor(totalScore),
-                  fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {totalScore.toFixed(1)}
-                </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Space size={40}>
+            <div>
+              <Text type="secondary" style={{ fontSize: 13, letterSpacing: 1 }}>TOTAL</Text>
+              <div style={{
+                fontSize: 44, fontWeight: 800, lineHeight: 1.15,
+                color: scoreColor(totalScore),
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {totalScore.toFixed(1)}
               </div>
-              <div style={{ width: 1, height: 52, background: 'linear-gradient(180deg, transparent, #d9d9d9, transparent)' }} />
-              <Space size={24}>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>岗位分</Text>
-                  <div style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{positionScore.toFixed(1)}</div>
-                </div>
-                <div style={{ color: '#d9d9d9' }}>+</div>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>组织分</Text>
-                  <div style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{orgScore.toFixed(1)}</div>
-                </div>
-              </Space>
-            </Space>
-          </Col>
-          <Col>
+            </div>
+            <div style={{ width: 1, height: 52, background: 'linear-gradient(180deg, transparent, #d9d9d9, transparent)' }} />
             <Space size={24}>
-              {rank && (
-                <div style={{
-                  textAlign: 'center',
-                  background: 'linear-gradient(135deg, #fffbe6, #fff1b8)',
-                  borderRadius: 12,
-                  padding: '8px 20px',
-                }}>
-                  <TrophyOutlined style={{ color: '#d4b106', fontSize: 16 }} />
-                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>#{rank}</div>
-                </div>
-              )}
-              {dist && (
-                <Tag
-                  style={{
-                    fontSize: 13, padding: '6px 18px', borderRadius: 20, margin: 0,
-                    background: dist.color, color: '#fff', border: 'none',
-                    fontWeight: 500,
-                  }}
-                >
-                  {dist.icon} {dist.label}
-                </Tag>
-              )}
-            </Space>
-          </Col>
-        </Row>
-      </Card>
-
-      {/* 纬度进度条 */}
-      <Card
-        style={{ marginBottom: 20, borderRadius: 12 }}
-        styles={{ body: { padding: '20px 28px' } }}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <Text strong style={{ fontSize: 15 }}>各纬度得分</Text>
-        </div>
-        <Space direction="vertical" size={20} style={{ width: '100%' }}>
-          {dimensions.map((g: any) => {
-            const dimScore = calcDimensionScore(g.items, workSummary, g.name)
-            const normalized = dimScore != null ? dimScore / g.weight : 0
-            const pct = dimScore != null ? Math.round(normalized) : 0
-            return (
-              <div key={g.name}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Space size={8}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 28, height: 28, borderRadius: 8,
-                      background: `${scoreColor(normalized)}14`,
-                      color: scoreColor(normalized), fontSize: 14,
-                    }}>
-                      {dimIcons[g.name] ?? <FireOutlined />}
-                    </span>
-                    <Text strong>{g.name}</Text>
-                    <Text type="secondary" style={{ fontSize: 12, background: '#f5f5f5', padding: '0 6px', borderRadius: 4 }}>
-                      {(g.weight * 100).toFixed(0)}%
-                    </Text>
-                  </Space>
-                  <Text style={{ fontWeight: 700, fontSize: 15, color: scoreColor(normalized), fontVariantNumeric: 'tabular-nums' }}>
-                    {dimScore?.toFixed(1) ?? '-'}
-                  </Text>
-                </div>
-                <Progress
-                  percent={dimScore != null ? pct : 0}
-                  strokeColor={dimScore != null ? scoreGradient(normalized) : '#f0f0f0'}
-                  showInfo={false}
-                  size={['100%', 8]}
-                  style={{ margin: 0 }}
-                />
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>岗位分</Text>
+                <div style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{positionScore.toFixed(1)}</div>
               </div>
-            )
-          })}
-        </Space>
+              <div style={{ color: '#d9d9d9' }}>+</div>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>组织分</Text>
+                <div style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{orgScore.toFixed(1)}</div>
+              </div>
+            </Space>
+          </Space>
+          <Space size={24}>
+            {rank && (
+              <div style={{
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #fffbe6, #fff1b8)',
+                borderRadius: 12,
+                padding: '8px 20px',
+              }}>
+                <TrophyOutlined style={{ color: '#d4b106', fontSize: 16 }} />
+                <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>#{rank}</div>
+              </div>
+            )}
+            {dist && (
+              <Tag
+                style={{
+                  fontSize: 13, padding: '6px 18px', borderRadius: 20, margin: 0,
+                  background: dist.color, color: '#fff', border: 'none',
+                  fontWeight: 500,
+                }}
+              >
+                {dist.icon} {dist.label}
+              </Tag>
+            )}
+          </Space>
+        </div>
       </Card>
 
-      {/* 雷达图 + 指标明细 */}
-      <Row gutter={16}>
-        <Col span={10}>
-          <Card
-            title={<Text strong style={{ fontSize: 15 }}>能力雷达</Text>}
-            style={{ height: '100%', borderRadius: 12 }}
-            styles={{ body: { padding: '12px 12px 8px' } }}
-          >
-            {radarData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
-                  <PolarGrid stroke="#f0f0f0" />
-                  <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 12, fill: '#8c8c8c' }} />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-                  <Radar
-                    name="得分" dataKey="score"
-                    stroke="#1677ff" fill="#1677ff" fillOpacity={0.15} strokeWidth={2}
-                    dot={{ r: 3, fill: '#1677ff', fillOpacity: 1 }}
+      {/* 维度进度条 + 能力雷达 */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+        <Card
+          style={{ flex: 1, borderRadius: 12 }}
+          styles={{ body: { padding: '20px 28px' } }}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <Text strong style={{ fontSize: 15 }}>各维度得分</Text>
+          </div>
+          <Space direction="vertical" size={20} style={{ width: '100%' }}>
+            {dimensions.map((g: any) => {
+              const dimScore = calcDimensionScore(g.items, workSummary, g.name)
+              const normalized = dimScore != null ? dimScore / g.weight : 0
+              const pct = dimScore != null ? Math.round(normalized) : 0
+              return (
+                <div key={g.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Space size={8}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: 28, height: 28, borderRadius: 8,
+                        background: `${scoreColor(normalized)}14`,
+                        color: scoreColor(normalized), fontSize: 14,
+                      }}>
+                        {dimIcons[g.name] ?? <FireOutlined />}
+                      </span>
+                      <Text strong>{g.name}</Text>
+                      <Text type="secondary" style={{ fontSize: 12, background: '#f5f5f5', padding: '0 6px', borderRadius: 4 }}>
+                        {(g.weight * 100).toFixed(0)}%
+                      </Text>
+                    </Space>
+                    <Text style={{ fontWeight: 700, fontSize: 15, color: scoreColor(normalized), fontVariantNumeric: 'tabular-nums' }}>
+                      {dimScore?.toFixed(1) ?? '-'}
+                    </Text>
+                  </div>
+                  <Progress
+                    percent={dimScore != null ? pct : 0}
+                    strokeColor={dimScore != null ? scoreGradient(normalized) : '#f0f0f0'}
+                    showInfo={false}
+                    size={['100%', 8]}
+                    style={{ margin: 0 }}
                   />
-                  <Tooltip
-                    contentStyle={{ borderRadius: 8, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            ) : (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
-            )}
-          </Card>
-        </Col>
-        <Col span={14}>
-          <Card
-            title={<Text strong style={{ fontSize: 15 }}>指标明细</Text>}
-            style={{ height: '100%', borderRadius: 12 }}
-            styles={{ body: { padding: '8px 20px' } }}
-          >
-            <Collapse
-              ghost
-              expandIconPosition="end"
-              items={dimensions.map((g: any) => ({
-                key: g.name,
-                label: <Text strong style={{ fontSize: 13 }}>{g.name}</Text>,
-                children: (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>指标</th>
-                        <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>规则</th>
-                        <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>原始值</th>
-                        <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>得分</th>
-                        <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>来源</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {g.items.map((item: any) => {
-                        const effectiveValue = resolveEffectiveValue(g.name, item, workSummary)
-                        const effectiveScore = resolveEffectiveScore(item, effectiveValue)
-                        const displayItem = { ...item, raw_value: effectiveValue }
-                        return (
-                          <tr key={item.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                            <td style={{ padding: '6px 8px' }}>
-                              {item.indicator_name}
-                              <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
-                                {(item.indicator_weight * 100).toFixed(0)}%
-                              </Text>
-                            </td>
-                            <td style={{ padding: '6px 8px', textAlign: 'center' }}>{ruleText(displayItem)}</td>
-                            <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                              {effectiveValue != null && item.threshold_100 != null && item.threshold_60 != null
-                                ? <ValueStatus value={effectiveValue} t100={item.threshold_100} t60={item.threshold_60} />
-                                : (effectiveValue ?? '-')}
-                            </td>
-                            <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>
-                              {effectiveScore?.toFixed(1) ?? '-'}
-                            </td>
-                            <td style={{ padding: '6px 8px', textAlign: 'center' }}>{sourceTag(item.data_source)}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                ),
-              }))}
-            />
-            {breakdown?.scores && workSummary?.found && workSummary.people?.[0] && (
-              <WorkSummaryCard summary={workSummary} />
-            )}
-          </Card>
-        </Col>
-      </Row>
+                </div>
+              )
+            })}
+          </Space>
+        </Card>
+        <Card
+          title={<Text strong style={{ fontSize: 15 }}>能力雷达</Text>}
+          style={{ width: 380, flexShrink: 0, borderRadius: 12 }}
+          styles={{ body: { padding: '12px 12px 8px' } }}
+        >
+          {radarData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="62%">
+                <PolarGrid stroke="#f0f0f0" />
+                <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 12, fill: '#8c8c8c' }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+                <Radar
+                  name="得分" dataKey="score"
+                  stroke="#1677ff" fill="#1677ff" fillOpacity={0.15} strokeWidth={2}
+                  dot={{ r: 3, fill: '#1677ff', fillOpacity: 1 }}
+                />
+                <Tooltip
+                  contentStyle={{ borderRadius: 8, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          )}
+        </Card>
+      </div>
 
-      <div style={{ marginTop: 16 }}>
+      {/* 指标明细 — 满宽 */}
+      <Card
+        title={<Text strong style={{ fontSize: 15 }}>指标明细</Text>}
+        style={{ marginBottom: 20, borderRadius: 12 }}
+        styles={{ body: { padding: '8px 20px' } }}
+      >
+        <Collapse
+          ghost
+          expandIconPosition="end"
+          items={dimensions.map((g: any) => ({
+            key: g.name,
+            label: <Text strong style={{ fontSize: 13 }}>{g.name}</Text>,
+            children: (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                    <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>指标</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>规则</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>原始值</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>得分</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>来源</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {g.items.map((item: any) => {
+                    const effectiveValue = resolveEffectiveValue(g.name, item, workSummary)
+                    const effectiveScore = resolveEffectiveScore(item, effectiveValue)
+                    const displayItem = { ...item, raw_value: effectiveValue }
+                    return (
+                      <tr key={item.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          {item.indicator_name}
+                          <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                            {(item.indicator_weight * 100).toFixed(0)}%
+                          </Text>
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>{ruleText(displayItem)}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                          {effectiveValue != null && item.threshold_100 != null && item.threshold_60 != null
+                            ? <ValueStatus value={effectiveValue} t100={item.threshold_100} t60={item.threshold_60} />
+                            : (effectiveValue ?? '-')}
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>
+                          {effectiveScore?.toFixed(1) ?? '-'}
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>{sourceTag(item.data_source)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            ),
+          }))}
+        />
+        {breakdown?.scores && workSummary?.found && workSummary?.people?.[0] && (
+          <WorkSummaryCard summary={workSummary} />
+        )}
+      </Card>
+
+      <div>
         <Button type="link" onClick={() => {
           const active = seasons.find(s => s.status === 'active')
           if (active) navigate(`/rankings/${active.id}`)
@@ -338,6 +331,9 @@ function resolveEffectiveScore(item: any, effectiveValue: number | null): number
   if (effectiveValue == null) return null
   if (item.score_type === 'threshold' && item.threshold_100 != null && item.threshold_60 != null) {
     return calcThresholdScore(effectiveValue, item.threshold_100, item.threshold_60)
+  }
+  if (item.score_type === 'threshold' && item.threshold_100 == null && item.threshold_60 == null) {
+    return effectiveValue
   }
   return null
 }

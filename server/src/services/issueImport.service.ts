@@ -113,11 +113,11 @@ function parseWorkItem(item: any): Record<string, any> {
 async function upsertRow(db: any, row: Record<string, any>): Promise<'inserted' | 'updated'> {
   const result = await db.execute(`
     INSERT INTO feishu_workitem_issue (
-      work_item_id, name, description, owner, resolver,
-      severity, start_time, archiving_date, work_item_status,
+      work_item_id, name, description, owner,
+      priority, start_time, archiving_date, work_item_status,
       \`source\`, root_cause, is_online_defect, updated_by, update_time
     ) VALUES (
-      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?, ?
     )
@@ -125,8 +125,7 @@ async function upsertRow(db: any, row: Record<string, any>): Promise<'inserted' 
       name = VALUES(name),
       description = VALUES(description),
       owner = VALUES(owner),
-      resolver = VALUES(resolver),
-      severity = VALUES(severity),
+      priority = VALUES(priority),
       start_time = VALUES(start_time),
       archiving_date = VALUES(archiving_date),
       work_item_status = VALUES(work_item_status),
@@ -136,8 +135,8 @@ async function upsertRow(db: any, row: Record<string, any>): Promise<'inserted' 
       updated_by = VALUES(updated_by),
       update_time = VALUES(update_time)
   `, [
-    row.work_item_id, row.name, row.description, row.owner, row.resolver,
-    row.severity, row.start_time, row.archiving_date, row.work_item_status,
+    row.work_item_id, row.name, row.description, row.owner,
+    row.priority, row.start_time, row.archiving_date, row.work_item_status,
     row.source, row.root_cause, row.is_online_defect, row.updated_by, row.update_time || new Date(),
   ])
 
