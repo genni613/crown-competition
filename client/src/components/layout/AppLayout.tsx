@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, Typography } from 'antd'
+import { Layout, Avatar, Dropdown, Typography, Tag } from 'antd'
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons'
 import { useAuthStore } from '../../store/authStore'
 import Sidebar from './Sidebar'
@@ -33,6 +33,11 @@ export default function AppLayout() {
             <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Avatar src={user?.avatar_url} icon={<UserOutlined />} size="small" />
               <Typography.Text>{user?.name}</Typography.Text>
+              {(user as any)?.feishu_job_role && (
+                <Tag color="blue" style={{ marginRight: 0 }}>
+                  {({ product: '产品', design: '设计', tech: '研发' } as Record<string, string>)[(user as any).feishu_job_role] || (user as any).feishu_job_role}
+                </Tag>
+              )}
             </div>
           </Dropdown>
         </Header>

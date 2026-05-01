@@ -80,10 +80,9 @@ seasonsRouter.post('/:id/end', adminMiddleware, asyncHandler(async (req: Request
 seasonsRouter.get('/:id/members', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
   const members = await db.query(
-    'SELECT sm.*, u.name as user_name, u.avatar_url as user_avatar_url, ' +
-    'u.department_name as user_department_name, u.title as user_title ' +
+    'SELECT sm.*, fu.name as user_name, fu.avatar_url as user_avatar_url ' +
     'FROM season_members sm ' +
-    'JOIN users u ON sm.user_id = u.id ' +
+    'JOIN feishu_user fu ON sm.user_key = fu.user_key ' +
     'WHERE sm.season_id = ? ' +
     'ORDER BY sm.`rank` IS NULL, sm.`rank` ASC',
     [req.params.id]
@@ -93,8 +92,8 @@ seasonsRouter.get('/:id/members', authMiddleware, asyncHandler(async (req: Reque
 
 // POST /api/seasons/:id/members — 添加成员
 seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { user_id, job_role, performance_grade } = req.body
-  if (!user_id) { res.status(400).json({ error: '缺少 user_id' }); return }
+  const { user_key, job_role, performance_grade } = req.body
+  if (!user_key) { res.status(400).json({ error: '缺少 user_key' }); return }
 
   const seasonId = parseInt(req.params.id, 10)
   const prevRawScore = performance_grade ? getPerformanceScore(performance_grade) : null
@@ -102,8 +101,8 @@ seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Req
   try {
     const memberId = await withTransaction(async tx => {
       const result = await tx.execute(
-        'INSERT INTO season_members (season_id, user_id, job_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?)',
-        [seasonId, user_id, job_role, performance_grade, prevRawScore]
+        'INSERT INTO season_members (season_id, user_key, job_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?)',
+        [seasonId, user_key, job_role, performance_grade, prevRawScore]
       )
       const dimensions = await tx.query<{ id: number; data_source?: string }>(
         'SELECT id, data_source FROM scoring_dimensions WHERE job_role = ?',

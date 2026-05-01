@@ -123,14 +123,14 @@ orgScoresRouter.delete('/:id', adminMiddleware, asyncHandler(async (req: Request
 orgScoresRouter.get('/:seasonId/summary', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
   const summary = await db.query(`
-    SELECT sm.id as member_id, sm.user_id, u.name as user_name, sm.total_org_score,
+    SELECT sm.id as member_id, sm.user_key, fu.name as user_name, sm.total_org_score,
            os.org_score_type_id, ost.display_name, os.points
     FROM season_members sm
-    JOIN users u ON sm.user_id = u.id
+    JOIN feishu_user fu ON sm.user_key = fu.user_key
     LEFT JOIN org_scores os ON os.season_member_id = sm.id AND os.status = 'approved'
     LEFT JOIN org_score_types ost ON os.org_score_type_id = ost.id
     WHERE sm.season_id = ?
-    ORDER BY u.name, ost.sort_order
+    ORDER BY fu.name, ost.sort_order
   `, [req.params.seasonId])
   res.json(summary)
 }))

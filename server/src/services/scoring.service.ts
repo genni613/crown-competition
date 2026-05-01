@@ -31,55 +31,53 @@ export async function calculateSeasonScores(seasonId: number): Promise<SeasonMem
           [jobRole]
         )
 
-        const dimMap = new Map<string, { dim: ScoringDimension; scores: IndicatorScore[] }>()
+        const dimMap = new Map<string, { indicators: { dim: ScoringDimension; score: IndicatorScore | null }[] }>()
         for (const dim of dimensions) {
           const key = dim.dimension_name
-          if (!dimMap.has(key)) dimMap.set(key, { dim, scores: [] })
+          if (!dimMap.has(key)) dimMap.set(key, { indicators: [] })
           const score = await tx.queryOne<IndicatorScore>(
             'SELECT * FROM indicator_scores WHERE season_member_id = ? AND dimension_id = ?',
             [member.id, dim.id]
           )
-          if (score) dimMap.get(key)!.scores.push(score)
+          dimMap.get(key)!.indicators.push({ dim, score: score ?? null })
         }
 
         let totalDeduction = 0
         let rawPositionScore = 0
 
-        for (const [, { dim, scores }] of dimMap) {
-          if (dim.score_type === 'deduction') {
-            for (const score of scores) {
-              const rawVal = score.raw_value || 0
-              const divisor = dim.deduction_divisor || 1
-              const perUnit = dim.deduction_per_unit || 1
-              const cap = dim.deduction_cap || 0
-              const deduction = Math.min(rawVal * perUnit / divisor, cap)
-              totalDeduction += deduction
+        for (const [, group] of dimMap) {
+          const thresholdIndicators = group.indicators.filter(i => i.dim.score_type !== 'deduction' && i.score)
+          const deductionIndicators = group.indicators.filter(i => i.dim.score_type === 'deduction' && i.score)
 
-              await tx.execute(
-                'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
-                [0, -deduction, score.id]
-              )
-            }
-          } else {
-            let dimScore = 0
-            for (const score of scores) {
-              const rawVal = score.raw_value || 0
-              const t100 = dim.threshold_100
-              const t60 = dim.threshold_60
-              const thresholdScore = (t100 != null && t60 != null)
-                ? calculateThresholdScore(rawVal, t100, t60)
-                : rawVal
-              await tx.execute(
-                'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
-                [thresholdScore, thresholdScore, score.id]
-              )
-              dimScore += thresholdScore * dim.indicator_weight
-            }
+          const dimWeight = thresholdIndicators[0]?.dim.dimension_weight ?? 0
 
-            const weightedDimScore = dim.dimension_weight > 0
-              ? dimScore / dim.dimension_weight
-              : dimScore
-            rawPositionScore += weightedDimScore * dim.dimension_weight
+          for (const { dim, score } of thresholdIndicators) {
+            const rawVal = score!.raw_value || 0
+            const t100 = dim.threshold_100
+            const t60 = dim.threshold_60
+            const thresholdScore = (t100 != null && t60 != null)
+              ? calculateThresholdScore(rawVal, t100, t60)
+              : rawVal
+            const contribution = thresholdScore * dim.indicator_weight * dimWeight
+            await tx.execute(
+              'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
+              [thresholdScore, contribution, score!.id]
+            )
+            rawPositionScore += contribution
+          }
+
+          for (const { dim, score } of deductionIndicators) {
+            const rawVal = score!.raw_value || 0
+            const divisor = dim.deduction_divisor || 1
+            const perUnit = dim.deduction_per_unit || 1
+            const cap = dim.deduction_cap || 0
+            const deduction = Math.min(rawVal * perUnit / divisor, cap)
+            totalDeduction += deduction
+
+            await tx.execute(
+              'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
+              [0, -deduction, score!.id]
+            )
           }
         }
 

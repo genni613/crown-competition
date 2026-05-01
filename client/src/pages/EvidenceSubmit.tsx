@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Form, Image, Input, Modal, Select, Space, Upload, message } from 'antd'
+import { Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Upload, message } from 'antd'
 import type { RcFile, UploadFile } from 'antd/es/upload/interface'
 import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, getMembers } from '../api/seasons'
 import { submitEvidence, uploadEvidenceAttachment } from '../api/evidence'
+import { getDimensions } from '../api/scoring'
 import { useAuthStore } from '../store/authStore'
-import type { Season, SeasonMember } from '../types/models'
+import type { Season, SeasonMember, ScoringDimension } from '../types/models'
 
 const supportedImageMimeTypes = new Set([
   'image/jpeg',
@@ -42,6 +43,8 @@ export default function EvidenceSubmit() {
   const [resultContent, setResultContent] = useState('')
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [evidenceDimensions, setEvidenceDimensions] = useState<ScoringDimension[]>([])
+  const [memberJobRole, setMemberJobRole] = useState<string | null>(null)
 
   useEffect(() => {
     getSeasons().then(res => setSeasons(res.data))
@@ -49,15 +52,24 @@ export default function EvidenceSubmit() {
 
   async function onSeasonChange(seasonId: number) {
     const res = await getMembers(seasonId)
-    const me = res.data.find((m: SeasonMember) => m.user_id === user?.id)
+    const me = res.data.find((m: SeasonMember) => m.user_key === user?.user_key)
     if (me) {
       form.setFieldValue('season_member_id', me.id)
       setMembershipReady(true)
+      setMemberJobRole(me.job_role || null)
+      if (me.job_role) {
+        try {
+          const dimRes = await getDimensions(me.job_role)
+          setEvidenceDimensions(dimRes.data.filter((d: ScoringDimension) => d.data_source === 'evidence'))
+        } catch { setEvidenceDimensions([]) }
+      }
       return
     }
 
     form.setFieldValue('season_member_id', undefined)
     setMembershipReady(false)
+    setMemberJobRole(null)
+    setEvidenceDimensions([])
     setResultTitle('提示')
     setResultContent('你还没有加入这个赛季，当前不能提交举证。')
     setResultOpen(true)
@@ -104,6 +116,8 @@ export default function EvidenceSubmit() {
   async function onFinish(values: {
     season_member_id: number
     target_type: string
+    target_id?: number
+    raw_value?: number
     title: string
     description: string
   }) {
@@ -166,6 +180,27 @@ export default function EvidenceSubmit() {
               <Select.Option value="org_score">组织分举证</Select.Option>
             </Select>
           </Form.Item>
+          {evidenceDimensions.length > 0 && (
+            <Form.Item label="关联指标" name="target_id" rules={[{ required: true, message: '请选择举证指标' }]}>
+              <Select placeholder="选择要举证的指标">
+                {evidenceDimensions.map(d => (
+                  <Select.Option key={d.id} value={d.id}>
+                    {d.dimension_name} — {d.indicator_name}
+                    {d.threshold_100 != null && d.threshold_60 != null && (
+                      <span style={{ color: '#999', marginLeft: 8 }}>
+                        (满分≥{d.threshold_100}，及格≥{d.threshold_60})
+                      </span>
+                    )}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
+          {evidenceDimensions.length > 0 && (
+            <Form.Item label="举证数值" name="raw_value" rules={[{ required: true, message: '请输入举证数值' }]}>
+              <InputNumber min={0} style={{ width: '100%' }} placeholder="例如：解决了 3 个问题，填 3" />
+            </Form.Item>
+          )}
           <Form.Item label="标题" name="title" rules={[{ required: true, message: '请输入标题' }]}>
             <Input placeholder="举证标题" />
           </Form.Item>

@@ -151,7 +151,7 @@ export default function ScoreEntry() {
             optionFilterProp="label"
             value={selectedMemberId}
             onChange={setSelectedMemberId}
-            options={members.map(member => ({ value: member.id, label: member.user_name || member.user_id, avatarUrl: member.user_avatar_url }))}
+            options={members.map(member => ({ value: member.id, label: member.user_name || member.user_key, avatarUrl: member.user_avatar_url }))}
             optionRender={({ data }) => (
               <Space>
                 <Avatar src={(data as any).avatarUrl} size="small" icon={<UserOutlined />} />

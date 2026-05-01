@@ -39,6 +39,7 @@ export interface FeishuUserRow {
   name: string
   email: string
   avatar_url: string | null
+  job_role: 'product' | 'design' | 'tech' | null
 }
 
 function normalizeDateInput(value: string | undefined, fieldName: string): string {
@@ -223,7 +224,7 @@ export async function queryPdSummaryByDateRange(
 export async function listFeishuUsers(): Promise<FeishuUserRow[]> {
   const db = getDb()
   return db.query<FeishuUserRow>(`
-    SELECT user_key, name, email, avatar_url
+    SELECT user_key, name, email, avatar_url, job_role
     FROM feishu_user
     WHERE user_key IS NOT NULL AND user_key != ''
     ORDER BY

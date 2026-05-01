@@ -9,7 +9,7 @@ type MetricMap = Record<string, number>
 
 interface SyncMember {
   season_member_id: number
-  user_id: string
+  user_key: string
   job_role: JobRole | null
   email: string | null
   name: string
@@ -340,7 +340,7 @@ function fieldWarnings(member: SyncMember, sample: any | undefined): SyncWarning
       : [storyFields.developer, storyFields.standardHours]
 
   for (const key of fieldsToCheck) {
-    if (isMissingField(sample, key)) warnings.push({ userId: member.user_id, reason: `样例工作项缺少字段 ${key}，请检查 feishuProjectFields.json` })
+    if (isMissingField(sample, key)) warnings.push({ userId: member.user_key, reason: `样例工作项缺少字段 ${key}，请检查 feishuProjectFields.json` })
   }
   return warnings
 }
@@ -349,7 +349,7 @@ async function aggregateMemberMetrics(member: SyncMember, season: Season): Promi
   if (!member.job_role) throw new Error('成员缺少 job_role')
   const startMs = toTime(season.start_date)
   const endMs = toTime(`${season.end_date}T23:59:59.999`)
-  const projectUserKey = await resolveProjectUserKey(member)
+  const projectUserKey = member.user_key
 
   const storyUserField = member.job_role === 'product'
     ? storyFields.productOwner
@@ -432,14 +432,14 @@ async function getMembers(seasonId: number, userId?: string): Promise<SyncMember
   const params: unknown[] = [seasonId]
   let where = 'WHERE sm.season_id = ?'
   if (userId) {
-    where += ' AND sm.user_id = ?'
+    where += ' AND sm.user_key = ?'
     params.push(userId)
   }
 
   return getDb().query<SyncMember>(`
-    SELECT sm.id AS season_member_id, sm.user_id, sm.job_role, u.email, u.name
+    SELECT sm.id AS season_member_id, sm.user_key, sm.job_role, fu.email, fu.name
     FROM season_members sm
-    JOIN users u ON u.id = sm.user_id
+    JOIN feishu_user fu ON fu.user_key = sm.user_key
     ${where}
   `, params)
 }
@@ -496,7 +496,7 @@ export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult
     } catch (error) {
       result.skippedCount += 1
       result.warnings.push({
-        userId: member.user_id,
+        userId: member.user_key,
         reason: error instanceof Error ? error.message : String(error),
       })
     }

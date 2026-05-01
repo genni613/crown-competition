@@ -150,4 +150,4 @@
 | value_a | 价值观A（持续两个赛季） | 3分 | 3分 |
 | infra_core | 复杂基建项目（核心） | 10分 | 无上限 |
 | infra_participate | 复杂基建项目（参与） | 5分 | 无上限 |
-| special_contribution | 特别贡献分（领导分配） | 可变 | 10分 |
+| special_contribution | 特别贡献分（组织评定） | 可变 | 10分 |

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card } from 'antd'
+import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card, Avatar } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, createSeason, activateSeason, endSeason, getMembers, addMember, removeMember } from '../../api/seasons'
-import { getUsers } from '../../api/users'
-import type { Season, SeasonMember, User } from '../../types/models'
+import { getLocalFeishuUsers } from '../../api/feishu'
+import type { LocalFeishuUser } from '../../api/feishu'
+import type { Season, SeasonMember } from '../../types/models'
 import { formatDate } from '../../utils/datetime'
 
 const statusColors: Record<string, string> = { draft: 'default', active: 'green', ended: 'red' }
@@ -18,14 +19,14 @@ const jobRoleOptions = [
 export default function SeasonManager() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [members, setMembers] = useState<SeasonMember[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [feishuUsers, setFeishuUsers] = useState<LocalFeishuUser[]>([])
   const [selectedSeason, setSelectedSeason] = useState<number>()
   const [createOpen, setCreateOpen] = useState(false)
   const [memberOpen, setMemberOpen] = useState(false)
   const [form] = Form.useForm()
   const [memberForm] = Form.useForm()
 
-  useEffect(() => { loadSeasons(); getUsers().then(r => setUsers(r.data)) }, [])
+  useEffect(() => { loadSeasons(); getLocalFeishuUsers().then(r => setFeishuUsers(r.data)) }, [])
 
   async function loadSeasons() {
     const res = await getSeasons()
@@ -113,9 +114,18 @@ export default function SeasonManager() {
             上期绩效仅作为增长保护基线，可选填写；本赛季分数仍由飞书数据、举证审批和管理员录分共同计算。
           </Typography.Paragraph>
           <Form form={memberForm} layout="inline" onFinish={onAddMember}>
-            <Form.Item name="user_id" rules={[{ required: true }]}>
-              <Select showSearch placeholder="选择用户" optionFilterProp="label" style={{ width: 150 }}>
-                {users.map(u => <Select.Option key={u.id} value={u.id} label={u.name}>{u.name}</Select.Option>)}
+            <Form.Item name="user_key" rules={[{ required: true }]}>
+              <Select showSearch placeholder="选择用户" optionFilterProp="label" style={{ width: 180 }}
+                onChange={(val) => {
+                  const u = feishuUsers.find(f => f.user_key === val)
+                  if (u?.job_role) memberForm.setFieldValue('job_role', u.job_role)
+                }}
+                optionRender={({ data: { label, value } }) => {
+                  const u = feishuUsers.find(f => f.user_key === value)
+                  return <Space><Avatar src={u?.avatar_url} size="small" />{label}</Space>
+                }}
+              >
+                {feishuUsers.map(u => <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>)}
               </Select>
             </Form.Item>
             <Form.Item name="job_role" rules={[{ required: true }]}>

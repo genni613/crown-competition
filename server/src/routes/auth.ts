@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { getIronSession } from 'iron-session'
+import { getDb } from '../db'
 import crypto from 'crypto'
 import { feishuAuth } from '../lib/feishu'
 import { sessionOptions, SessionData } from '../lib/session'
@@ -119,11 +120,18 @@ authRouter.get('/me', authMiddleware, asyncHandler(async (req: Request, res: Res
         role: currentUser.role,
       })
       req.currentUser = updated
-      res.json({ user: updated })
+      const fu = await getDb().queryOne<{ job_role: string | null }>('SELECT job_role FROM feishu_user WHERE user_key = ?', [updated.user_key])
+      res.json({ user: { ...updated, feishu_job_role: fu?.job_role ?? null } })
       return
     } catch (error) {
       console.warn('Failed to refresh current user profile from Feishu:', error)
     }
   }
-  res.json({ user: req.currentUser })
+  const userKey = (req.currentUser as any)?.user_key
+  let feishuJobRole: string | null = null
+  if (userKey) {
+    const fu = await getDb().queryOne<{ job_role: string | null }>('SELECT job_role FROM feishu_user WHERE user_key = ?', [userKey])
+    feishuJobRole = fu?.job_role ?? null
+  }
+  res.json({ user: { ...req.currentUser, feishu_job_role: feishuJobRole } })
 }))

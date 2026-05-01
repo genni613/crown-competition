@@ -43,14 +43,15 @@ scoringRouter.get('/breakdown/:seasonId/:memberId', authMiddleware, asyncHandler
 
   if (!member) { res.status(404).json({ error: '成员不存在' }); return }
 
-  if (req.currentUser?.role !== 'ADMIN' && req.currentUser?.id !== member.user_id) {
+  if (req.currentUser?.role !== 'ADMIN' && req.currentUser?.user_key !== member.user_key) {
     res.status(403).json({ error: '无权查看' })
     return
   }
 
   const scores = await db.query(`
     SELECT isc.*, sd.dimension_name, sd.indicator_name, sd.dimension_weight,
-           sd.indicator_weight, sd.data_source, sd.score_type, sd.threshold_100, sd.threshold_60
+           sd.indicator_weight, sd.data_source, sd.score_type, sd.threshold_100, sd.threshold_60,
+           sd.deduction_per_unit, sd.deduction_cap, sd.deduction_divisor
     FROM indicator_scores isc
     JOIN scoring_dimensions sd ON isc.dimension_id = sd.id
     WHERE isc.season_member_id = ?
@@ -58,8 +59,8 @@ scoringRouter.get('/breakdown/:seasonId/:memberId', authMiddleware, asyncHandler
   `, [req.params.memberId])
 
   const user = await db.queryOne(
-    'SELECT name, avatar_url, department_name FROM users WHERE id = ?',
-    [member.user_id]
+    'SELECT name, avatar_url FROM feishu_user WHERE user_key = ?',
+    [member.user_key]
   )
 
   res.json({ member, user, scores })
@@ -69,10 +70,9 @@ scoringRouter.get('/breakdown/:seasonId/:memberId', authMiddleware, asyncHandler
 scoringRouter.get('/rankings/:seasonId', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
   const rankings = await db.query(
-    'SELECT sm.*, u.name as user_name, u.avatar_url as user_avatar_url, ' +
-    'u.department_name as user_department_name ' +
+    'SELECT sm.*, fu.name as user_name, fu.avatar_url as user_avatar_url ' +
     'FROM season_members sm ' +
-    'JOIN users u ON sm.user_id = u.id ' +
+    'JOIN feishu_user fu ON sm.user_key = fu.user_key ' +
     'WHERE sm.season_id = ? ' +
     'ORDER BY sm.`rank` IS NULL, sm.`rank` ASC',
     [req.params.seasonId]
@@ -84,10 +84,9 @@ scoringRouter.get('/rankings/:seasonId', authMiddleware, asyncHandler(async (req
 scoringRouter.get('/rankings/:seasonId/:jobRole', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
   const rankings = await db.query(
-    'SELECT sm.*, u.name as user_name, u.avatar_url as user_avatar_url, ' +
-    'u.department_name as user_department_name ' +
+    'SELECT sm.*, fu.name as user_name, fu.avatar_url as user_avatar_url ' +
     'FROM season_members sm ' +
-    'JOIN users u ON sm.user_id = u.id ' +
+    'JOIN feishu_user fu ON sm.user_key = fu.user_key ' +
     'WHERE sm.season_id = ? AND sm.job_role = ? ' +
     'ORDER BY sm.`rank` IS NULL, sm.`rank` ASC',
     [req.params.seasonId, req.params.jobRole]

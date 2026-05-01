@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(191) PRIMARY KEY,
+  user_key VARCHAR(64) NULL COMMENT '飞书项目 user_key，关联 feishu_user 表',
   name VARCHAR(255) NOT NULL,
   avatar_url TEXT NULL,
   email VARCHAR(255) NULL,
@@ -25,7 +26,7 @@ CREATE TABLE IF NOT EXISTS seasons (
 CREATE TABLE IF NOT EXISTS season_members (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   season_id BIGINT NOT NULL,
-  user_id VARCHAR(191) NOT NULL,
+  user_key VARCHAR(64) NOT NULL COMMENT '关联 feishu_user.user_key',
   job_role ENUM('product', 'design', 'tech') NULL,
   performance_grade ENUM('A', 'B+', 'B', 'B-', 'C') NULL,
   prev_raw_score DOUBLE NULL,
@@ -37,11 +38,10 @@ CREATE TABLE IF NOT EXISTS season_members (
   total_score DOUBLE NULL,
   `rank` INT NULL,
   distribution ENUM('2', '7', '1') NULL,
-  UNIQUE KEY uniq_season_member (season_id, user_id),
+  UNIQUE KEY uniq_season_member (season_id, user_key),
   KEY idx_season_members_season (season_id),
-  KEY idx_season_members_user (user_id),
-  CONSTRAINT fk_season_members_season FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
-  CONSTRAINT fk_season_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  KEY idx_season_members_user (user_key),
+  CONSTRAINT fk_season_members_season FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS scoring_dimensions (
@@ -297,6 +297,7 @@ CREATE TABLE IF NOT EXISTS feishu_user (
   email VARCHAR(255) DEFAULT '' COMMENT '邮箱',
   avatar_url TEXT NULL COMMENT '头像URL',
   status VARCHAR(32) DEFAULT '' COMMENT '状态',
+  job_role ENUM('product', 'design', 'tech') NULL COMMENT '岗位',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_user_key (user_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书用户表';

@@ -38,7 +38,7 @@ export default function Rankings() {
     { title: '成员', dataIndex: 'user_name', render: (name: string, r: SeasonMember) => (
       <span><Avatar src={r.user_avatar_url} icon={<UserOutlined />} size="small" style={{ marginRight: 8 }} />{name}</span>
     )},
-    { title: '部门', dataIndex: 'user_department_name' },
+    { title: '部门', dataIndex: 'user_department_name', render: (v: string | null) => v || '-' },
     { title: '岗位分', dataIndex: 'final_position_score', render: (v: number) => v?.toFixed(1) ?? '-' },
     { title: '组织分', dataIndex: 'total_org_score', render: (v: number) => v?.toFixed(1) ?? '0' },
     { title: '总分', dataIndex: 'total_score', render: (v: number) => <Typography.Text strong>{v?.toFixed(1) ?? '-'}</Typography.Text> },

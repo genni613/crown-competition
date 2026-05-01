@@ -317,6 +317,22 @@ feishuRouter.get('/local-users', adminMiddleware, asyncHandler(async (_req, res)
   res.json(result)
 }))
 
+// PUT /api/feishu/my-job-role — 当前登录用户设置自己的岗位
+feishuRouter.put('/my-job-role', authMiddleware, asyncHandler(async (req, res) => {
+  const { job_role } = req.body
+  if (!job_role || !['product', 'design', 'tech'].includes(job_role)) {
+    res.status(400).json({ error: '无效的岗位类型' })
+    return
+  }
+  const userKey = (req.currentUser as any)?.user_key
+  if (!userKey) {
+    res.status(400).json({ error: '当前用户未关联飞书账号' })
+    return
+  }
+  await getDb().execute('UPDATE feishu_user SET job_role = ? WHERE user_key = ?', [job_role, userKey])
+  res.json({ ok: true })
+}))
+
 // POST /api/feishu/story/import — 接收飞书OpenAPI response，解析入库
 feishuRouter.post('/story/import', adminMiddleware, asyncHandler(async (req, res) => {
   const payload = req.body

@@ -91,6 +91,15 @@ export default function EvidenceReview() {
     { title: '提交人', dataIndex: 'user_name' },
     { title: '赛季', dataIndex: 'season_name' },
     { title: '标题', dataIndex: 'title' },
+    {
+      title: '关联指标',
+      render: (_: unknown, r: EvidenceSubmission) => {
+        const snap = r.snapshot_json as Record<string, unknown> | null
+        if (!snap?.target_id || r.target_type !== 'indicator') return <Typography.Text type="secondary">-</Typography.Text>
+        const rawVal = snap.raw_value != null ? `（举证值: ${snap.raw_value}）` : ''
+        return <Typography.Text style={{ fontSize: 12 }}>{r.title || '指标举证'} {rawVal}</Typography.Text>
+      },
+    },
     { title: '描述', dataIndex: 'description', ellipsis: true },
     {
       title: '图片',

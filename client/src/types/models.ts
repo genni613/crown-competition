@@ -1,5 +1,6 @@
 export interface User {
   id: string
+  user_key: string | null
   name: string
   avatar_url: string | null
   email: string | null
@@ -20,7 +21,7 @@ export interface Season {
 export interface SeasonMember {
   id: number
   season_id: number
-  user_id: string
+  user_key: string
   job_role: 'product' | 'design' | 'tech' | null
   performance_grade: string | null
   prev_raw_score: number | null
@@ -34,7 +35,6 @@ export interface SeasonMember {
   distribution: '2' | '7' | '1' | null
   user_name?: string
   user_avatar_url?: string | null
-  user_department_name?: string | null
 }
 
 export interface ScoringDimension {

@@ -64,14 +64,14 @@ scoresRouter.put('/:seasonId/:memberId/batch', adminMiddleware, asyncHandler(asy
 scoresRouter.get('/:seasonId/summary', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
   const summary = await db.query(`
-    SELECT sm.id as member_id, sm.user_id, u.name as user_name, sm.job_role,
+    SELECT sm.id as member_id, sm.user_key, fu.name as user_name, sm.job_role,
            isc.dimension_id, sd.indicator_name, isc.raw_value, isc.threshold_score, isc.final_score
     FROM season_members sm
-    JOIN users u ON sm.user_id = u.id
+    JOIN feishu_user fu ON sm.user_key = fu.user_key
     LEFT JOIN indicator_scores isc ON isc.season_member_id = sm.id
     LEFT JOIN scoring_dimensions sd ON isc.dimension_id = sd.id
     WHERE sm.season_id = ?
-    ORDER BY u.name, sd.sort_order
+    ORDER BY fu.name, sd.sort_order
   `, [req.params.seasonId])
   res.json(summary)
 }))

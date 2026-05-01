@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
+  App,
   Button,
   Card,
   Collapse,
   Form,
   InputNumber,
-  message,
   Modal,
   Select,
   Space,
@@ -23,6 +23,7 @@ const sourceColors: Record<string, string> = { feishu: 'green', admin: 'orange',
 const sourceLabels: Record<string, string> = { feishu: '飞书', admin: '录入', evidence: '举证' }
 
 export default function DimensionManager() {
+  const { message } = App.useApp()
   const [data, setData] = useState<ScoringDimension[]>([])
   const [loading, setLoading] = useState(true)
   const [editItem, setEditItem] = useState<ScoringDimension | null>(null)
@@ -62,6 +63,24 @@ export default function DimensionManager() {
   async function onSave() {
     if (!editItem) return
     const values = await form.validateFields()
+    const newWeight = values.indicator_weight ?? editItem.indicator_weight
+
+    if (editItem.score_type !== 'deduction' && newWeight != null) {
+      const siblings = data.filter(
+        d => d.dimension_name === editItem.dimension_name
+          && d.job_role === editItem.job_role
+          && d.score_type !== 'deduction'
+          && d.id !== editItem.id
+      )
+      const dimWeight = editItem.dimension_weight
+      const siblingSum = siblings.reduce((s, d) => s + d.indicator_weight, 0)
+      const total = siblingSum + newWeight
+      if (Math.abs(total - dimWeight) > 0.01) {
+        message.warning(`「${editItem.dimension_name}」指标权重之和应等于纬度权重（${(dimWeight * 100).toFixed(0)}%），当前合计 ${(total * 100).toFixed(0)}%，请调整`)
+        return
+      }
+    }
+
     setSaving(true)
     try {
       await updateDimension(editItem.id, values)
@@ -90,7 +109,7 @@ export default function DimensionManager() {
         <span>
           {dimName}
           <Tag color="blue" style={{ marginLeft: 8 }}>
-            {(indicators[0].dimension_weight * 100).toFixed(0)}%
+            纬度权重 {(indicators[0].dimension_weight * 100).toFixed(0)}%
           </Tag>
           <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
             {indicators.length} 个指标
@@ -209,7 +228,7 @@ export default function DimensionManager() {
             <Form.Item name="dimension_weight" label="维度权重" style={{ width: 200 }}>
               <InputNumber min={0} max={1} step={0.05} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="indicator_weight" label="指标权重" style={{ width: 200 }}>
+            <Form.Item name="indicator_weight" label="指标权重（纬度内占比）" style={{ width: 200 }}>
               <InputNumber min={0} max={1} step={0.05} style={{ width: '100%' }} />
             </Form.Item>
           </Space>

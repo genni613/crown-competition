@@ -2,6 +2,7 @@
 
 export interface User {
   id: string // 飞书 open_id
+  user_key: string | null
   name: string
   avatar_url: string | null
   email: string | null
@@ -27,7 +28,7 @@ export interface Season {
 export interface SeasonMember {
   id: number
   season_id: number
-  user_id: string
+  user_key: string
   job_role: 'product' | 'design' | 'tech' | null
   performance_grade: 'A' | 'B+' | 'B' | 'B-' | 'C' | null
   prev_raw_score: number | null
@@ -135,8 +136,6 @@ export type PerformanceGrade = 'A' | 'B+' | 'B' | 'B-' | 'C'
 export interface SeasonMemberDetail extends SeasonMember {
   user_name: string
   user_avatar_url: string | null
-  user_department_name: string | null
-  user_title: string | null
 }
 
 /** 指标得分详情（关联维度信息） */

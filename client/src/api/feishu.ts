@@ -151,6 +151,7 @@ export interface LocalFeishuUser {
   name: string
   email: string
   avatar_url?: string | null
+  job_role?: 'product' | 'design' | 'tech' | null
 }
 
 export const getFeishuProjectStatus = () =>
@@ -191,6 +192,9 @@ export const getLocalPdSummary = (params: { startDate: string; endDate: string; 
 
 export const getLocalFeishuUsers = () =>
   api.get<LocalFeishuUser[]>('/feishu/local-users')
+
+export const updateMyJobRole = (job_role: string) =>
+  api.put('/feishu/my-job-role', { job_role })
 
 export interface WorkHourImportResult {
   total: number

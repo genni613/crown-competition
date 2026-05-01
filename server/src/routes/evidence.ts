@@ -4,6 +4,7 @@ import path from 'path'
 import crypto from 'crypto'
 import multer, { MulterError } from 'multer'
 import { getDb } from '../db'
+import { calculateThresholdScore } from '../utils/scoringFormulas'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 
@@ -37,7 +38,7 @@ const upload = multer({
 
 function canAccessEvidence(currentUser: any, evidenceOwnerId: string) {
   if (!currentUser) return false
-  return currentUser.role === 'ADMIN' || currentUser.id === evidenceOwnerId
+  return currentUser.role === 'ADMIN' || currentUser.user_key === evidenceOwnerId
 }
 
 function normalizeAttachmentUrls(value: unknown): string[] {
@@ -139,8 +140,8 @@ evidenceRouter.get('/attachments/:filename', authMiddleware, asyncHandler(async 
 
   const url = `/api/evidence/attachments/${filename}`
   const db = getDb()
-  const owner = await db.queryOne<{ user_id: string }>(`
-    SELECT sm.user_id
+  const owner = await db.queryOne<{ user_key: string }>(`
+    SELECT sm.user_key
     FROM evidence_submissions es
     JOIN season_members sm ON es.season_member_id = sm.id
     WHERE es.attachment_urls LIKE ?
@@ -152,7 +153,7 @@ evidenceRouter.get('/attachments/:filename', authMiddleware, asyncHandler(async 
     return
   }
 
-  if (!canAccessEvidence(req.currentUser, owner.user_id)) {
+  if (!canAccessEvidence(req.currentUser, owner.user_key)) {
     res.status(403).json({ error: '无权查看' })
     return
   }
@@ -170,12 +171,12 @@ evidenceRouter.get('/attachments/:filename', authMiddleware, asyncHandler(async 
 evidenceRouter.get('/pending', adminMiddleware, asyncHandler(async (_req: Request, res: Response) => {
   const db = getDb()
   const list = await db.query(`
-    SELECT es.*, sm.user_id, sm.season_id, u.name as user_name,
+    SELECT es.*, sm.user_key, sm.season_id, fu.name as user_name,
            lr.comment as review_comment, lr.created_at as reviewed_at,
            lr.snapshot_json as review_snapshot_json, reviewer.name as reviewer_name
     FROM evidence_submissions es
     JOIN season_members sm ON es.season_member_id = sm.id
-    JOIN users u ON sm.user_id = u.id
+    JOIN feishu_user fu ON sm.user_key = fu.user_key
     ${latestReviewJoin}
     WHERE es.status = 'pending'
     ORDER BY es.created_at DESC
@@ -187,13 +188,13 @@ evidenceRouter.get('/pending', adminMiddleware, asyncHandler(async (_req: Reques
 evidenceRouter.get('/reviewed', adminMiddleware, asyncHandler(async (_req: Request, res: Response) => {
   const db = getDb()
   const list = await db.query(`
-    SELECT es.*, sm.user_id, sm.season_id, s.name as season_name, u.name as user_name,
+    SELECT es.*, sm.user_key, sm.season_id, s.name as season_name, fu.name as user_name,
            lr.comment as review_comment, lr.created_at as reviewed_at,
            lr.snapshot_json as review_snapshot_json, reviewer.name as reviewer_name
     FROM evidence_submissions es
     JOIN season_members sm ON es.season_member_id = sm.id
     JOIN seasons s ON sm.season_id = s.id
-    JOIN users u ON sm.user_id = u.id
+    JOIN feishu_user fu ON sm.user_key = fu.user_key
     ${latestReviewJoin}
     WHERE es.status IN ('approved', 'rejected')
     ORDER BY COALESCE(lr.created_at, es.updated_at) DESC, es.id DESC
@@ -204,7 +205,7 @@ evidenceRouter.get('/reviewed', adminMiddleware, asyncHandler(async (_req: Reque
 async function listMyEvidence(req: Request, res: Response, seasonId?: string) {
   const db = getDb()
 
-  const params: Array<string | number> = [req.currentUser.id]
+  const params: Array<string | number> = [req.currentUser.user_key]
   let seasonFilter = ''
 
   if (seasonId) {
@@ -220,7 +221,7 @@ async function listMyEvidence(req: Request, res: Response, seasonId?: string) {
      JOIN season_members sm ON es.season_member_id = sm.id
      JOIN seasons s ON sm.season_id = s.id
      ${latestReviewJoin}
-     WHERE sm.user_id = ?${seasonFilter}
+     WHERE sm.user_key = ?${seasonFilter}
      ORDER BY es.created_at DESC`,
     params
   )
@@ -247,21 +248,23 @@ evidenceRouter.post('/', authMiddleware, asyncHandler(async (req: Request, res: 
   }
 
   const db = getDb()
-  const member = await db.queryOne<{ user_id: string }>(
+  const member = await db.queryOne<{ user_key: string }>(
     'SELECT * FROM season_members WHERE id = ?',
     [season_member_id]
   )
-  if (!member || member.user_id !== req.currentUser.id) {
+  if (!member || member.user_key !== req.currentUser.user_key) {
     res.status(403).json({ error: '无权操作' })
     return
   }
 
   const attachmentList = attachment_urls || []
+  const raw_value = req.body.raw_value != null ? Number(req.body.raw_value) : null
   const snapshot = {
     submitted_by: req.currentUser.id,
     season_member_id,
     target_type: target_type || 'indicator',
     target_id: target_id ?? null,
+    raw_value,
     title,
     description: description ?? null,
     attachment_urls: attachmentList,
@@ -304,12 +307,46 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
   `, [req.params.id, req.currentUser.id, status, review_comment ?? null, JSON.stringify(reviewSnapshot)])
 
   if (status === 'approved') {
-    const evidence = await db.queryOne<{ target_type: string; target_id?: number }>(
+    const evidence = await db.queryOne<{
+      target_type: string; target_id: number | null;
+      season_member_id: number; snapshot_json: string | null
+    }>(
       'SELECT * FROM evidence_submissions WHERE id = ?',
       [req.params.id]
     )
     if (evidence?.target_type === 'indicator' && evidence?.target_id) {
-      await db.execute('UPDATE indicator_scores SET approved = 1 WHERE id = ?', [evidence.target_id])
+      const snapshot = evidence.snapshot_json ? JSON.parse(evidence.snapshot_json) : {}
+      const rawValue = snapshot.raw_value ?? null
+      const dimensionId = evidence.target_id
+
+      // 读取维度规则
+      const dim = await db.queryOne<{
+        threshold_100: number | null; threshold_60: number | null; score_type: string
+      }>('SELECT * FROM scoring_dimensions WHERE id = ?', [dimensionId])
+
+      let thresholdScore: number | null = null
+      let finalScore: number | null = null
+      if (dim && rawValue != null && dim.threshold_100 != null && dim.threshold_60 != null) {
+        thresholdScore = calculateThresholdScore(rawValue, dim.threshold_100, dim.threshold_60)
+        finalScore = thresholdScore
+      }
+
+      // 查找或创建 indicator_scores 行
+      const existing = await db.queryOne<{ id: number }>(
+        'SELECT id FROM indicator_scores WHERE season_member_id = ? AND dimension_id = ?',
+        [evidence.season_member_id, dimensionId]
+      )
+      if (existing) {
+        await db.execute(
+          'UPDATE indicator_scores SET raw_value = ?, threshold_score = ?, final_score = ?, source = ?, approved = 1 WHERE id = ?',
+          [rawValue, thresholdScore, finalScore, 'evidence', existing.id]
+        )
+      } else {
+        await db.execute(
+          'INSERT INTO indicator_scores (season_member_id, dimension_id, raw_value, threshold_score, final_score, source, approved) VALUES (?, ?, ?, ?, ?, ?, 1)',
+          [evidence.season_member_id, dimensionId, rawValue, thresholdScore, finalScore, 'evidence']
+        )
+      }
     }
   }
 
@@ -320,21 +357,21 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
 evidenceRouter.get('/:id', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
   const evidence = await db.queryOne<{
-    user_id: string
+    user_key: string
     [key: string]: unknown
   }>(`
-    SELECT es.*, sm.user_id, u.name as user_name,
+    SELECT es.*, sm.user_key, fu.name as user_name,
            lr.comment as review_comment, lr.created_at as reviewed_at,
            lr.snapshot_json as review_snapshot_json, reviewer.name as reviewer_name
     FROM evidence_submissions es
     JOIN season_members sm ON es.season_member_id = sm.id
-    JOIN users u ON sm.user_id = u.id
+    JOIN feishu_user fu ON sm.user_key = fu.user_key
     ${latestReviewJoin}
     WHERE es.id = ?
   `, [req.params.id])
   if (!evidence) { res.status(404).json({ error: '不存在' }); return }
 
-  if (!canAccessEvidence(req.currentUser, evidence.user_id)) {
+  if (!canAccessEvidence(req.currentUser, evidence.user_key)) {
     res.status(403).json({ error: '无权查看' })
     return
   }
@@ -363,11 +400,11 @@ evidenceRouter.delete('/:id', authMiddleware, asyncHandler(async (req: Request, 
   )
   if (!evidence) { res.status(404).json({ error: '不存在' }); return }
 
-  const member = await db.queryOne<{ user_id: string }>(
+  const member = await db.queryOne<{ user_key: string }>(
     'SELECT * FROM season_members WHERE id = ?',
     [evidence.season_member_id]
   )
-  if (!member || member.user_id !== req.currentUser.id) {
+  if (!member || member.user_key !== req.currentUser.user_key) {
     res.status(403).json({ error: '无权操作' })
     return
   }
