@@ -10,3 +10,11 @@ export const updateOrgScore = (id: number, data: any) => api.put(`/org-scores/${
 export const deleteOrgScore = (id: number) => api.delete(`/org-scores/${id}`)
 export const getOrgScoreSummary = (seasonId: number) =>
   api.get(`/org-scores/${seasonId}/summary`)
+export const matchOrgScoreType = (scoreTypeHint: string) =>
+  api.post<{
+    best_match: { id: number; name: string; display_name: string } | null
+    confidence: 'high' | 'medium' | 'low'
+    reason: string
+    alternatives: Array<{ id: number; name: string; display_name: string }>
+    source: 'alias' | 'llm' | 'none'
+  }>('/org-score-assist/match-type', { scoreTypeHint })

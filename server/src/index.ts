@@ -12,6 +12,7 @@ import { scoresRouter } from './routes/scores'
 import { scoringRouter } from './routes/scoring'
 import { evidenceRouter } from './routes/evidence'
 import { orgScoresRouter } from './routes/orgScores'
+import { orgScoreAssistRouter } from './routes/orgScoreAssist'
 import { feishuRouter } from './routes/feishu'
 import { dimensionsRouter } from './routes/dimensions'
 import { copilotkitRouter } from './routes/copilotkit'
@@ -29,6 +30,7 @@ app.use('/api/scores', scoresRouter)
 app.use('/api/scoring', scoringRouter)
 app.use('/api/evidence', evidenceRouter)
 app.use('/api/org-scores', orgScoresRouter)
+app.use('/api/org-score-assist', orgScoreAssistRouter)
 app.use('/api/feishu', feishuRouter)
 app.use('/api/dimensions', dimensionsRouter)
 app.use(copilotkitRouter)

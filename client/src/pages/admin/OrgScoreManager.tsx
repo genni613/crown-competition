@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -17,6 +18,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { clearOrgScoreDraft, loadOrgScoreDraft, type OrgScoreDraft } from '../../components/copilot/orgScoreDraft'
 import { getMembers } from '../../api/seasons'
 import { addOrgScore, deleteOrgScore, getOrgScoreTypes, getOrgScores } from '../../api/orgScores'
 import type { SeasonMember, OrgScore, OrgScoreType } from '../../types/models'
@@ -29,6 +31,7 @@ type OrgScoreRecord = OrgScore & {
 }
 
 export default function OrgScoreManager() {
+  const location = useLocation()
   const { seasonId } = useParams()
   const [members, setMembers] = useState<SeasonMember[]>([])
   const [types, setTypes] = useState<OrgScoreType[]>([])
@@ -37,11 +40,16 @@ export default function OrgScoreManager() {
   const [records, setRecords] = useState<OrgScoreRecord[]>([])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedTypeId, setSelectedTypeId] = useState<number>()
+  const [copilotDraft, setCopilotDraft] = useState<OrgScoreDraft | null>(null)
   const [form] = Form.useForm()
 
   useEffect(() => {
     loadMeta()
   }, [seasonId])
+
+  useEffect(() => {
+    setCopilotDraft(loadOrgScoreDraft())
+  }, [seasonId, location.search])
 
   useEffect(() => {
     if (!selectedMemberId && members.length > 0) setSelectedMemberId(members[0].id)
@@ -105,12 +113,93 @@ export default function OrgScoreManager() {
     })
   }
 
+  function normalizeText(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[()（）\-_/,.，。:：]/g, '')
+  }
+
+  function getTypeAliases(type: OrgScoreType): string[] {
+    const aliases = [type.display_name, type.name]
+
+    const aliasMap: Record<string, string[]> = {
+      mentor: ['带教', '带教伙伴', '导师带教'],
+      certified_trainer: ['认证讲师', '集团认证讲师', '讲师积分'],
+      sharing_group: ['组内分享', '分享组内', '周会分享', '小组分享'],
+      sharing_dept: ['会员数字化分享', '部门分享', '分享会员数字化'],
+      sharing_group_hq: ['集团分享', '总部分享', '分享集团'],
+      duty_no_response: ['值班未响应', '值班响应', '值班扣分'],
+      gardener: ['花匠', '花匠工作'],
+      referral_onboard: ['内推入职', '内推进人', '推荐入职'],
+      referral_confirm: ['内推转正', '推荐转正'],
+      value_a: ['价值观a', '价值观A'],
+      infra_core: ['复杂基建核心', '基建核心', '核心基建'],
+      infra_participate: ['复杂基建参与', '基建参与'],
+      special_contribution: ['特别贡献', '组织评定', '特别贡献分'],
+    }
+
+    return [...aliases, ...(aliasMap[type.name] || [])]
+  }
+
+  const draftMatch = useMemo(() => {
+    if (!copilotDraft || !seasonId) return null
+    if (copilotDraft.seasonId !== Number(seasonId)) return null
+
+    const memberHint = normalizeText(copilotDraft.memberName)
+    const matchedMember = members.find(item => {
+      const name = normalizeText(item.user_name || '')
+      return name.includes(memberHint) || memberHint.includes(name)
+    })
+
+    const typeHint = normalizeText(copilotDraft.scoreTypeHint)
+    const matchedType = copilotDraft.matchedTypeId != null
+      ? types.find(item => item.id === copilotDraft.matchedTypeId)
+      : types.find(item => {
+          const aliases = getTypeAliases(item).map(normalizeText)
+          return aliases.some(alias => alias.includes(typeHint) || typeHint.includes(alias))
+        })
+
+    return {
+      matchedMember,
+      matchedType,
+    }
+  }, [copilotDraft, seasonId, members, types])
+
+  function applyDraftToForm() {
+    if (!copilotDraft || !draftMatch) return
+
+    if (draftMatch.matchedMember) {
+      setSelectedMemberId(draftMatch.matchedMember.id)
+    }
+
+    if (draftMatch.matchedType) {
+      if (draftMatch.matchedType.points_per_unit > 0) setActiveTab('positive')
+      if (draftMatch.matchedType.points_per_unit < 0) setActiveTab('negative')
+      setSelectedTypeId(draftMatch.matchedType.id)
+      form.setFieldsValue({
+        org_score_type_id: draftMatch.matchedType.id,
+        quantity: copilotDraft.quantity,
+        description: copilotDraft.description,
+      })
+    } else {
+      form.setFieldsValue({
+        quantity: copilotDraft.quantity,
+        description: copilotDraft.description,
+      })
+    }
+
+    setDrawerOpen(true)
+  }
+
   async function onAdd(values: any) {
     if (!seasonId || !selectedMemberId || !selectedTypeId) return
     try {
       await addOrgScore(Number(seasonId), selectedMemberId, values)
       message.success('已录入')
       setDrawerOpen(false)
+      clearOrgScoreDraft()
+      setCopilotDraft(null)
       form.resetFields()
       await Promise.all([
         loadMeta(),
@@ -152,6 +241,76 @@ export default function OrgScoreManager() {
           先选成员，再点具体加分/减分项录入，避免在大表里找项。
         </Typography.Paragraph>
       </div>
+
+      {copilotDraft && copilotDraft.seasonId === Number(seasonId) && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="已载入 AI 草稿"
+          description={(
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Typography.Text>
+                系统已根据聊天里的自然语言生成组织分草稿。请先核对下面这些内容，再决定是否应用到表单。
+              </Typography.Text>
+              <Space wrap>
+                <Tag color="blue">成员：{copilotDraft.memberName}</Tag>
+                <Tag color={draftMatch?.matchedMember ? 'green' : 'orange'}>
+                  {draftMatch?.matchedMember ? `已匹配 ${draftMatch.matchedMember.user_name}` : '成员待确认'}
+                </Tag>
+                <Tag color="purple">分项：{copilotDraft.scoreTypeHint}</Tag>
+                <Tag color={draftMatch?.matchedType ? 'green' : 'orange'}>
+                  {draftMatch?.matchedType ? `已匹配 ${draftMatch.matchedType.display_name}` : '分项待确认'}
+                </Tag>
+                <Tag>数量：{copilotDraft.quantity}</Tag>
+              </Space>
+              {copilotDraft.matchReason && (
+                <Typography.Text type="secondary">
+                  映射依据：{copilotDraft.matchReason}
+                </Typography.Text>
+              )}
+              {copilotDraft.alternatives && copilotDraft.alternatives.length > 0 && (
+                <Space wrap>
+                  {copilotDraft.alternatives.map(item => (
+                    <Tag key={item.id}>备选：{item.display_name}</Tag>
+                  ))}
+                </Space>
+              )}
+              <Typography.Text type="secondary">
+                说明：{copilotDraft.description}
+              </Typography.Text>
+              <Space>
+                <Button type="primary" size="small" onClick={applyDraftToForm}>
+                  应用到表单
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setDrawerOpen(true)
+                    form.setFieldsValue({
+                      quantity: copilotDraft.quantity,
+                      description: copilotDraft.description,
+                    })
+                  }}
+                >
+                  仅带入说明和数量
+                </Button>
+              </Space>
+            </Space>
+          )}
+          action={(
+            <Button
+              size="small"
+              onClick={() => {
+                clearOrgScoreDraft()
+                setCopilotDraft(null)
+              }}
+            >
+              清除草稿
+            </Button>
+          )}
+        />
+      )}
 
       <Row gutter={12} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={14}>
@@ -265,12 +424,19 @@ export default function OrgScoreManager() {
       <Drawer
         title={selectedType ? `录入 ${selectedType.display_name}` : '录入组织分'}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onClose={() => {
+          setDrawerOpen(false)
+        }}
         width={420}
         destroyOnClose
         footer={
           <Space style={{ float: 'right' }}>
-            <Button onClick={() => setDrawerOpen(false)}>取消</Button>
+            <Button onClick={() => {
+              setDrawerOpen(false)
+            }}
+            >
+              取消
+            </Button>
             <Button type="primary" onClick={() => form.submit()}>提交</Button>
           </Space>
         }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Alert, Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Upload, message } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, getMembers } from '../api/seasons'
@@ -31,6 +32,7 @@ function readFileAsDataUrl(file: Blob): Promise<string> {
 }
 
 export default function EvidenceSubmit() {
+  const location = useLocation()
   const { user } = useAuthStore()
   const [seasons, setSeasons] = useState<Season[]>([])
   const [membershipReady, setMembershipReady] = useState(false)
@@ -53,7 +55,8 @@ export default function EvidenceSubmit() {
 
   useEffect(() => {
     setCopilotDraft(loadEvidenceDraft())
-  }, [])
+    setDraftApplied(false)
+  }, [location.search])
 
   async function onSeasonChange(seasonId: number) {
     const res = await getMembers(seasonId)

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Style A: Creative Voltage</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+.slide {
+  width: 100vw; height: 100vh; height: 100dvh;
+  overflow: hidden; display: flex; position: relative;
+  background: var(--bg-dark);
+}
+:root {
+  --bg-primary: #0066ff;
+  --bg-dark: #1a1a2e;
+  --accent-neon: #d4ff00;
+  --text-light: #ffffff;
+  --slide-padding: clamp(1rem, 4vw, 4rem);
+}
+
+/* Left panel - electric blue */
+.left-panel {
+  width: 45%; height: 100%;
+  background: var(--bg-primary);
+  display: flex; flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--slide-padding);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Halftone pattern */
+.left-panel::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(0,0,0,0.12) 1px, transparent 1px);
+  background-size: 12px 12px;
+  opacity: 0.5;
+}
+
+/* Neon badge */
+.badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent-neon); color: var(--bg-dark);
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.6rem, 1vw, 0.8rem);
+  font-weight: 700; padding: clamp(4px, 0.5vw, 8px) clamp(10px, 1.2vw, 18px);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  transform: rotate(-2deg);
+  margin-bottom: clamp(1rem, 3vh, 2rem);
+  position: relative; z-index: 1;
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+.left-panel h2 {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-weight: 400; color: rgba(255,255,255,0.7);
+  margin-bottom: clamp(0.5rem, 1vh, 1rem);
+  position: relative; z-index: 1;
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.left-panel p {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.65rem, 1vw, 0.85rem);
+  color: rgba(255,255,255,0.5);
+  position: relative; z-index: 1;
+  animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+}
+
+/* Right panel - dark */
+.right-panel {
+  width: 55%; height: 100%;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  padding: var(--slide-padding);
+  position: relative;
+}
+
+.right-panel h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 800; color: var(--text-light);
+  line-height: 0.95;
+  animation: revealUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+.right-panel h1 span {
+  color: var(--accent-neon);
+  display: block;
+}
+
+.right-panel .subtitle {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.8rem, 1.5vw, 1.2rem);
+  color: rgba(255,255,255,0.4);
+  margin-top: clamp(1rem, 3vh, 2.5rem);
+  animation: revealUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both;
+}
+
+/* Neon line accent */
+.neon-line {
+  position: absolute; bottom: 0; left: 0;
+  width: 100%; height: 4px;
+  background: var(--accent-neon);
+  box-shadow: 0 0 20px var(--accent-neon), 0 0 40px var(--accent-neon);
+  animation: expandWidth 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.8s both;
+}
+
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes expandWidth {
+  from { transform: scaleX(0); transform-origin: left; }
+  to { transform: scaleX(1); transform-origin: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="slide">
+  <div class="left-panel">
+    <div class="badge">2026 Internal</div>
+    <h2>会员数字化团队</h2>
+    <p>科技中心 · 绩效竞赛平台</p>
+  </div>
+  <div class="right-panel">
+    <h1>皇冠<span>竞赛</span></h1>
+    <p class="subtitle">Crown Competition // v1.0</p>
+    <div class="neon-line"></div>
+  </div>
+</div>
+</body>
+</html>

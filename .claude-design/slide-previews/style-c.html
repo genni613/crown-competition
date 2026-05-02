@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Style C: Split Pastel</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+.slide {
+  width: 100vw; height: 100vh; height: 100dvh;
+  overflow: hidden; display: flex; position: relative;
+}
+:root {
+  --bg-peach: #f5e6dc;
+  --bg-lavender: #e4dff0;
+  --text-dark: #1a1a1a;
+  --badge-mint: #c8f0d8;
+  --badge-yellow: #f0f0c8;
+  --badge-pink: #f0d4e0;
+  --slide-padding: clamp(1rem, 4vw, 4rem);
+}
+
+/* Left panel - warm peach */
+.left-panel {
+  width: 50%; height: 100%;
+  background: var(--bg-peach);
+  display: flex; flex-direction: column;
+  justify-content: center;
+  padding: var(--slide-padding);
+  position: relative;
+}
+
+.left-panel .top-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(0.6rem, 0.9vw, 0.8rem);
+  font-weight: 500;
+  color: rgba(26,26,26,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: clamp(1rem, 2vh, 2rem);
+  animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+.left-panel h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 800;
+  color: var(--text-dark);
+  line-height: 0.95;
+  animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.left-panel h1 span {
+  display: block;
+  color: #8b6cc1;
+}
+
+.left-panel .desc {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(0.8rem, 1.4vw, 1.1rem);
+  font-weight: 400;
+  color: rgba(26,26,26,0.55);
+  margin-top: clamp(1rem, 2vh, 2rem);
+  max-width: 400px;
+  line-height: 1.6;
+  animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both;
+}
+
+/* Right panel - cool lavender */
+.right-panel {
+  width: 50%; height: 100%;
+  background: var(--bg-lavender);
+  display: flex; flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: var(--slide-padding);
+  position: relative;
+}
+
+/* Grid pattern on right */
+.right-panel::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(139,108,193,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139,108,193,0.06) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.badges {
+  display: flex; flex-direction: column; gap: clamp(8px, 1vh, 14px);
+  position: relative; z-index: 1;
+}
+
+.badge {
+  display: inline-flex; align-items: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(0.7rem, 1.1vw, 0.95rem);
+  font-weight: 600;
+  padding: clamp(6px, 0.8vw, 12px) clamp(16px, 2vw, 28px);
+  border-radius: 50px;
+  animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.badge:nth-child(1) {
+  background: var(--badge-mint); color: #2d6a4f;
+  animation-delay: 0.5s;
+}
+.badge:nth-child(2) {
+  background: var(--badge-yellow); color: #7a6c1a;
+  animation-delay: 0.65s;
+}
+.badge:nth-child(3) {
+  background: var(--badge-pink); color: #8b3a5e;
+  animation-delay: 0.8s;
+}
+.badge:nth-child(4) {
+  background: rgba(255,255,255,0.6); color: #4a4a8a;
+  animation-delay: 0.95s;
+}
+
+/* Decorative circle */
+.deco-circle {
+  position: absolute;
+  width: clamp(120px, 20vw, 260px);
+  height: clamp(120px, 20vw, 260px);
+  border-radius: 50%;
+  border: 2px dashed rgba(139,108,193,0.15);
+  top: 15%; right: 10%;
+  animation: spin 20s linear infinite;
+}
+
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(25px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.8) translateX(20px); }
+  to { opacity: 1; transform: scale(1) translateX(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="slide">
+  <div class="left-panel">
+    <div class="top-label">Tech Center · 2026</div>
+    <h1>皇冠<span>竞赛</span></h1>
+    <p class="desc">会员数字化团队绩效竞赛平台<br>面向全模块正式员工的公平量化评估体系</p>
+  </div>
+  <div class="right-panel">
+    <div class="deco-circle"></div>
+    <div class="badges">
+      <div class="badge">React + TypeScript</div>
+      <div class="badge">CopilotKit AI</div>
+      <div class="badge">飞书数据同步</div>
+      <div class="badge">智能评分引擎</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
