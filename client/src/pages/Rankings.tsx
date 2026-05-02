@@ -14,7 +14,8 @@ const jobRoles = [
   { key: 'tech', label: '研发' },
 ]
 
-const distColors: Record<string, string> = { '2': '#52c41a', '7': '#1677ff', '1': '#ff4d4f' }
+const distColors: Record<string, string> = { '2': '#22c55e', '7': '#0ea5e9', '1': '#f59e0b' }
+const pillStyle = { borderRadius: 20, padding: '2px 12px' }
 
 export default function Rankings() {
   const { seasonId } = useParams()
@@ -66,7 +67,7 @@ export default function Rankings() {
                       <td style={{ padding: 4, textAlign: 'center', fontWeight: isMe ? 700 : 400 }}>{r.rank ? `#${r.rank}` : '-'}</td>
                       <td style={{ padding: 4 }}>{isMe ? <Typography.Text strong>{r.user_name}</Typography.Text> : r.user_name}</td>
                       <td style={{ padding: 4, textAlign: 'center', fontWeight: 600 }}>{r.total_score?.toFixed(1) ?? '-'}</td>
-                      <td style={{ padding: 4, textAlign: 'center' }}>{r.distribution ? <Tag color={distColors[r.distribution]} style={{ margin: 0 }}>{r.distribution}</Tag> : '-'}</td>
+                      <td style={{ padding: 4, textAlign: 'center' }}>{r.distribution ? <Tag color={distColors[r.distribution]} style={{ ...pillStyle, margin: 0 }}>{r.distribution}</Tag> : '-'}</td>
                     </tr>
                   )
                 })}
@@ -93,7 +94,11 @@ export default function Rankings() {
   }
 
   const columns = [
-    { title: '排名', dataIndex: 'rank', width: 60, render: (v: number) => v ? `#${v}` : '-' },
+    { title: '排名', dataIndex: 'rank', width: 60, render: (_v: any, _record: any, index: number) => {
+      const rank = index + 1
+      const rankColors: Record<number, string> = { 1: '#d4a017', 2: '#94a3b8', 3: '#b45309' }
+      return <span style={{ fontWeight: 700, color: rankColors[rank] || '#0f172a' }}>{rank}</span>
+    }},
     { title: '成员', dataIndex: 'user_name', render: (name: string, r: SeasonMember) => (
       <span><Avatar src={r.user_avatar_url} icon={<UserOutlined />} size="small" style={{ marginRight: 8 }} />{name}</span>
     )},
@@ -101,14 +106,17 @@ export default function Rankings() {
     { title: '岗位分', dataIndex: 'final_position_score', render: (v: number) => v?.toFixed(1) ?? '-' },
     { title: '组织分', dataIndex: 'total_org_score', render: (v: number) => v?.toFixed(1) ?? '0' },
     { title: '总分', dataIndex: 'total_score', render: (v: number) => <Typography.Text strong>{v?.toFixed(1) ?? '-'}</Typography.Text> },
-    { title: '271', dataIndex: 'distribution', render: (v: string) => v ? <Tag color={distColors[v]}>{v}</Tag> : '-' },
+    { title: '271', dataIndex: 'distribution', render: (v: string) => v ? <Tag color={distColors[v]} style={pillStyle}>{v}</Tag> : '-' },
   ]
 
   return (
     <div>
-      <Typography.Title level={4}>排名看板</Typography.Title>
+      <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>排名看板</Typography.Title>
       <Tabs items={jobRoles.map(j => ({ key: j.key, label: j.label }))} onChange={setRole} />
-      <Table dataSource={data} columns={columns} rowKey="id" loading={loading} pagination={false} size="middle" />
+      <Table dataSource={data} columns={columns} rowKey="id" loading={loading} pagination={false} size="middle"
+        rowClassName={(record: any) => record.user_key === user?.user_key ? 'ant-table-row-selected' : ''}
+        onRow={(record: any) => ({ style: record.user_key === user?.user_key ? { background: '#eff6ff' } : {} })}
+      />
     </div>
   )
 }
