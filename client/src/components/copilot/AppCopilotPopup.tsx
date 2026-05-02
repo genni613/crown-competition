@@ -1,15 +1,19 @@
-import { useLocation } from 'react-router-dom'
-import { useCopilotReadable } from '@copilotkit/react-core'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
+import { Card, Typography } from 'antd'
 import { CopilotPopup } from '@copilotkit/react-core/v2'
 import { useAuthStore } from '../../store/authStore'
 import { copilotConfig } from './config'
+import { saveEvidenceDraft } from './evidenceDraft'
 
 const supportedFeatures = [
-  '本系统中管理员的"待办"就是审核待审核的举证，没有其他待办事项。当管理员用户问"有什么要处理"时，直接查看待审核举证数量和内容',
-  '查看赛季成绩与排名',
-  '查看和解释评分纬度',
-  '指导用户提交举证材料',
-  '用户问的问题如果超出你的能力范围，直接说明并引导用户去对应页面操作',
+  '解释皇冠赛规则、岗位差异、评分维度和举证口径',
+  '根据当前页面，告诉用户下一步应该去哪里操作',
+  '帮助用户整理举证描述，判断更可能对应哪个评分指标',
+  '根据自然语言生成举证草稿，并跳转到提交页自动填表',
+  '在信息齐全且用户确认后，代提交指标举证',
+  '指导用户如何提交更清晰、更容易被采纳的举证材料',
+  '当问题超出当前能力范围时，明确说明限制并引导到对应页面或人工处理',
 ]
 
 export function AppCopilotPopup() {
@@ -18,6 +22,7 @@ export function AppCopilotPopup() {
   }
 
   const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useAuthStore()
 
   useCopilotReadable(
@@ -51,13 +56,86 @@ export function AppCopilotPopup() {
     [],
   )
 
+  useCopilotAction(
+    copilotConfig.enabled ? {
+      name: 'draft_evidence_form',
+      description: '根据用户的自然语言整理一条指标举证草稿，并跳转到举证提交页自动填好表单，供用户确认后再提交',
+      parameters: [
+        { name: 'metricHint', type: 'string', required: true, description: '指标名称或简短提示，例如“微社区被点赞数”' },
+        { name: 'rawValue', type: 'number', required: true, description: '举证数值' },
+        { name: 'title', type: 'string', required: true, description: '建议填写到表单里的举证标题' },
+        { name: 'description', type: 'string', required: true, description: '建议填写到表单里的举证描述' },
+        { name: 'seasonId', type: 'number', required: false, description: '目标赛季 ID，不传则由页面优先选择进行中的赛季' },
+      ],
+      handler: async ({
+        metricHint,
+        rawValue,
+        title,
+        description,
+        seasonId,
+      }: {
+        metricHint: string
+        rawValue: number
+        title: string
+        description: string
+        seasonId?: number
+      }) => {
+        saveEvidenceDraft({
+          seasonId,
+          metricHint,
+          rawValue,
+          title,
+          description,
+          source: 'copilot',
+          createdAt: new Date().toISOString(),
+        })
+
+        navigate('/evidence/submit')
+
+        return {
+          ok: true,
+          navigatedTo: '/evidence/submit',
+          draft: {
+            seasonId: seasonId ?? null,
+            metricHint,
+            rawValue,
+            title,
+            description,
+          },
+        }
+      },
+      render: ({ status, result }: { status: string; result: any }) => {
+        if (status === 'executing') {
+          return <Typography.Text type="secondary">正在生成举证草稿并打开提交页面...</Typography.Text>
+        }
+        if (!result) return null
+        if (result.error) {
+          return <Typography.Text type="danger">{result.error}</Typography.Text>
+        }
+        return (
+          <Card size="small" style={{ maxWidth: 460 }}>
+            <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
+              已为你生成举证草稿
+            </Typography.Text>
+            <Typography.Paragraph style={{ marginBottom: 6 }}>
+              已跳转到举证提交页，并自动填入指标、数值、标题和描述。
+            </Typography.Paragraph>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              你还需要确认内容，并补充至少一张举证图片后再提交。
+            </Typography.Text>
+          </Card>
+        )
+      },
+    } : null as any,
+  )
+
   return (
     <CopilotPopup
       agentId={copilotConfig.agent}
       clickOutsideToClose
       labels={{
         modalHeaderTitle: '皇冠赛助手',
-        welcomeMessageText: '我可以帮你理解当前页面、评分规则、举证流程和管理后台能力。',
+        welcomeMessageText: '我可以帮你理解评分规则、整理举证，并把自然语言草拟成表单内容带你跳到提交页；实时数据查询和最终定分仍以系统与管理员处理为准。',
       }}
     />
   )

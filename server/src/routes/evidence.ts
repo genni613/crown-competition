@@ -56,6 +56,14 @@ function normalizeAttachmentUrls(value: unknown): string[] {
   }
 }
 
+function ensureEvidenceAttachments(value: unknown): string[] {
+  const attachmentUrls = normalizeAttachmentUrls(value)
+  if (attachmentUrls.length === 0) {
+    throw new Error('请至少上传一张举证图片')
+  }
+  return attachmentUrls
+}
+
 function normalizeEvidenceRecord<T extends Record<string, unknown>>(record: T): T & { attachment_urls: string[] } {
   return {
     ...record,
@@ -257,7 +265,13 @@ evidenceRouter.post('/', authMiddleware, asyncHandler(async (req: Request, res: 
     return
   }
 
-  const attachmentList = attachment_urls || []
+  let attachmentList: string[]
+  try {
+    attachmentList = ensureEvidenceAttachments(attachment_urls)
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : '举证图片校验失败' })
+    return
+  }
   const raw_value = req.body.raw_value != null ? Number(req.body.raw_value) : null
   const snapshot = {
     submitted_by: req.currentUser.id,

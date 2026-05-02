@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Upload, message } from 'antd'
+import { Alert, Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Upload, message } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, getMembers } from '../api/seasons'
 import { submitEvidence, uploadEvidenceAttachment } from '../api/evidence'
 import { getDimensions } from '../api/scoring'
+import { clearEvidenceDraft, loadEvidenceDraft, type EvidenceDraft } from '../components/copilot/evidenceDraft'
 import { useAuthStore } from '../store/authStore'
 import type { Season, SeasonMember, ScoringDimension } from '../types/models'
 import type { RcFile, UploadFile, UploadProps } from 'antd/es/upload/interface'
@@ -44,8 +45,14 @@ export default function EvidenceSubmit() {
   const [evidenceDimensions, setEvidenceDimensions] = useState<ScoringDimension[]>([])
   const [memberJobRole, setMemberJobRole] = useState<string | null>(null)
   const [selectedDimensionId, setSelectedDimensionId] = useState<number | undefined>()
+  const [copilotDraft, setCopilotDraft] = useState<EvidenceDraft | null>(null)
+  const [draftApplied, setDraftApplied] = useState(false)
   useEffect(() => {
     getSeasons().then(res => setSeasons(res.data))
+  }, [])
+
+  useEffect(() => {
+    setCopilotDraft(loadEvidenceDraft())
   }, [])
 
   async function onSeasonChange(seasonId: number) {
@@ -72,6 +79,41 @@ export default function EvidenceSubmit() {
     setResultContent('你还没有加入这个赛季，当前不能提交举证。')
     setResultOpen(true)
   }
+
+  useEffect(() => {
+    if (!copilotDraft || seasons.length === 0 || draftApplied) return
+
+    const activeSeason = seasons.find(s => s.status === 'active')
+    const targetSeasonId = copilotDraft.seasonId ?? activeSeason?.id
+    if (!targetSeasonId) return
+
+    form.setFieldsValue({
+      season_id: targetSeasonId,
+      target_type: 'indicator',
+      raw_value: copilotDraft.rawValue,
+      title: copilotDraft.title,
+      description: copilotDraft.description,
+    })
+
+    setDraftApplied(true)
+    void onSeasonChange(targetSeasonId)
+  }, [copilotDraft, seasons, draftApplied, form])
+
+  useEffect(() => {
+    if (!copilotDraft || !evidenceDimensions.length) return
+
+    const metricHint = copilotDraft.metricHint.toLowerCase().replace(/\s+/g, '')
+    const matched = evidenceDimensions.find(d => {
+      const indicator = d.indicator_name.toLowerCase().replace(/\s+/g, '')
+      const dimension = d.dimension_name.toLowerCase().replace(/\s+/g, '')
+      return indicator.includes(metricHint) || `${dimension}${indicator}`.includes(metricHint) || metricHint.includes(indicator)
+    })
+
+    if (matched) {
+      form.setFieldValue('target_id', matched.id)
+      setSelectedDimensionId(matched.id)
+    }
+  }, [copilotDraft, evidenceDimensions, form])
 
   function validateFile(file: File): boolean {
     if (!file.type.startsWith('image/')) {
@@ -166,6 +208,8 @@ export default function EvidenceSubmit() {
       setResultTitle('提交结果')
       setResultContent('举证已提交，等待管理员审核。')
       setResultOpen(true)
+      clearEvidenceDraft()
+      setCopilotDraft(null)
       form.resetFields()
       setFileList([])
       setMembershipReady(false)
@@ -183,6 +227,25 @@ export default function EvidenceSubmit() {
   return (
     <Card title="提交举证">
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        {copilotDraft && (
+          <Alert
+            type="info"
+            showIcon
+            message="已载入 AI 草稿"
+            description="系统已根据你在聊天里的自然语言预填了部分表单。请核对指标、数值、标题、描述，并补充至少一张举证图片后再提交。"
+            action={(
+              <Button
+                size="small"
+                onClick={() => {
+                  clearEvidenceDraft()
+                  setCopilotDraft(null)
+                }}
+              >
+                清除草稿
+              </Button>
+            )}
+          />
+        )}
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item label="赛季" name="season_id" rules={[{ required: true, message: '请选择赛季' }]}>
             <Select onChange={onSeasonChange} placeholder="选择赛季">
