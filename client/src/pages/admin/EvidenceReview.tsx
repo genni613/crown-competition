@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Button, Image, Input, Modal, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Image, Input, Modal, Space, Table, Tag, Typography, message } from 'antd'
+import { useCopilotAction } from '@copilotkit/react-core'
 import { getPendingEvidence, getReviewedEvidence, reviewEvidence } from '../../api/evidence'
+import { copilotConfig } from '../../components/copilot/config'
 import type { EvidenceSubmission } from '../../types/models'
 
 const statusMap: Record<string, { color: string; label: string }> = {
@@ -22,6 +24,52 @@ export default function EvidenceReview() {
   const [resultOpen, setResultOpen] = useState(false)
   const [resultTitle, setResultTitle] = useState('审核结果')
   const [resultContent, setResultContent] = useState('')
+
+  useCopilotAction(
+    copilotConfig.enabled ? {
+      name: 'query_pending_evidence',
+      description: '查询所有待审核的举证提交（仅管理员可用），返回待审核数量和详细信息',
+      parameters: [],
+      handler: async () => {
+        try {
+          const res = await getPendingEvidence()
+          return { pending: res.data }
+        } catch (e: any) {
+          return { error: e.message || '查询待审核举证失败' }
+        }
+      },
+      render: ({ status, result }: { status: string; result: any }) => {
+        if (status === 'executing') return <Typography.Text type="secondary">正在查询...</Typography.Text>
+        if (!result) return null
+        if (result.error) return <Typography.Text type="danger">{result.error}</Typography.Text>
+
+        const list: EvidenceSubmission[] = result.pending
+        if (!list?.length) return <Typography.Text type="secondary">当前没有待审核的举证</Typography.Text>
+
+        return (
+          <Card size="small" style={{ maxWidth: 460 }}>
+            <div style={{ marginBottom: 8 }}>
+              <Tag color="orange" style={{ fontSize: 13 }}>{list.length} 条待审核</Tag>
+            </div>
+            <div style={{ maxHeight: 280, overflow: 'auto' }}>
+              {list.map(e => (
+                <div key={e.id} style={{ padding: '8px 0', borderBottom: '1px solid #fafafa' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography.Text strong style={{ fontSize: 13 }}>{e.title}</Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>{e.season_name}</Typography.Text>
+                  </div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>提交人：{e.user_name || '-'}</Typography.Text>
+                  {e.description && (
+                    <div><Typography.Text style={{ fontSize: 12 }}>{e.description.length > 60 ? e.description.slice(0, 60) + '...' : e.description}</Typography.Text></div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      },
+    } : null as any,
+  )
 
   useEffect(() => {
     void load(tab)

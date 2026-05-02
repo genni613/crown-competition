@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Card, Empty, Image, Space, Table, Tag, Timeline, Typography, message } from 'antd'
+import { useCopilotAction } from '@copilotkit/react-core'
 import { getEvidenceDetail, getMyEvidence } from '../api/evidence'
+import { copilotConfig } from '../components/copilot/config'
 import type { EvidenceReview, EvidenceSubmission } from '../types/models'
 import { formatDateTime } from '../utils/datetime'
 
@@ -17,6 +19,55 @@ export default function EvidenceList() {
   const [detailLoadingId, setDetailLoadingId] = useState<number | null>(null)
   const [previewImage, setPreviewImage] = useState<string>('')
   const [previewOpen, setPreviewOpen] = useState(false)
+
+  useCopilotAction(
+    copilotConfig.enabled ? {
+      name: 'query_my_evidence',
+      description: '查询当前用户的所有举证提交及其审核状态，返回汇总统计和详细列表',
+      parameters: [],
+      handler: async () => {
+        try {
+          const res = await getMyEvidence()
+          return { evidence: res.data }
+        } catch (e: any) {
+          return { error: e.message || '查询举证失败' }
+        }
+      },
+      render: ({ status, result }: { status: string; result: any }) => {
+        if (status === 'executing') return <Typography.Text type="secondary">正在查询举证...</Typography.Text>
+        if (!result) return null
+        if (result.error) return <Typography.Text type="danger">{result.error}</Typography.Text>
+
+        const list: EvidenceSubmission[] = result.evidence
+        if (!list?.length) return <Typography.Text type="secondary">暂无举证记录</Typography.Text>
+
+        const counts = { total: list.length, pending: 0, approved: 0, rejected: 0 }
+        list.forEach(e => { if (counts[e.status as keyof typeof counts] !== undefined) (counts as any)[e.status]++ })
+
+        return (
+          <Card size="small" style={{ maxWidth: 440 }}>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+              <Tag color="default">共 {counts.total} 条</Tag>
+              <Tag color="orange">待审核 {counts.pending}</Tag>
+              <Tag color="green">已通过 {counts.approved}</Tag>
+              <Tag color="red">已驳回 {counts.rejected}</Tag>
+            </div>
+            <div style={{ maxHeight: 240, overflow: 'auto' }}>
+              {list.map(e => (
+                <div key={e.id} style={{ padding: '6px 0', borderBottom: '1px solid #fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <Typography.Text style={{ fontSize: 13 }}>{e.title}</Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>{e.season_name}</Typography.Text>
+                  </div>
+                  <Tag color={statusMap[e.status]?.color} style={{ margin: 0 }}>{statusMap[e.status]?.label}</Tag>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      },
+    } : null as any,
+  )
 
   useEffect(() => {
     void loadInitial()

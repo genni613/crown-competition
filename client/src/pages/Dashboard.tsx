@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Tag, Spin, Empty, Typography, Button, Progress, Space, Collapse } from 'antd'
+import { Card, Tag, Spin, Empty, Typography, Button, Progress, Space, Collapse, Descriptions, Divider } from 'antd'
 import {
   TrophyOutlined, CrownOutlined, FireOutlined,
   RiseOutlined, TeamOutlined, BulbOutlined,
   CheckCircleOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
+import { useCopilotAction } from '@copilotkit/react-core'
 import { useAuthStore } from '../store/authStore'
 import { getSeasons, getMembers } from '../api/seasons'
 import { getBreakdown } from '../api/scoring'
 import { getMyWorkSummary, type MyWorkSummaryResponse } from '../api/feishu'
+import { copilotConfig } from '../components/copilot/config'
 import type { Season, SeasonMember } from '../types/models'
 
 const { Title, Text } = Typography
@@ -73,6 +75,75 @@ export default function Dashboard() {
       setLoading(false)
     }
   }
+
+  useCopilotAction(
+    copilotConfig.enabled ? {
+      name: 'query_my_scores',
+      description: '查询当前登录用户在当前赛季的评分明细，包括总分、排名、271分布、各维度得分和指标明细',
+      parameters: [],
+      handler: async () => {
+        try {
+          const res = await getSeasons()
+          const activeSeason = res.data.find((s: Season) => s.status === 'active')
+          if (!activeSeason) return { error: '当前没有进行中的赛季' }
+
+          const membersRes = await getMembers(activeSeason.id)
+          const me = membersRes.data.find((m: SeasonMember) => m.user_key === user?.user_key)
+          if (!me) return { error: '您未参与当前赛季' }
+
+          const [bdRes, wsRes] = await Promise.all([
+            getBreakdown(activeSeason.id, me.id),
+            getMyWorkSummary(activeSeason.id).catch(() => ({ data: { found: false } as MyWorkSummaryResponse })),
+          ])
+          return { member: me, breakdown: bdRes.data, workSummary: wsRes.data, season: activeSeason }
+        } catch (e: any) {
+          return { error: e.message || '查询失败' }
+        }
+      },
+      render: ({ status, result }: { status: string; result: any }) => {
+        if (status === 'executing') return <Card size="small"><Spin /></Card>
+        if (!result) return null
+        if (result.error) return <Card size="small"><Typography.Text type="danger">{result.error}</Typography.Text></Card>
+
+        const { member, breakdown: bd, season } = result
+        const dims = bd?.scores ? groupByDimension(bd.scores) : []
+        const posScore = bd?.scores ? bd.scores.reduce((sum: number, s: any) => sum + (s.final_score || 0), 0) : 0
+        const orgScore = member.total_org_score ?? 0
+        const total = posScore + orgScore
+        const distInfo = member.distribution ? distConfig[member.distribution] : null
+
+        return (
+          <Card size="small" style={{ maxWidth: 480 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Typography.Text strong style={{ fontSize: 14 }}>我的成绩</Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>{season?.name}</Typography.Text>
+            </div>
+            <Descriptions size="small" column={3}>
+              <Descriptions.Item label="总分"><Typography.Text strong style={{ color: scoreColor(total), fontSize: 16 }}>{total.toFixed(1)}</Typography.Text></Descriptions.Item>
+              <Descriptions.Item label="排名">#{member.rank || '-'}</Descriptions.Item>
+              <Descriptions.Item label="271">{distInfo ? <Tag color={distInfo.color} style={{ color: '#fff', border: 'none', margin: 0 }}>{distInfo.label}</Tag> : '-'}</Descriptions.Item>
+            </Descriptions>
+            <Divider style={{ margin: '8px 0' }} />
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {dims.map((g: any) => {
+                const dimScore = calcDimensionScore(g.items, result.workSummary, g.name)
+                const normalized = dimScore != null ? dimScore / g.weight : 0
+                return (
+                  <div key={g.name}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography.Text style={{ fontSize: 12 }}>{g.name}</Typography.Text>
+                      <Typography.Text style={{ fontSize: 12, fontWeight: 600, color: scoreColor(normalized) }}>{dimScore?.toFixed(1) ?? '-'}</Typography.Text>
+                    </div>
+                    <Progress percent={dimScore != null ? Math.round(normalized) : 0} strokeColor={scoreColor(normalized)} showInfo={false} size={['100%', 4]} />
+                  </div>
+                )
+              })}
+            </Space>
+          </Card>
+        )
+      },
+    } : null as any,
+  )
 
   if (loading) return <Spin />
   if (!myMember) return <Empty description="暂无参赛信息，请等待管理员添加" />

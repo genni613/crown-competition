@@ -117,6 +117,39 @@ flowchart LR
 - 当前用户上下文
 - 当前页面路由上下文
 - 系统核心能力上下文
+- 后端 CopilotKit runtime + `match_scoring_points` tool
+
+## 已注册的 CopilotKit Actions（前端 useCopilotAction）
+
+### 用户侧
+
+| 页面 | Action | 触发示例 | 聊天内渲染 |
+|------|--------|----------|-----------|
+| Dashboard (`/`) | `query_my_scores` | "我的成绩"、"各维度得分" | 总分+排名+271标签+各维度进度条 |
+| Rankings (`/rankings/:seasonId`) | `query_rankings` | "当前排名"、"产品岗排名" | 排名表格，高亮当前用户 |
+| EvidenceList (`/evidence/mine`) | `query_my_evidence` | "我的举证状态"、"有多少通过了" | 状态汇总标签+举证列表 |
+
+### 管理员侧
+
+| 页面 | Action | 触发示例 | 聊天内渲染 |
+|------|--------|----------|-----------|
+| EvidenceReview (`/admin/evidence`) | `query_pending_evidence` | "待审核举证"、"有多少条待审核" | 待审核数量+提交人/标题/赛季列表 |
+
+### 实现要点
+
+- 所有 action 通过 `copilotConfig.enabled` 条件注册，未启用时不会调用 hook
+- handler 直接调用 `client/src/api/` 下已有函数，无后端改动
+- render 函数使用 Ant Design 组件（Card、Tag、Progress、Descriptions），保持风格一致
+- action 挂载在对应页面组件内，用户离开页面时自动卸载
+
+### 待扩展
+
+后续可在更多页面注册 action：
+
+- `SeasonManager`：`query_seasons`（查询赛季列表和状态）
+- `ScoreEntry`：`query_member_scores`（查询某成员的评分明细）
+- `OrgScoreManager`：`query_org_scores`（查询某成员的组织分）
+- `DimensionManager`：`query_dimensions`（查询评分维度规则）
 
 ## 还需要补充的部分
 
