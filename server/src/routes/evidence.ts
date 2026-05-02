@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import multer, { MulterError } from 'multer'
 import { getDb } from '../db'
 import { calculateThresholdScore } from '../utils/scoringFormulas'
+import { calculateSeasonScores } from '../services/scoring.service'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 
@@ -335,14 +336,14 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
 
       // 读取维度规则
       const dim = await db.queryOne<{
-        threshold_100: number | null; threshold_60: number | null; score_type: string
+        threshold_100: number | null; threshold_60: number | null; score_type: string; indicator_weight: number
       }>('SELECT * FROM scoring_dimensions WHERE id = ?', [dimensionId])
 
       let thresholdScore: number | null = null
       let finalScore: number | null = null
       if (dim && rawValue != null && dim.threshold_100 != null && dim.threshold_60 != null) {
         thresholdScore = calculateThresholdScore(rawValue, dim.threshold_100, dim.threshold_60)
-        finalScore = thresholdScore
+        finalScore = thresholdScore * (dim.indicator_weight ?? 1)
       }
 
       // 查找或创建 indicator_scores 行
@@ -361,6 +362,15 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
           [evidence.season_member_id, dimensionId, rawValue, thresholdScore, finalScore, 'evidence']
         )
       }
+    }
+
+    // 触发全量赛季分数重算
+    const sm = await db.queryOne<{ season_id: number }>(
+      'SELECT season_id FROM season_members WHERE id = ?',
+      [evidence!.season_member_id]
+    )
+    if (sm) {
+      await calculateSeasonScores(sm.season_id)
     }
   }
 

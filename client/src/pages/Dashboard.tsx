@@ -173,9 +173,7 @@ export default function Dashboard() {
 
   const dimensions = breakdown?.scores ? groupByDimension(breakdown.scores) : []
   const dist = myMember.distribution ? distConfig[myMember.distribution] : null
-  const positionScore = breakdown?.scores
-    ? breakdown.scores.reduce((sum: number, s: any) => sum + (s.final_score || 0), 0)
-    : 0
+  const positionScore = myMember.raw_position_score ?? 0
   const orgScore = myMember.total_org_score ?? 0
   const totalScore = positionScore + orgScore
   const rank = myMember.rank

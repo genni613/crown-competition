@@ -247,7 +247,7 @@ export function AppCopilotPopup() {
       clickOutsideToClose
       labels={{
         modalHeaderTitle: '皇冠赛助手',
-        welcomeMessageText: '我可以帮你理解评分规则、整理举证或组织分录入草稿，并把自然语言草拟成表单内容带你跳转或刷新到对应页面；实时数据查询和最终定分仍以系统与管理员处理为准。',
+        welcomeMessageText: '嗨，有什么可以帮你的？比如查规则、整理举证、录入组织分，跟我说就行 👋',
       }}
     />
   )

@@ -83,19 +83,33 @@ export default function Sidebar() {
 
       {/* User info */}
       {user && (
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Dropdown menu={{ items: logoutMenu }} placement="topRight" trigger={['click']}>
-            <Avatar src={user.avatar_url} icon={<UserOutlined />} size={28} style={{ background: '#e0f2fe', cursor: 'pointer', flexShrink: 0 }} />
-          </Dropdown>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
-            {(user as any).feishu_job_role && (
-              <Tag style={{ margin: 0, padding: '0 6px', fontSize: 10, lineHeight: '18px', borderRadius: 4, background: '#eff6ff', color: '#0284c7', border: 'none' }}>
-                {jobRoleMap[(user as any).feishu_job_role] || (user as any).feishu_job_role}
-              </Tag>
-            )}
+        <Dropdown menu={{ items: logoutMenu }} placement="topRight" trigger={['click']}>
+          <div style={{
+            padding: '12px 14px', borderTop: '1px solid #f1f5f9',
+            display: 'flex', alignItems: 'center', gap: 10,
+            cursor: 'pointer', transition: 'background 0.15s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <Avatar src={user.avatar_url} icon={<UserOutlined />} size={36} style={{ background: '#e0f2fe', flexShrink: 0, boxShadow: '0 0 0 2px #fff, 0 0 0 3px #bae6fd' }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', lineHeight: '20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                {(user as any).feishu_job_role && (
+                  <span style={{ fontSize: 11, lineHeight: 1, color: '#0284c7', background: '#f0f9ff', padding: '2px 6px', borderRadius: 4 }}>
+                    {jobRoleMap[(user as any).feishu_job_role] || (user as any).feishu_job_role}
+                  </span>
+                )}
+                {user.title && (
+                  <span style={{ fontSize: 11, lineHeight: 1, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {user.title}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </Dropdown>
       )}
     </div>
   )

@@ -6,6 +6,7 @@ import zhCN from 'antd/locale/zh_CN'
 import App from './App'
 import { AppCopilotProvider } from './components/copilot/AppCopilotProvider'
 import '@copilotkit/react-core/v2/styles.css'
+import './copilot-override.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
