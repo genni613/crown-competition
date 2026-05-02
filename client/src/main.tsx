@@ -10,7 +10,7 @@ import '@copilotkit/react-core/v2/styles.css'
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppCopilotProvider>
-      <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#1677ff', borderRadius: 6 } }}>
+      <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#0ea5e9', borderRadius: 8, fontFamily: 'Inter, system-ui, -apple-system, sans-serif' } }}>
         <BrowserRouter>
           <AntdApp>
             <App />
