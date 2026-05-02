@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Alert, Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Upload, message } from 'antd'
+import { Alert, Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Typography, Upload, message } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, getMembers } from '../api/seasons'
 import { submitEvidence, uploadEvidenceAttachment } from '../api/evidence'
@@ -228,13 +228,16 @@ export default function EvidenceSubmit() {
   const activeSeasons = useMemo(() => seasons.filter(s => s.status === 'active'), [seasons])
 
   return (
-    <Card title="提交举证">
+    <div>
+      <Typography.Title level={4} style={{ margin: '0 0 16px', color: '#0f172a' }}>提交举证</Typography.Title>
+      <Card style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         {copilotDraft && (
           <Alert
             type="info"
             showIcon
             message="已载入 AI 草稿"
+            style={{ background: '#eff6ff', border: '1px solid #bae6fd', borderRadius: 10 }}
             description="系统已根据你在聊天里的自然语言预填了部分表单。请核对指标、数值、标题、描述，并补充至少一张举证图片后再提交。"
             action={(
               <Button
@@ -341,7 +344,7 @@ export default function EvidenceSubmit() {
             </Upload>
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} disabled={!membershipReady || fileList.length === 0}>
+            <Button type="primary" htmlType="submit" loading={loading} disabled={!membershipReady || fileList.length === 0} style={{ background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)', border: 'none', borderRadius: 8 }}>
               提交
             </Button>
           </Form.Item>
@@ -366,6 +369,7 @@ export default function EvidenceSubmit() {
       >
         {resultContent}
       </Modal>
-    </Card>
+      </Card>
+    </div>
   )
 }

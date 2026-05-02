@@ -193,9 +193,9 @@ export default function EvidenceList() {
 
   return (
     <div>
-      <Typography.Title level={4}>我的举证</Typography.Title>
+      <Typography.Title level={4} style={{ margin: '0 0 16px', color: '#0f172a' }}>我的举证</Typography.Title>
       {data.length === 0 ? (
-        <Empty description="暂无举证记录" />
+        <Empty description={<span style={{ color: '#94a3b8' }}>暂无举证记录，<a href="/evidence/submit" style={{ color: '#0ea5e9' }}>去提交第一条</a></span>} />
       ) : (
         <Table
           dataSource={data}
@@ -203,6 +203,7 @@ export default function EvidenceList() {
           rowKey="id"
           size="middle"
           loading={loading}
+          onRow={() => ({ onMouseEnter: (e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#f8fafc' }, onMouseLeave: (e) => { (e.currentTarget as HTMLTableRowElement).style.background = '' } })}
           expandable={{
             onExpand: (expanded, record) => {
               if (expanded) {
