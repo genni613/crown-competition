@@ -55,8 +55,39 @@ export default function App() {
     }
   }
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', marginTop: 200 }}><Spin size="large" /></div>
-  if (!user) return <div style={{ textAlign: 'center', marginTop: 200 }}><h2>请先登录</h2><a href="/api/auth/login">飞书扫码登录</a></div>
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
+      <Spin size="large" />
+    </div>
+  )
+
+  if (!user) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
+      <div style={{
+        maxWidth: 400, width: '100%', padding: '48px 40px', background: '#fff',
+        borderRadius: 16, boxShadow: '0 8px 30px rgba(0,0,0,0.08)', textAlign: 'center',
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: 12, margin: '0 auto 20px',
+          background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 22, fontWeight: 700,
+        }}>C</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>皇冠赛</div>
+        <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 32 }}>团队绩效竞赛平台</div>
+        <a
+          href="/api/auth/login"
+          style={{
+            display: 'block', background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+            color: '#fff', fontSize: 15, fontWeight: 600, lineHeight: '44px',
+            borderRadius: 10, textDecoration: 'none',
+          }}
+        >
+          飞书扫码登录
+        </a>
+      </div>
+    </div>
+  )
 
   return (
     <>
