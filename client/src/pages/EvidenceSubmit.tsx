@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Upload, message } from 'antd'
-import type { RcFile, UploadFile } from 'antd/es/upload/interface'
 import { PlusOutlined } from '@ant-design/icons'
 import { getSeasons, getMembers } from '../api/seasons'
 import { submitEvidence, uploadEvidenceAttachment } from '../api/evidence'
 import { getDimensions } from '../api/scoring'
 import { useAuthStore } from '../store/authStore'
 import type { Season, SeasonMember, ScoringDimension } from '../types/models'
+import type { RcFile, UploadFile, UploadProps } from 'antd/es/upload/interface'
+
+const MAX_FILES = 5
+const MAX_SIZE_MB = 5
 
 const supportedImageMimeTypes = new Set([
   'image/jpeg',
@@ -26,11 +29,6 @@ function readFileAsDataUrl(file: Blob): Promise<string> {
   })
 }
 
-function isSupportedPreviewImage(file: RcFile) {
-  const fileName = file.name.toLowerCase()
-  return supportedImageMimeTypes.has(file.type) || supportedImageExtensions.some(ext => fileName.endsWith(ext))
-}
-
 export default function EvidenceSubmit() {
   const { user } = useAuthStore()
   const [seasons, setSeasons] = useState<Season[]>([])
@@ -46,7 +44,6 @@ export default function EvidenceSubmit() {
   const [evidenceDimensions, setEvidenceDimensions] = useState<ScoringDimension[]>([])
   const [memberJobRole, setMemberJobRole] = useState<string | null>(null)
   const [selectedDimensionId, setSelectedDimensionId] = useState<number | undefined>()
-
   useEffect(() => {
     getSeasons().then(res => setSeasons(res.data))
   }, [])
@@ -76,42 +73,58 @@ export default function EvidenceSubmit() {
     setResultOpen(true)
   }
 
-  async function handlePreview(file: UploadFile) {
-    if (file.url) {
-      setPreviewImage(file.url)
-      setPreviewOpen(true)
-      return
+  function validateFile(file: File): boolean {
+    if (!file.type.startsWith('image/')) {
+      message.error('只能上传图片文件')
+      return false
+    }
+    const fileName = file.name.toLowerCase()
+    const isSupported = supportedImageMimeTypes.has(file.type) || supportedImageExtensions.some(ext => fileName.endsWith(ext))
+    if (!isSupported) {
+      message.error('当前仅支持 JPG、PNG、WEBP、GIF。HEIC 请先转换后再上传。')
+      return false
+    }
+    if (file.size / 1024 / 1024 >= MAX_SIZE_MB) {
+      message.error('图片不能超过 5MB')
+      return false
+    }
+    return true
+  }
+
+  const beforeUpload: UploadProps['beforeUpload'] = async (file) => {
+    const imageFile = file as RcFile
+    if (!validateFile(imageFile)) {
+      return Upload.LIST_IGNORE
+    }
+    if (fileList.length >= MAX_FILES) {
+      message.warning(`最多上传 ${MAX_FILES} 张`)
+      return Upload.LIST_IGNORE
     }
 
-    if (file.thumbUrl) {
-      setPreviewImage(file.thumbUrl)
-      setPreviewOpen(true)
-      return
-    }
+    const previewUrl = await readFileAsDataUrl(imageFile)
+    setFileList(prev => [
+      ...prev,
+      {
+        uid: imageFile.uid,
+        name: imageFile.name,
+        status: 'done',
+        originFileObj: imageFile,
+        thumbUrl: previewUrl,
+        url: previewUrl,
+      },
+    ])
+    return Upload.LIST_IGNORE
+  }
 
-    const origin = file.originFileObj
-    if (!origin) return
-    const dataUrl = await readFileAsDataUrl(origin)
-    setPreviewImage(dataUrl)
+  const handlePreview: UploadProps['onPreview'] = async (file) => {
+    const previewUrl = file.url || file.thumbUrl || (file.originFileObj ? await readFileAsDataUrl(file.originFileObj) : '')
+    setPreviewImage(previewUrl)
     setPreviewOpen(true)
   }
 
-  async function handleFileListChange(nextFileList: UploadFile[]) {
-    const normalized = await Promise.all(
-      nextFileList.slice(0, 5).map(async (file) => {
-        if (file.url || file.thumbUrl || !file.originFileObj) {
-          return file
-        }
-
-        const dataUrl = await readFileAsDataUrl(file.originFileObj)
-        return {
-          ...file,
-          thumbUrl: dataUrl,
-        }
-      })
-    )
-
-    setFileList(normalized)
+  const handleRemove: UploadProps['onRemove'] = (file) => {
+    setFileList(prev => prev.filter(item => item.uid !== file.uid))
+    return true
   }
 
   async function onFinish(values: {
@@ -137,13 +150,12 @@ export default function EvidenceSubmit() {
     setLoading(true)
     try {
       const attachmentUrls = await Promise.all(
-        fileList
-          .map(file => file.originFileObj)
-          .filter((file): file is RcFile => Boolean(file))
-          .map(async (file) => {
-            const res = await uploadEvidenceAttachment(file)
-            return res.data.url
-          })
+        fileList.map(async (item) => {
+          const file = item.originFileObj
+          if (!file) throw new Error('图片文件丢失，请重新选择后再提交')
+          const res = await uploadEvidenceAttachment(file)
+          return res.data.url
+        })
       )
 
       await submitEvidence({
@@ -206,10 +218,21 @@ export default function EvidenceSubmit() {
             const selectedDim = evidenceDimensions.find(d => d.id === selectedDimensionId)
             const indicatorName = selectedDim?.indicator_name || ''
             const isLikes = indicatorName.includes('点赞')
+            const isIssue = indicatorName.includes('线上问题')
+            const valuePlaceholder = isLikes
+              ? '例如：获得 10 个赞，填 10'
+              : isIssue
+                ? '例如：本季度解决了 3 个线上问题，填 3'
+                : '例如：解决了 3 个问题，填 3'
+            const descPlaceholder = isLikes
+              ? '例如：本季度在微社区因日常协作互助获得同事点赞，累计 10 个'
+              : isIssue
+                ? '例如：本季度主动认领并解决了3个线上问题，包括XX页面白屏、XX接口超时、XX数据展示异常'
+                : '例如：本季度完成了3个AI工具——自动日报生成器、代码review机器人、数据看板自动刷新'
             return (
               <>
                 <Form.Item label="举证数值" name="raw_value" rules={[{ required: true, message: '请输入举证数值' }]}>
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder={isLikes ? '例如：获得 10 个赞，填 10' : '例如：解决了 3 个问题，填 3'} />
+                  <InputNumber min={0} style={{ width: '100%' }} placeholder={valuePlaceholder} />
                 </Form.Item>
                 <Form.Item label="标题" name="title" rules={[{ required: true, message: '请输入标题' }]}>
                   <Input placeholder="举证标题" />
@@ -221,9 +244,7 @@ export default function EvidenceSubmit() {
                 >
                   <Input.TextArea
                     rows={2}
-                    placeholder={isLikes
-                      ? '例如：本季度在微社区因日常协作互助获得同事点赞，累计 10 个'
-                      : '例如：本季度完成了3个AI工具——自动日报生成器、代码review机器人、数据看板自动刷新'}
+                    placeholder={descPlaceholder}
                     maxLength={200}
                     showCount
                   />
@@ -240,33 +261,12 @@ export default function EvidenceSubmit() {
               accept="image/*"
               listType="picture-card"
               fileList={fileList}
-              openFileDialogOnClick
-              style={{ pointerEvents: 'auto' }}
-              customRequest={({ onSuccess }) => { onSuccess?.('ok') }}
-              beforeUpload={(file) => {
-                const isImage = file.type.startsWith('image/')
-                if (!isImage) {
-                  message.error('只能上传图片文件')
-                  return Upload.LIST_IGNORE
-                }
-                const isSupported = isSupportedPreviewImage(file)
-                if (!isSupported) {
-                  message.error('当前仅支持 JPG、PNG、WEBP、GIF。HEIC 请先转换后再上传。')
-                  return Upload.LIST_IGNORE
-                }
-                const isLt5M = file.size / 1024 / 1024 < 5
-                if (!isLt5M) {
-                  message.error('图片不能超过 5MB')
-                  return Upload.LIST_IGNORE
-                }
-                return true
-              }}
+              beforeUpload={beforeUpload}
               onPreview={handlePreview}
-              onChange={({ fileList: nextFileList }) => {
-                void handleFileListChange(nextFileList)
-              }}
+              onRemove={handleRemove}
+              multiple
             >
-              {fileList.length >= 5 ? null : (
+              {fileList.length >= MAX_FILES ? null : (
                 <div>
                   <PlusOutlined />
                   <div style={{ marginTop: 8 }}>上传</div>

@@ -59,7 +59,7 @@ export async function seed(): Promise<void> {
     ['product', '交付质量', 0.00, '需求变更消耗PD', 0.00, 'feishu', 'deduction', null, null, 1, 15, 3, 7],
     // 协作贡献 (15%) - 两个指标 1:2
     ['product', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'evidence', 'threshold', 10, 5, null, null, null, 8],
-    ['product', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'feishu', 'threshold', 5, 1, null, null, null, 9],
+    ['product', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'evidence', 'threshold', 5, 1, null, null, null, 9],
 
     // ===== 设计岗 =====
     // 交付效率 (25%) - 两个指标 3:2
@@ -77,7 +77,7 @@ export async function seed(): Promise<void> {
     ['design', '交付质量', 0.00, '设计返工消耗PD', 0.00, 'feishu', 'deduction', null, null, 1, 15, 3, 18],
     // 协作贡献 (15%) - 两个指标 1:2
     ['design', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'evidence', 'threshold', 10, 5, null, null, null, 19],
-    ['design', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'feishu', 'threshold', 5, 1, null, null, null, 20],
+    ['design', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'evidence', 'threshold', 5, 1, null, null, null, 20],
 
     // ===== 研发岗 =====
     // 交付效率 (40%) - 单指标
@@ -91,7 +91,7 @@ export async function seed(): Promise<void> {
     ['tech', '交付质量', 0.00, '提测不通过', 0.00, 'feishu', 'deduction', null, null, 10, 100, 1, 26],
     // 协作贡献 (15%) - 两个指标 1:2
     ['tech', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'evidence', 'threshold', 10, 5, null, null, null, 27],
-    ['tech', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'feishu', 'threshold', 5, 1, null, null, null, 28],
+    ['tech', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'evidence', 'threshold', 5, 1, null, null, null, 28],
   ] as const
 
   for (const d of dimensions) {

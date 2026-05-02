@@ -220,7 +220,7 @@ async function writeIndicatorScores(member: SyncMember, metrics: MetricMap): Pro
   const db = getDb()
   const dimensions = await db.query<ScoringDimension>(`
     SELECT * FROM scoring_dimensions
-    WHERE job_role = ? AND data_source = 'feishu'
+    WHERE job_role = ? AND data_source IN ('feishu', 'evidence')
   `, [member.job_role])
 
   const dimensionByName = new Map(dimensions.map(dim => [dim.indicator_name, dim]))
@@ -230,17 +230,37 @@ async function writeIndicatorScores(member: SyncMember, metrics: MetricMap): Pro
     for (const [metricName, rawValue] of Object.entries(metrics)) {
       const dimension = dimensionByName.get(metricName)
       if (!dimension) continue
-      await tx.execute(`
-        INSERT INTO indicator_scores (
-          season_member_id, dimension_id, raw_value, source, approved, notes
-        ) VALUES (?, ?, ?, 'feishu', 1, ?)
-        ON DUPLICATE KEY UPDATE
-          raw_value = VALUES(raw_value),
-          source = 'feishu',
-          approved = 1,
-          notes = VALUES(notes)
-      `, [member.season_member_id, dimension.id, rawValue, 'synced from local db'])
-      written += 1
+
+      if (dimension.data_source === 'evidence') {
+        // 仅在用户没有已审批的举证记录时，写入飞书数据作为默认值
+        const existingApproved = await tx.queryOne<{ id: number }>(
+          `SELECT id FROM indicator_scores WHERE season_member_id = ? AND dimension_id = ? AND approved = 1`,
+          [member.season_member_id, dimension.id]
+        )
+        if (existingApproved) continue
+
+        await tx.execute(`
+          INSERT INTO indicator_scores (
+            season_member_id, dimension_id, raw_value, source, approved, notes
+          ) VALUES (?, ?, ?, 'evidence', 1, ?)
+          ON DUPLICATE KEY UPDATE
+            raw_value = VALUES(raw_value),
+            notes = VALUES(notes)
+        `, [member.season_member_id, dimension.id, rawValue, '飞书同步默认值，用户举证后覆盖'])
+        written += 1
+      } else {
+        await tx.execute(`
+          INSERT INTO indicator_scores (
+            season_member_id, dimension_id, raw_value, source, approved, notes
+          ) VALUES (?, ?, ?, 'feishu', 1, ?)
+          ON DUPLICATE KEY UPDATE
+            raw_value = VALUES(raw_value),
+            source = 'feishu',
+            approved = 1,
+            notes = VALUES(notes)
+        `, [member.season_member_id, dimension.id, rawValue, 'synced from local db'])
+        written += 1
+      }
     }
   })
   return written

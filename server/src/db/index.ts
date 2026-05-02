@@ -50,6 +50,7 @@ async function applySchema(currentPool: Pool): Promise<void> {
 
   await ensureEvidenceAuditColumns(currentPool)
   await ensureEvidenceReviewTable(currentPool)
+  await ensureIssueDataSourceMigration(currentPool)
 }
 
 async function columnExists(currentPool: Pool, tableName: string, columnName: string): Promise<boolean> {
@@ -99,6 +100,17 @@ async function tableExists(currentPool: Pool, tableName: string): Promise<boolea
     [config.mysql.database, tableName]
   )
   return rows.length > 0
+}
+
+async function ensureIssueDataSourceMigration(currentPool: Pool): Promise<void> {
+  const [rows] = await currentPool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM scoring_dimensions WHERE indicator_name = '线上问题系统解决数' AND data_source = 'feishu'`
+  )
+  if ((rows as any)[0]?.cnt > 0) {
+    await currentPool.query(
+      `UPDATE scoring_dimensions SET data_source = 'evidence' WHERE indicator_name = '线上问题系统解决数' AND data_source = 'feishu'`
+    )
+  }
 }
 
 async function ensureEvidenceReviewTable(currentPool: Pool): Promise<void> {

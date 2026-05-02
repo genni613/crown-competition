@@ -269,12 +269,14 @@ export default function Dashboard() {
                           </td>
                           <td style={{ padding: '6px 8px', textAlign: 'center' }}>{ruleText(displayItem)}</td>
                           <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                            {effectiveValue != null && item.threshold_100 != null && item.threshold_60 != null
-                              ? <ValueStatus value={effectiveValue} t100={item.threshold_100} t60={item.threshold_60} />
+                            {item.score_type === 'threshold' && effectiveScore != null
+                              ? <ScoreStatus score={effectiveScore} />
                               : (effectiveValue ?? '-')}
                           </td>
                           <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>
-                            {effectiveScore?.toFixed(1) ?? '-'}
+                            {item.score_type === 'threshold' && effectiveScore != null
+                              ? (effectiveScore * item.indicator_weight).toFixed(1)
+                              : (effectiveScore?.toFixed(1) ?? '-')}
                           </td>
                           <td style={{ padding: '6px 8px', textAlign: 'center' }}>{sourceTag(item.data_source)}</td>
                         </tr>
@@ -364,14 +366,12 @@ function calcDimensionScore(items: any[], workSummary: MyWorkSummaryResponse | n
   return hasAny ? dimScore - totalDeduction : null
 }
 
-function ValueStatus({ value, t100, t60 }: { value: number; t100: number; t60: number }) {
-  const isFull = value >= t100
-  const isPass = value >= t60
-  const label = isFull ? '满分' : isPass ? '及格' : '不及格'
-  const color = isFull ? '#52c41a' : isPass ? '#1677ff' : '#ff4d4f'
+function ScoreStatus({ score }: { score: number }) {
+  const label = score >= 100 ? '满分' : score >= 60 ? '及格' : '不及格'
+  const color = score >= 100 ? '#52c41a' : score >= 60 ? '#1677ff' : '#ff4d4f'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontWeight: 500 }}>{value}</span>
+      <span style={{ fontWeight: 500 }}>{score.toFixed(1)}</span>
       <span style={{ fontSize: 11, color, background: `${color}14`, padding: '1px 6px', borderRadius: 4, border: `1px solid ${color}40` }}>{label}</span>
     </span>
   )
