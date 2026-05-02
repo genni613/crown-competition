@@ -4,8 +4,11 @@ export async function seed(): Promise<void> {
   const db = getDb()
 
   // 检查是否已有种子数据
-  const count = (await db.queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM org_score_types'))?.cnt ?? 0
-  if (count > 0) return
+  const [orgCount, dimCount] = await Promise.all([
+    db.queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM org_score_types'),
+    db.queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM scoring_dimensions'),
+  ])
+  if ((orgCount?.cnt ?? 0) > 0 && (dimCount?.cnt ?? 0) > 0) return
 
   const insertOrg = `
     INSERT INTO org_score_types (name, display_name, points_per_unit, max_per_season, sort_order)
@@ -55,7 +58,7 @@ export async function seed(): Promise<void> {
     ['product', '交付质量', 0.10, '核心项目准时上线率', 1.00, 'feishu', 'threshold', 100, 80, null, null, null, 6],
     ['product', '交付质量', 0.00, '需求变更消耗PD', 0.00, 'feishu', 'deduction', null, null, 1, 15, 3, 7],
     // 协作贡献 (15%) - 两个指标 1:2
-    ['product', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'admin', 'threshold', 10, 5, null, null, null, 8],
+    ['product', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'evidence', 'threshold', 10, 5, null, null, null, 8],
     ['product', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'feishu', 'threshold', 5, 1, null, null, null, 9],
 
     // ===== 设计岗 =====
@@ -73,7 +76,7 @@ export async function seed(): Promise<void> {
     ['design', '交付质量', 0.25, '设计还原度', 0.40, 'admin', 'threshold', 95, 85, null, null, null, 17],
     ['design', '交付质量', 0.00, '设计返工消耗PD', 0.00, 'feishu', 'deduction', null, null, 1, 15, 3, 18],
     // 协作贡献 (15%) - 两个指标 1:2
-    ['design', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'admin', 'threshold', 10, 5, null, null, null, 19],
+    ['design', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'evidence', 'threshold', 10, 5, null, null, null, 19],
     ['design', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'feishu', 'threshold', 5, 1, null, null, null, 20],
 
     // ===== 研发岗 =====
@@ -87,7 +90,7 @@ export async function seed(): Promise<void> {
     ['tech', '交付质量', 0.00, '线上问题(仅研发代码)', 0.00, 'feishu', 'deduction', null, null, 1, 100, 1, 25],
     ['tech', '交付质量', 0.00, '提测不通过', 0.00, 'feishu', 'deduction', null, null, 10, 100, 1, 26],
     // 协作贡献 (15%) - 两个指标 1:2
-    ['tech', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'admin', 'threshold', 10, 5, null, null, null, 27],
+    ['tech', '协作贡献', 0.15, '微社区被点赞数', 0.33, 'evidence', 'threshold', 10, 5, null, null, null, 27],
     ['tech', '协作贡献', 0.15, '线上问题系统解决数', 0.67, 'feishu', 'threshold', 5, 1, null, null, null, 28],
   ] as const
 

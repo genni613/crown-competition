@@ -45,6 +45,7 @@ export default function EvidenceSubmit() {
   const [loading, setLoading] = useState(false)
   const [evidenceDimensions, setEvidenceDimensions] = useState<ScoringDimension[]>([])
   const [memberJobRole, setMemberJobRole] = useState<string | null>(null)
+  const [selectedDimensionId, setSelectedDimensionId] = useState<number | undefined>()
 
   useEffect(() => {
     getSeasons().then(res => setSeasons(res.data))
@@ -128,6 +129,11 @@ export default function EvidenceSubmit() {
       return
     }
 
+    if (fileList.length === 0) {
+      message.warning('请至少上传一张举证图片')
+      return
+    }
+
     setLoading(true)
     try {
       const attachmentUrls = await Promise.all(
@@ -182,7 +188,7 @@ export default function EvidenceSubmit() {
           </Form.Item>
           {evidenceDimensions.length > 0 && (
             <Form.Item label="关联指标" name="target_id" rules={[{ required: true, message: '请选择举证指标' }]}>
-              <Select placeholder="选择要举证的指标">
+              <Select placeholder="选择要举证的指标" onChange={(val: number) => setSelectedDimensionId(val)}>
                 {evidenceDimensions.map(d => (
                   <Select.Option key={d.id} value={d.id}>
                     {d.dimension_name} — {d.indicator_name}
@@ -196,34 +202,47 @@ export default function EvidenceSubmit() {
               </Select>
             </Form.Item>
           )}
-          {evidenceDimensions.length > 0 && (
-            <Form.Item label="举证数值" name="raw_value" rules={[{ required: true, message: '请输入举证数值' }]}>
-              <InputNumber min={0} style={{ width: '100%' }} placeholder="例如：解决了 3 个问题，填 3" />
-            </Form.Item>
-          )}
-          <Form.Item label="标题" name="title" rules={[{ required: true, message: '请输入标题' }]}>
-            <Input placeholder="举证标题" />
-          </Form.Item>
-          <Form.Item
-            label="一句话描述"
-            name="description"
-            rules={[{ required: true, message: '请用一句话概括你的成果，方便系统自动匹配得分点' }]}
-          >
-            <Input.TextArea
-              rows={2}
-              placeholder="例如：本季度完成了3个AI工具——自动日报生成器、代码review机器人、数据看板自动刷新"
-              maxLength={200}
-              showCount
-            />
-          </Form.Item>
+          {evidenceDimensions.length > 0 && (() => {
+            const selectedDim = evidenceDimensions.find(d => d.id === selectedDimensionId)
+            const indicatorName = selectedDim?.indicator_name || ''
+            const isLikes = indicatorName.includes('点赞')
+            return (
+              <>
+                <Form.Item label="举证数值" name="raw_value" rules={[{ required: true, message: '请输入举证数值' }]}>
+                  <InputNumber min={0} style={{ width: '100%' }} placeholder={isLikes ? '例如：获得 10 个赞，填 10' : '例如：解决了 3 个问题，填 3'} />
+                </Form.Item>
+                <Form.Item label="标题" name="title" rules={[{ required: true, message: '请输入标题' }]}>
+                  <Input placeholder="举证标题" />
+                </Form.Item>
+                <Form.Item
+                  label="一句话描述"
+                  name="description"
+                  rules={[{ required: true, message: '请用一句话概括你的成果，方便系统自动匹配得分点' }]}
+                >
+                  <Input.TextArea
+                    rows={2}
+                    placeholder={isLikes
+                      ? '例如：本季度在微社区因日常协作互助获得同事点赞，累计 10 个'
+                      : '例如：本季度完成了3个AI工具——自动日报生成器、代码review机器人、数据看板自动刷新'}
+                    maxLength={200}
+                    showCount
+                  />
+                </Form.Item>
+              </>
+            )
+          })()}
           <Form.Item
             label="举证图片"
+            required
             extra="仅支持 JPG、PNG、WEBP、GIF，最多 5 张，单张不超过 5MB。"
           >
             <Upload
               accept="image/*"
               listType="picture-card"
               fileList={fileList}
+              openFileDialogOnClick
+              style={{ pointerEvents: 'auto' }}
+              customRequest={({ onSuccess }) => { onSuccess?.('ok') }}
               beforeUpload={(file) => {
                 const isImage = file.type.startsWith('image/')
                 if (!isImage) {
@@ -240,7 +259,7 @@ export default function EvidenceSubmit() {
                   message.error('图片不能超过 5MB')
                   return Upload.LIST_IGNORE
                 }
-                return false
+                return true
               }}
               onPreview={handlePreview}
               onChange={({ fileList: nextFileList }) => {
@@ -256,7 +275,7 @@ export default function EvidenceSubmit() {
             </Upload>
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} disabled={!membershipReady}>
+            <Button type="primary" htmlType="submit" loading={loading} disabled={!membershipReady || fileList.length === 0}>
               提交
             </Button>
           </Form.Item>
