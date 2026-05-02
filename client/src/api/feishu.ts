@@ -246,6 +246,20 @@ export const syncProjectsByDateRange = (startDate: string, endDate: string, work
 export const syncAllUsers = () =>
   api.post<WorkHourImportResult>('/feishu/user-data/sync')
 
+export interface SeasonSyncResult {
+  seasonId: number
+  memberCount: number
+  syncedCount: number
+  skippedCount: number
+  writtenScoreCount: number
+}
+
+export const syncSeasonScores = (seasonId: number) =>
+  api.post<SeasonSyncResult>(`/feishu/${seasonId}/sync`)
+
+export const calculateSeasonScores = (seasonId: number) =>
+  api.post(`/scoring/calculate/${seasonId}`)
+
 export interface MyWorkSummaryResponse {
   found: boolean
   startDate?: string

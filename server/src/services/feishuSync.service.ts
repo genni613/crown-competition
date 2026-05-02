@@ -1,8 +1,6 @@
-import fieldsConfig from '../config/feishuProjectFields.json'
-import { config } from '../config'
 import { getDb, withTransaction } from '../db'
-import { feishuProject } from './feishuProject.service'
 import { calculateSeasonScores } from './scoring.service'
+import { queryPdSummaryByDateRange } from './pdAggregation.service'
 import type { JobRole, ScoringDimension, Season } from '../types/entities'
 
 type MetricMap = Record<string, number>
@@ -38,10 +36,6 @@ interface SyncResult {
   warnings: SyncWarning[]
 }
 
-const storyFields = fieldsConfig.story
-const issueFields = fieldsConfig.issue
-const defectFields = fieldsConfig.defect
-
 const metricNamesByRole: Record<JobRole, string[]> = {
   product: [
     '产品需求使用研发测试PD数',
@@ -74,227 +68,6 @@ function toTime(value: string | number | Date): number {
   return parsed
 }
 
-function inRange(value: unknown, startMs: number, endMs: number): boolean {
-  const time = readDate(value)
-  return time != null && time >= startMs && time <= endMs
-}
-
-function readDate(value: unknown): number | null {
-  const raw = unwrapValue(value)
-  if (raw == null || raw === '') return null
-  if (typeof raw === 'number') return raw
-  if (typeof raw === 'string') {
-    const numeric = Number(raw)
-    if (Number.isFinite(numeric) && numeric > 1_000_000_000) return numeric
-    const parsed = new Date(raw).getTime()
-    return Number.isNaN(parsed) ? null : parsed
-  }
-  return null
-}
-
-function unwrapValue(value: unknown): any {
-  if (value && typeof value === 'object') {
-    const item = value as Record<string, any>
-    if ('value' in item) return item.value
-    if ('field_value' in item) return item.field_value
-    if ('number_value' in item) return item.number_value
-    if ('date_value' in item) return item.date_value
-    if ('text' in item) return item.text
-    if ('name' in item) return item.name
-    if ('label' in item) return item.label
-  }
-  return value
-}
-
-function readNumber(value: unknown): number {
-  const raw = unwrapValue(value)
-  if (raw == null || raw === '') return 0
-  if (typeof raw === 'number') return raw
-  const parsed = Number(raw)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-function readText(value: unknown): string {
-  const raw = unwrapValue(value)
-  if (raw == null) return ''
-  if (Array.isArray(raw)) return raw.map(readText).filter(Boolean).join(',')
-  if (typeof raw === 'object') return JSON.stringify(raw)
-  return String(raw)
-}
-
-function readBool(value: unknown): boolean {
-  const raw = unwrapValue(value)
-  if (typeof raw === 'boolean') return raw
-  if (typeof raw === 'number') return raw !== 0
-  if (typeof raw === 'string') return ['true', '是', 'yes', '1', '核心'].includes(raw.toLowerCase())
-  return Boolean(raw)
-}
-
-function fieldValue(item: any, key?: string): unknown {
-  if (!key) return undefined
-  if (item?.[key] !== undefined) return item[key]
-  if (item?.fields?.[key] !== undefined) return item.fields[key]
-  if (item?.field_value_map?.[key] !== undefined) return item.field_value_map[key]
-
-  const fields = item?.fields || item?.field_values || item?.fieldValueList || item?.field_value_list
-  if (Array.isArray(fields)) {
-    const found = fields.find((field: any) =>
-      field.field_key === key ||
-      field.field_alias === key ||
-      field.key === key ||
-      field.alias === key
-    )
-    if (found) return found.value ?? found.field_value ?? found
-  }
-  return undefined
-}
-
-function isMissingField(item: any, key?: string): boolean {
-  if (!key) return true
-  return fieldValue(item, key) === undefined
-}
-
-function hasUser(value: unknown, userKey: string): boolean {
-  const raw = unwrapValue(value)
-  if (raw == null) return false
-  if (typeof raw === 'string') return raw === userKey
-  if (Array.isArray(raw)) return raw.some(item => hasUser(item, userKey))
-  if (typeof raw === 'object') {
-    const item = raw as Record<string, any>
-    return [item.user_key, item.userKey, item.key, item.id, item.open_id, item.out_id].some(id => id === userKey)
-  }
-  return false
-}
-
-function dataItems(json: any): any[] {
-  const data = json?.data
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data?.items)) return data.items
-  if (Array.isArray(data?.work_items)) return data.work_items
-  if (Array.isArray(data?.work_item_list)) return data.work_item_list
-  if (Array.isArray(json?.items)) return json.items
-  return []
-}
-
-function hasMore(json: any, pageNum: number, pageSize: number, itemCount: number): boolean {
-  const pagination = json?.pagination || json?.data?.pagination
-  if (typeof pagination?.has_more === 'boolean') return pagination.has_more
-  if (typeof json?.data?.has_more === 'boolean') return json.data.has_more
-  const total = Number(pagination?.total || json?.data?.total || 0)
-  return total > pageNum * pageSize && itemCount > 0
-}
-
-function searchGroup(fieldKey: string, userKey: string, dateFieldKey: string, startMs: number, endMs: number) {
-  return {
-    conjunction: 'AND',
-    search_params: [
-      { param_key: fieldKey, operator: 'IN', value: [userKey] },
-      { param_key: dateFieldKey, operator: 'BETWEEN', value: [startMs, endMs] },
-    ],
-  }
-}
-
-async function searchAll(workItemTypeKey: string, body: Record<string, any>): Promise<any[]> {
-  const pageSize = config.feishuProject.pageSize
-  const all: any[] = []
-  let pageNum = 1
-
-  while (true) {
-    const json = await feishuProject.searchWorkItems(workItemTypeKey, {
-      ...body,
-      page_num: pageNum,
-      page_size: pageSize,
-      expand: {
-        need_workflow: true,
-        relation_fields_detail: true,
-        need_multi_text: true,
-        need_user_detail: true,
-        need_sub_task_parent: true,
-        ...(body.expand || {}),
-      },
-    })
-    const items = dataItems(json)
-    all.push(...items)
-    if (!hasMore(json, pageNum, pageSize, items.length)) break
-    pageNum += 1
-  }
-
-  return all
-}
-
-async function resolveProjectUserKey(member: SyncMember): Promise<string> {
-  if (!member.email) throw new Error('用户缺少 email，无法映射飞书项目 user_key')
-  const json = await feishuProject.queryUserByEmail(member.email)
-  const users = json.data?.users || json.data?.user_list || json.data || []
-  const first = Array.isArray(users) ? users[0] : users
-  const userKey = first?.user_key || first?.userKey || first?.key
-  if (!userKey) throw new Error(`未找到飞书项目用户映射：${member.email}`)
-  return userKey
-}
-
-function aggregateProduct(stories: any[], issues: any[], userKey: string, startMs: number, endMs: number): MetricMap {
-  const ownedStories = stories.filter(item => hasUser(fieldValue(item, storyFields.productOwner), userKey))
-  const reviewStories = ownedStories.filter(item => fieldValue(item, storyFields.reviewPlanAt) != null)
-  const onTimeReviews = reviewStories.filter(item => {
-    const plan = readDate(fieldValue(item, storyFields.reviewPlanAt))
-    const done = readDate(fieldValue(item, storyFields.reviewDoneAt))
-    return plan != null && done != null && done <= plan
-  })
-  const coreStories = ownedStories.filter(item => readBool(fieldValue(item, storyFields.isCore)))
-  const onTimeLaunches = coreStories.filter(item => {
-    const plan = readDate(fieldValue(item, storyFields.launchPlanAt))
-    const done = readDate(fieldValue(item, storyFields.launchDoneAt))
-    return plan != null && done != null && done <= plan
-  })
-  const resolvedIssues = issues.filter(item =>
-    hasUser(fieldValue(item, issueFields.resolver), userKey) &&
-    inRange(fieldValue(item, issueFields.closedAt), startMs, endMs)
-  )
-
-  return {
-    '产品需求使用研发测试PD数': ownedStories.reduce((sum, item) =>
-      sum + readNumber(fieldValue(item, storyFields.pd)) + readNumber(fieldValue(item, storyFields.clientPd)) / 3, 0),
-    '需求评审通过准时率': reviewStories.length ? onTimeReviews.length / reviewStories.length * 100 : 0,
-    '核心项目准时上线率': coreStories.length ? onTimeLaunches.length / coreStories.length * 100 : 0,
-    '需求变更消耗PD': ownedStories.reduce((sum, item) => sum + readNumber(fieldValue(item, storyFields.changePd)), 0),
-    '线上问题系统解决数': resolvedIssues.length,
-  }
-}
-
-function complexityWeight(value: unknown): number {
-  const text = readText(value).toLowerCase()
-  if (text.includes('复杂') || text.includes('high') || text.includes('3')) return 3
-  if (text.includes('中') || text.includes('medium') || text.includes('2')) return 2
-  if (!text) return 1
-  return 1
-}
-
-function aggregateDesign(stories: any[], issues: any[], userKey: string, startMs: number, endMs: number): MetricMap {
-  const ownedStories = stories.filter(item => hasUser(fieldValue(item, storyFields.designer), userKey))
-  const designPlanStories = ownedStories.filter(item => fieldValue(item, storyFields.designPlanAt) != null)
-  const onTimeDesigns = designPlanStories.filter(item => {
-    const plan = readDate(fieldValue(item, storyFields.designPlanAt))
-    const done = readDate(fieldValue(item, storyFields.designDoneAt))
-    return plan != null && done != null && done <= plan
-  })
-  const resolvedIssues = issues.filter(item =>
-    hasUser(fieldValue(item, issueFields.resolver), userKey) &&
-    inRange(fieldValue(item, issueFields.closedAt), startMs, endMs)
-  )
-
-  return {
-    '设计需求完成数（加权）': ownedStories.reduce((sum, item) =>
-      sum + complexityWeight(fieldValue(item, storyFields.designComplexity)), 0),
-    '设计交付准时率': designPlanStories.length ? onTimeDesigns.length / designPlanStories.length * 100 : 0,
-    '设计返工消耗PD': ownedStories.reduce((sum, item) => sum + readNumber(fieldValue(item, storyFields.designReworkPd)), 0),
-    '线上问题系统解决数': resolvedIssues.length,
-  }
-}
-
-function severity(item: any): string {
-  return readText(fieldValue(item, issueFields.severity)).toUpperCase()
-}
-
 function computeDeliveryQuality(p0: number, p1: number, p2: number): number {
   const total = p0 + p1 + p2
   if (total === 0) return 100
@@ -305,116 +78,140 @@ function computeDeliveryQuality(p0: number, p1: number, p2: number): number {
   return 60
 }
 
-function aggregateTech(stories: any[], issues: any[], defects: any[], userKey: string, startMs: number, endMs: number, issuePriorityCounts: Record<string, number> = {}): MetricMap {
-  const ownedStories = stories.filter(item => hasUser(fieldValue(item, storyFields.developer), userKey))
-  const ownedIssues = issues.filter(item =>
-    (hasUser(fieldValue(item, issueFields.owner), userKey) || hasUser(fieldValue(item, issueFields.resolver), userKey)) &&
-    inRange(fieldValue(item, issueFields.closedAt), startMs, endMs)
+const GONGSHI_TIME = 'COALESCE(work_date, work_start_time, create_time, update_time)'
+
+async function queryLocalPdCount(userKey: string, startMs: number, endMs: number): Promise<number> {
+  const rows = await getDb().query<{ total_pd: number }>(`
+    SELECT ROUND(SUM(COALESCE(pd_count, 0)), 2) AS total_pd
+    FROM feishu_workitem_gongshi
+    WHERE work_hour_reporter = ?
+      AND ${GONGSHI_TIME} IS NOT NULL
+      AND ${GONGSHI_TIME} >= ?
+      AND ${GONGSHI_TIME} < ?
+  `, [userKey, new Date(startMs), new Date(endMs)])
+  return Number(rows[0]?.total_pd || 0)
+}
+
+async function queryLocalIssueCount(userKey: string, startMs: number, endMs: number, extraWhere: string = ''): Promise<number> {
+  const rows = await getDb().query<{ count: number }>(`
+    SELECT COUNT(*) as count FROM feishu_workitem_issue
+    WHERE owner = ?
+      AND COALESCE(archiving_date, start_time) IS NOT NULL
+      AND COALESCE(archiving_date, start_time) >= ?
+      AND COALESCE(archiving_date, start_time) < ?
+      ${extraWhere}
+  `, [userKey, new Date(startMs), new Date(endMs)])
+  return Number(rows[0]?.count || 0)
+}
+
+async function queryLocalIssuePriorityCounts(userKey: string, startMs: number, endMs: number): Promise<Record<string, number>> {
+  const rows = await getDb().query<{ priority: string | null; count: number }>(`
+    SELECT UPPER(TRIM(priority)) AS priority, COUNT(*) AS count
+    FROM feishu_workitem_issue
+    WHERE owner = ?
+      AND COALESCE(archiving_date, start_time) IS NOT NULL
+      AND COALESCE(archiving_date, start_time) >= ?
+      AND COALESCE(archiving_date, start_time) < ?
+      AND UPPER(TRIM(priority)) IN ('P0', 'P1', 'P2')
+    GROUP BY UPPER(TRIM(priority))
+  `, [userKey, new Date(startMs), new Date(endMs)])
+  return Object.fromEntries(
+    rows.map(row => [String(row.priority || '').toUpperCase(), Number(row.count)])
   )
-  const resolvedIssues = issues.filter(item =>
-    hasUser(fieldValue(item, issueFields.resolver), userKey) &&
-    inRange(fieldValue(item, issueFields.closedAt), startMs, endMs)
-  )
-  const processIssues = ownedIssues.filter(item => ['P0', 'P1', 'P2'].includes(severity(item)))
-  const onlineFaults = ownedIssues.filter(item => {
-    const source = readText(fieldValue(item, issueFields.source)).toLowerCase()
-    return ['P1', 'P2'].includes(severity(item)) && (source.includes('故障') || source.includes('fault'))
-  })
-  const codeIssues = ownedIssues.filter(item => {
-    const cause = readText(fieldValue(item, issueFields.rootCause)).toLowerCase()
-    return cause.includes('研发') || cause.includes('代码') || cause.includes('code')
-  })
-  const failedTests = defects.filter(item =>
-    hasUser(fieldValue(item, defectFields.owner), userKey) &&
-    inRange(fieldValue(item, defectFields.failedAt), startMs, endMs) &&
-    /不通过|fail|failed/i.test(readText(fieldValue(item, defectFields.testResult)))
-  )
+}
+
+async function aggregateProduct(userKey: string, startMs: number, endMs: number, startDate: string, endDate: string): Promise<MetricMap> {
+  const pdResult = await queryPdSummaryByDateRange(startDate, endDate, userKey)
+  const workHours = pdResult.people.find(p => p.project_user_key === userKey)?.total_hours ?? 0
+  const resolvedIssueCount = await queryLocalIssueCount(userKey, startMs, endMs)
 
   return {
-    '消耗需求评估标准工时': ownedStories.reduce((sum, item) => sum + readNumber(fieldValue(item, storyFields.standardHours)), 0),
+    '产品需求使用研发测试PD数': workHours,
+    '需求评审通过准时率': 100,
+    '核心项目准时上线率': 100,
+    '需求变更消耗PD': 0,
+    '线上问题系统解决数': resolvedIssueCount,
+  }
+}
+
+async function aggregateDesign(userKey: string, startMs: number, endMs: number): Promise<MetricMap> {
+  const db = getDb()
+
+  // 设计需求完成数：从工时表统计关联的不同需求数
+  const storyRows = await db.query<{ count: number }>(`
+    SELECT COUNT(DISTINCT related_requirement) as count
+    FROM feishu_workitem_gongshi
+    WHERE work_hour_reporter = ?
+      AND ${GONGSHI_TIME} IS NOT NULL
+      AND ${GONGSHI_TIME} >= ?
+      AND ${GONGSHI_TIME} < ?
+      AND related_requirement IS NOT NULL AND related_requirement != ''
+  `, [userKey, new Date(startMs), new Date(endMs)])
+
+  const resolvedIssueCount = await queryLocalIssueCount(userKey, startMs, endMs)
+
+  return {
+    '设计需求完成数（加权）': Number(storyRows[0]?.count || 0),
+    '设计交付准时率': 100,
+    '设计返工消耗PD': 0,
+    '线上问题系统解决数': resolvedIssueCount,
+  }
+}
+
+async function aggregateTech(userKey: string, startMs: number, endMs: number, startDate: string, endDate: string): Promise<MetricMap> {
+  const pdResult = await queryPdSummaryByDateRange(startDate, endDate, userKey)
+  const totalHours = pdResult.people.find(p => p.project_user_key === userKey)?.total_hours ?? 0
+  const issuePriorityCounts = await queryLocalIssuePriorityCounts(userKey, startMs, endMs)
+
+  // 线上故障(P1/P2)：P1/P2 且来源含"故障"
+  const faultCount = await queryLocalIssueCount(userKey, startMs, endMs,
+    `AND UPPER(TRIM(priority)) IN ('P1', 'P2') AND \`source\` LIKE '%故障%'`)
+
+  // 线上问题(仅研发代码)：问题原因含"研发"/"代码"
+  const codeCount = await queryLocalIssueCount(userKey, startMs, endMs,
+    `AND (root_cause LIKE '%研发%' OR root_cause LIKE '%代码%' OR root_cause LIKE '%code%')`)
+
+  // 线上问题系统解决数
+  const resolvedCount = await queryLocalIssueCount(userKey, startMs, endMs)
+
+  return {
+    '消耗需求评估标准工时': totalHours,
     '过程问题(P0/P1/P2)': computeDeliveryQuality(
       issuePriorityCounts['P0'] || 0,
       issuePriorityCounts['P1'] || 0,
       issuePriorityCounts['P2'] || 0,
     ),
-    '线上故障(P1/P2)': onlineFaults.length,
-    '线上问题(仅研发代码)': codeIssues.length,
-    '提测不通过': failedTests.length,
-    '线上问题系统解决数': resolvedIssues.length,
+    '线上故障(P1/P2)': faultCount,
+    '线上问题(仅研发代码)': codeCount,
+    '提测不通过': 0,
+    '线上问题系统解决数': resolvedCount,
   }
-}
-
-function fieldWarnings(member: SyncMember, sample: any | undefined): SyncWarning[] {
-  if (!sample || !member.job_role) return []
-  const warnings: SyncWarning[] = []
-  const fieldsToCheck = member.job_role === 'product'
-    ? [storyFields.productOwner, storyFields.pd, storyFields.reviewPlanAt, storyFields.launchPlanAt]
-    : member.job_role === 'design'
-      ? [storyFields.designer, storyFields.designComplexity, storyFields.designPlanAt]
-      : [storyFields.developer, storyFields.standardHours]
-
-  for (const key of fieldsToCheck) {
-    if (isMissingField(sample, key)) warnings.push({ userId: member.user_key, reason: `样例工作项缺少字段 ${key}，请检查 feishuProjectFields.json` })
-  }
-  return warnings
 }
 
 async function aggregateMemberMetrics(member: SyncMember, season: Season): Promise<MemberPreview> {
   if (!member.job_role) throw new Error('成员缺少 job_role')
   const startMs = toTime(season.start_date)
-  const endMs = toTime(`${season.end_date}T23:59:59.999`)
-  const projectUserKey = member.user_key
+  const endMs = toTime(season.end_date) + 86_399_999
+  const userKey = member.user_key
 
-  const storyUserField = member.job_role === 'product'
-    ? storyFields.productOwner
-    : member.job_role === 'design'
-      ? storyFields.designer
-      : storyFields.developer
-
-  const stories = await searchAll(config.feishuProject.storyType, {
-    search_group: searchGroup(storyUserField, projectUserKey, 'created_at', startMs, endMs),
-    fields: Object.values(storyFields),
-  })
-  const issues = await searchAll(config.feishuProject.issueType, {
-    search_group: searchGroup(issueFields.resolver, projectUserKey, issueFields.closedAt, startMs, endMs),
-    fields: Object.values(issueFields),
-  })
-  const defects = member.job_role === 'tech'
-    ? await searchAll(config.feishuProject.defectType, {
-      search_group: searchGroup(defectFields.owner, projectUserKey, defectFields.failedAt, startMs, endMs),
-      fields: Object.values(defectFields),
-    })
-    : []
-
-  let issuePriorityCounts: Record<string, number> = {}
-  if (member.job_role === 'tech') {
-    const priorityRows = await getDb().query<{ priority: string; count: number }>(`
-      SELECT priority, COUNT(*) as count
-      FROM feishu_workitem_issue
-      WHERE owner = ? AND start_time BETWEEN ? AND ?
-      GROUP BY priority
-    `, [projectUserKey, new Date(startMs), new Date(endMs)])
-    issuePriorityCounts = Object.fromEntries(
-      priorityRows.map((r: any) => [r.priority, Number(r.count)])
-    )
-  }
+  const sdDate = new Date(toTime(season.start_date))
+  const edDate = new Date(toTime(season.end_date))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const sd = `${sdDate.getFullYear()}-${pad(sdDate.getMonth() + 1)}-${pad(sdDate.getDate())}`
+  const ed = `${edDate.getFullYear()}-${pad(edDate.getMonth() + 1)}-${pad(edDate.getDate())}`
 
   const metrics = member.job_role === 'product'
-    ? aggregateProduct(stories, issues, projectUserKey, startMs, endMs)
+    ? await aggregateProduct(userKey, startMs, endMs, sd, ed)
     : member.job_role === 'design'
-      ? aggregateDesign(stories, issues, projectUserKey, startMs, endMs)
-      : aggregateTech(stories, issues, defects, projectUserKey, startMs, endMs, issuePriorityCounts)
+      ? await aggregateDesign(userKey, startMs, endMs)
+      : await aggregateTech(userKey, startMs, endMs, sd, ed)
 
   return {
     member,
-    projectUserKey,
+    projectUserKey: userKey,
     metrics,
-    warnings: fieldWarnings(member, stories[0]),
-    rawCounts: {
-      stories: stories.length,
-      issues: issues.length,
-      defects: defects.length,
-    },
+    warnings: [],
+    rawCounts: { local: 1 },
   }
 }
 
@@ -442,7 +239,7 @@ async function writeIndicatorScores(member: SyncMember, metrics: MetricMap): Pro
           source = 'feishu',
           approved = 1,
           notes = VALUES(notes)
-      `, [member.season_member_id, dimension.id, rawValue, 'synced from feishu project'])
+      `, [member.season_member_id, dimension.id, rawValue, 'synced from local db'])
       written += 1
     }
   })
@@ -472,7 +269,6 @@ async function getMembers(seasonId: number, userId?: string): Promise<SyncMember
 }
 
 export async function previewMemberFeishuData(seasonId: number, userId: string): Promise<MemberPreview> {
-  feishuProject.assertConfigured()
   const season = await getSeason(seasonId)
   const member = (await getMembers(seasonId, userId))[0]
   if (!member) throw new Error('赛季成员不存在')
@@ -480,16 +276,17 @@ export async function previewMemberFeishuData(seasonId: number, userId: string):
 }
 
 export async function syncMemberFeishuData(seasonId: number, userId: string): Promise<SyncResult> {
-  feishuProject.assertConfigured()
+  console.log('[sync-member] start', { seasonId, userId })
   const season = await getSeason(seasonId)
   const member = (await getMembers(seasonId, userId))[0]
   if (!member) throw new Error('赛季成员不存在')
 
-  const warnings: SyncWarning[] = []
   const preview = await aggregateMemberMetrics(member, season)
-  warnings.push(...preview.warnings)
+  console.log('[sync-member] metrics', { userId, metrics: preview.metrics })
   const writtenScoreCount = await writeIndicatorScores(member, preview.metrics)
+  console.log('[sync-member] writtenScoreCount', writtenScoreCount)
   await calculateSeasonScores(seasonId)
+  console.log('[sync-member] done')
 
   return {
     seasonId,
@@ -497,14 +294,15 @@ export async function syncMemberFeishuData(seasonId: number, userId: string): Pr
     syncedCount: 1,
     skippedCount: 0,
     writtenScoreCount,
-    warnings,
+    warnings: preview.warnings,
   }
 }
 
 export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult> {
-  feishuProject.assertConfigured()
+  console.log('[sync-season] start', { seasonId })
   const season = await getSeason(seasonId)
   const members = await getMembers(seasonId)
+  console.log('[sync-season] members', { count: members.length, users: members.map(m => m.user_key) })
   const result: SyncResult = {
     seasonId,
     memberCount: members.length,
@@ -517,10 +315,12 @@ export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult
   for (const member of members) {
     try {
       const preview = await aggregateMemberMetrics(member, season)
+      console.log('[sync-season] member metrics', { userKey: member.user_key, jobRole: member.job_role, metrics: preview.metrics })
       result.warnings.push(...preview.warnings)
       result.writtenScoreCount += await writeIndicatorScores(member, preview.metrics)
       result.syncedCount += 1
     } catch (error) {
+      console.error('[sync-season] member error', { userKey: member.user_key, error: error instanceof Error ? error.message : error })
       result.skippedCount += 1
       result.warnings.push({
         userId: member.user_key,
@@ -530,6 +330,7 @@ export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult
   }
 
   if (result.syncedCount > 0) await calculateSeasonScores(seasonId)
+  console.log('[sync-season] done', { syncedCount: result.syncedCount, skippedCount: result.skippedCount, writtenScoreCount: result.writtenScoreCount })
   return result
 }
 

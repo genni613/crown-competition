@@ -79,9 +79,11 @@ export default function Dashboard() {
 
   const dimensions = breakdown?.scores ? groupByDimension(breakdown.scores) : []
   const dist = myMember.distribution ? distConfig[myMember.distribution] : null
-  const positionScore = myMember.final_position_score ?? 0
+  const positionScore = breakdown?.scores
+    ? breakdown.scores.reduce((sum: number, s: any) => sum + (s.final_score || 0), 0)
+    : 0
   const orgScore = myMember.total_org_score ?? 0
-  const totalScore = myMember.total_score ?? 0
+  const totalScore = positionScore + orgScore
   const rank = myMember.rank
 
   const radarData = dimensions.map((g: any) => {
@@ -241,50 +243,52 @@ export default function Dashboard() {
             key: g.name,
             label: <Text strong style={{ fontSize: 13 }}>{g.name}</Text>,
             children: (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>指标</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>规则</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>原始值</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>得分</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>来源</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {g.items.map((item: any) => {
-                    const effectiveValue = resolveEffectiveValue(g.name, item, workSummary)
-                    const effectiveScore = resolveEffectiveScore(item, effectiveValue)
-                    const displayItem = { ...item, raw_value: effectiveValue }
-                    return (
-                      <tr key={item.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                        <td style={{ padding: '6px 8px' }}>
-                          {item.indicator_name}
-                          <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
-                            {(item.indicator_weight * 100).toFixed(0)}%
-                          </Text>
-                        </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>{ruleText(displayItem)}</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                          {effectiveValue != null && item.threshold_100 != null && item.threshold_60 != null
-                            ? <ValueStatus value={effectiveValue} t100={item.threshold_100} t60={item.threshold_60} />
-                            : (effectiveValue ?? '-')}
-                        </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>
-                          {effectiveScore?.toFixed(1) ?? '-'}
-                        </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>{sourceTag(item.data_source)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>指标</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>规则</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>原始值</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>得分</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>来源</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.items.map((item: any) => {
+                      const effectiveValue = resolveEffectiveValue(g.name, item, workSummary)
+                      const effectiveScore = resolveEffectiveScore(item, effectiveValue)
+                      const displayItem = { ...item, raw_value: effectiveValue }
+                      return (
+                        <tr key={item.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                          <td style={{ padding: '6px 8px' }}>
+                            {item.indicator_name}
+                            <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                              {(item.indicator_weight * 100).toFixed(0)}%
+                            </Text>
+                          </td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>{ruleText(displayItem)}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                            {effectiveValue != null && item.threshold_100 != null && item.threshold_60 != null
+                              ? <ValueStatus value={effectiveValue} t100={item.threshold_100} t60={item.threshold_60} />
+                              : (effectiveValue ?? '-')}
+                          </td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>
+                            {effectiveScore?.toFixed(1) ?? '-'}
+                          </td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>{sourceTag(item.data_source)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {g.name === '交付效率' && workSummary?.found && workSummary?.people?.[0] && (
+                  <WorkSummaryCard summary={workSummary} />
+                )}
+              </>
             ),
           }))}
         />
-        {breakdown?.scores && workSummary?.found && workSummary?.people?.[0] && (
-          <WorkSummaryCard summary={workSummary} />
-        )}
       </Card>
 
       <div>
@@ -312,11 +316,10 @@ function groupByDimension(scores: any[]) {
 }
 
 function resolveEffectiveValue(dimName: string, item: any, workSummary: MyWorkSummaryResponse | null): number | null {
-  if (item.raw_value != null) return item.raw_value
   if (dimName === '交付效率' && workSummary?.found && workSummary.people?.[0]) {
     return workSummary.people[0].total_hours
   }
-  return null
+  return item.raw_value ?? null
 }
 
 function calcThresholdScore(value: number | null, t100: number | null, t60: number | null): number | null {
@@ -327,7 +330,6 @@ function calcThresholdScore(value: number | null, t100: number | null, t60: numb
 }
 
 function resolveEffectiveScore(item: any, effectiveValue: number | null): number | null {
-  if (item.final_score != null) return item.final_score
   if (effectiveValue == null) return null
   if (item.score_type === 'threshold' && item.threshold_100 != null && item.threshold_60 != null) {
     return calcThresholdScore(effectiveValue, item.threshold_100, item.threshold_60)
@@ -335,26 +337,31 @@ function resolveEffectiveScore(item: any, effectiveValue: number | null): number
   if (item.score_type === 'threshold' && item.threshold_100 == null && item.threshold_60 == null) {
     return effectiveValue
   }
-  return null
+  return item.final_score ?? null
 }
 
 function calcDimensionScore(items: any[], workSummary: MyWorkSummaryResponse | null, dimName: string): number | null {
-  const weightSum = items.reduce((s: number, item: any) => s + (item.indicator_weight || 0), 0)
-  if (weightSum === 0) return null
-  let dimIndScore = 0
-  let dimWeight = 0
+  let dimScore = 0
+  let totalDeduction = 0
   let hasAny = false
   for (const item of items) {
     const val = resolveEffectiveValue(dimName, item, workSummary)
+    if (item.score_type === 'deduction') {
+      if (val != null && val > 0) {
+        const perUnit = item.deduction_per_unit || 1
+        const divisor = item.deduction_divisor || 1
+        const cap = item.deduction_cap || 0
+        totalDeduction += Math.min(val * perUnit / divisor, cap)
+      }
+      continue
+    }
     const score = resolveEffectiveScore(item, val)
     if (score != null) {
-      const normalizedWeight = item.indicator_weight / weightSum
-      dimIndScore += score * normalizedWeight
-      dimWeight = item.dimension_weight
+      dimScore += score * item.indicator_weight
       hasAny = true
     }
   }
-  return hasAny ? dimIndScore * dimWeight : null
+  return hasAny ? dimScore - totalDeduction : null
 }
 
 function ValueStatus({ value, t100, t60 }: { value: number; t100: number; t60: number }) {

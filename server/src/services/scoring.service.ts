@@ -49,8 +49,6 @@ export async function calculateSeasonScores(seasonId: number): Promise<SeasonMem
           const thresholdIndicators = group.indicators.filter(i => i.dim.score_type !== 'deduction' && i.score)
           const deductionIndicators = group.indicators.filter(i => i.dim.score_type === 'deduction' && i.score)
 
-          const dimWeight = thresholdIndicators[0]?.dim.dimension_weight ?? 0
-
           for (const { dim, score } of thresholdIndicators) {
             const rawVal = score!.raw_value || 0
             const t100 = dim.threshold_100
@@ -58,7 +56,7 @@ export async function calculateSeasonScores(seasonId: number): Promise<SeasonMem
             const thresholdScore = (t100 != null && t60 != null)
               ? calculateThresholdScore(rawVal, t100, t60)
               : rawVal
-            const contribution = thresholdScore * dim.indicator_weight * dimWeight
+            const contribution = thresholdScore * dim.indicator_weight
             await tx.execute(
               'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
               [thresholdScore, contribution, score!.id]

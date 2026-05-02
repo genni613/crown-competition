@@ -43,6 +43,8 @@ import {
   syncIncrementalProjects,
   syncProjectsByDateRange,
   syncAllUsers,
+  syncSeasonScores,
+  calculateSeasonScores,
   queryFeishuWorkItemDetails,
   type FeishuProjectField,
   type FeishuRawFilterResponse,
@@ -425,6 +427,7 @@ export default function FeishuManager() {
   const [projectDateRange, setProjectDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [userLoading, setUserLoading] = useState(false)
   const [userResult, setUserResult] = useState<WorkHourImportResult>()
+  const [scoreSyncLoading, setScoreSyncLoading] = useState(false)
   const [pdSummaryLoading, setPdSummaryLoading] = useState(false)
   const [pdSummaryRange, setPdSummaryRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [pdSummaryProjectUserKey, setPdSummaryProjectUserKey] = useState<string>()
@@ -1689,6 +1692,49 @@ export default function FeishuManager() {
                     )}
                   </Card>
                 )}
+              </Space>
+            ),
+          },
+          {
+            key: 'score-sync',
+            label: '评分同步',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="同步指标分数（indicator_scores）">
+                  <Space direction="vertical" size={12}>
+                    <Typography.Text type="secondary">
+                      从本地飞书数据表聚合指标，写入 indicator_scores 并触发整赛季评分重算。
+                    </Typography.Text>
+                    <Space>
+                      <Button type="primary" loading={scoreSyncLoading} onClick={async () => {
+                        setScoreSyncLoading(true)
+                        try {
+                          const res = await syncSeasonScores(Number(seasonId))
+                          message.success(`同步完成：${res.data.syncedCount} 人，写入 ${res.data.writtenScoreCount} 条指标`)
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '同步失败')
+                        } finally {
+                          setScoreSyncLoading(false)
+                        }
+                      }}>
+                        全量同步指标并重算
+                      </Button>
+                      <Button loading={scoreSyncLoading} onClick={async () => {
+                        setScoreSyncLoading(true)
+                        try {
+                          await calculateSeasonScores(Number(seasonId))
+                          message.success('评分重算完成')
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.error || err?.message || '重算失败')
+                        } finally {
+                          setScoreSyncLoading(false)
+                        }
+                      }}>
+                        仅重算评分
+                      </Button>
+                    </Space>
+                  </Space>
+                </Card>
               </Space>
             ),
           },
