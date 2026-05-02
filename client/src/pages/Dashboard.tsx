@@ -209,7 +209,7 @@ export default function Dashboard() {
         <div style={{ textAlign: 'right' }}>
           {rank && (
             <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: '7px 16px', fontSize: 14, marginBottom: 8 }}>
-              #{rank} / {myMember.total_members ?? '-'}
+              #{rank}
             </div>
           )}
           {dist && (
