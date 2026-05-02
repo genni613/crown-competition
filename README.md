@@ -119,18 +119,38 @@ crown-competition/
 │       ├── services/           # 业务逻辑（10 个服务）
 │       ├── utils/              # 评分公式引擎、常量
 │       └── types/              # 实体类型定义
-├── docs/                       # 详细技术文档
-└── design.md                   # 主设计文档
+└── docs/                       # 所有设计和技术文档
 ```
 
 ## 文档
 
+### 设计 & 规则
+
 | 文档 | 说明 |
 |------|------|
-| [design.md](design.md) | 完整设计文档（项目概述、OAuth 流程、评分体系、数据库、API、前端页面） |
-| [scoring-rules.md](scoring-rules.md) | 各角色评分规则、阈值、权重 |
-| [kit.md](kit.md) | CopilotKit 功能说明 |
+| [docs/design.md](docs/design.md) | 完整设计文档（项目概述、OAuth 流程、评分体系、数据库、API、前端页面） |
+| [docs/competition-rules.md](docs/competition-rules.md) | 试点赛评分规则原文（各角色维度、阈值、权重、组织分） |
+| [docs/scoring-rules.md](docs/scoring-rules.md) | 评分计算流程与规则手册（供 AI Agent 使用） |
+| [docs/scoring-result-model.md](docs/scoring-result-model.md) | 评分结果模型设计（赛季指标分、维度分） |
 | [docs/scoring-metric-aggregation.md](docs/scoring-metric-aggregation.md) | 指标自动聚合可行性分析 |
-| [docs/permission-control.md](docs/permission-control.md) | 权限控制设计 |
-| [docs/feishu-project-openapi-sync.md](docs/feishu-project-openapi-sync.md) | 飞书 Project OpenAPI 对接指南 |
-| [docs/scoring-result-model.md](docs/scoring-result-model.md) | 评分结果模型设计 |
+
+### 飞书集成
+
+| 文档 | 说明 |
+|------|------|
+| [docs/feishu-data-sync-design.md](docs/feishu-data-sync-design.md) | 飞书取数设计文档（无缓存版方案） |
+| [docs/feishu-project-openapi-sync.md](docs/feishu-project-openapi-sync.md) | 飞书 Project OpenAPI 对接实施指南 |
+
+### AI 助手
+
+| 文档 | 说明 |
+|------|------|
+| [docs/copilotkit-setup.md](docs/copilotkit-setup.md) | CopilotKit 接入说明与配置 |
+| [docs/copilotkit-capabilities.md](docs/copilotkit-capabilities.md) | CopilotKit 功能能力、已注册 Actions、上下文感知设计 |
+
+### 其他
+
+| 文档 | 说明 |
+|------|------|
+| [docs/permission-control.md](docs/permission-control.md) | 权限控制设计与 RBAC 模型 |
+| [docs/slides.html](docs/slides.html) | 项目演示幻灯片 |
