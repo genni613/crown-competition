@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Tag, Spin, Empty, Typography, Button, Progress, Space, Collapse, Descriptions, Divider } from 'antd'
 import {
-  TrophyOutlined, CrownOutlined, FireOutlined,
+  CrownOutlined, FireOutlined,
   RiseOutlined, TeamOutlined, BulbOutlined,
   CheckCircleOutlined, WarningOutlined,
 } from '@ant-design/icons'
@@ -18,9 +18,9 @@ import type { Season, SeasonMember } from '../types/models'
 const { Title, Text } = Typography
 
 const distConfig: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  '2': { label: '优秀', color: '#52c41a', bg: 'linear-gradient(135deg, #52c41a22, #52c41a08)', icon: <CrownOutlined /> },
-  '7': { label: '达标', color: '#1677ff', bg: 'linear-gradient(135deg, #1677ff22, #1677ff08)', icon: <CheckCircleOutlined /> },
-  '1': { label: '待改进', color: '#faad14', bg: 'linear-gradient(135deg, #faad1422, #faad1408)', icon: <WarningOutlined /> },
+  '2': { label: '优秀', color: '#22c55e', bg: '#f0fdf4', icon: <CrownOutlined /> },
+  '7': { label: '达标', color: '#0ea5e9', bg: '#eff6ff', icon: <CheckCircleOutlined /> },
+  '1': { label: '待改进', color: '#f59e0b', bg: '#fffbeb', icon: <WarningOutlined /> },
 }
 
 const dimIcons: Record<string, React.ReactNode> = {
@@ -31,12 +31,12 @@ const dimIcons: Record<string, React.ReactNode> = {
   协作贡献: <TeamOutlined />,
 }
 
-const scoreColor = (v: number) => (v >= 85 ? '#52c41a' : v >= 70 ? '#1677ff' : v >= 60 ? '#faad14' : '#ff4d4f')
-const scoreGradient = (v: number) => {
-  if (v >= 85) return { '0%': '#73d13d', '100%': '#389e0d' }
-  if (v >= 70) return { '0%': '#4096ff', '100%': '#1677ff' }
-  if (v >= 60) return { '0%': '#ffc53d', '100%': '#faad14' }
-  return { '0%': '#ff7875', '100%': '#ff4d4f' }
+const scoreColor = (v: number) => (v >= 85 ? '#0ea5e9' : v >= 70 ? '#0ea5e9' : v >= 60 ? '#f59e0b' : '#ef4444')
+const dimGradient = (v: number) => {
+  if (v >= 85) return 'linear-gradient(90deg, #0ea5e9, #38bdf8)'
+  if (v >= 70) return 'linear-gradient(90deg, #06b6d4, #22d3ee)'
+  if (v >= 60) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+  return 'linear-gradient(90deg, #ef4444, #f87171)'
 }
 
 export default function Dashboard() {
@@ -160,7 +160,15 @@ export default function Dashboard() {
     } : null as any,
   )
 
-  if (loading) return <Spin />
+  if (loading) return (
+    <div style={{ maxWidth: 1100 }}>
+      <div style={{ height: 140, borderRadius: 14, marginBottom: 20, background: '#e0f2fe' }} />
+      <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+        <div style={{ flex: 1, height: 200, borderRadius: 12, background: '#f1f5f9' }} />
+        <div style={{ width: 200, height: 200, borderRadius: 12, background: '#f1f5f9' }} />
+      </div>
+    </div>
+  )
   if (!myMember) return <Empty description="暂无参赛信息，请等待管理员添加" />
 
   const dimensions = breakdown?.scores ? groupByDimension(breakdown.scores) : []
@@ -179,68 +187,38 @@ export default function Dashboard() {
   })
 
   return (
-    <div style={{ maxWidth: 1100 }}>
-      {/* 顶部总分卡片 */}
-      <Card
+    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+      {/* Score Hero */}
+      <div
         style={{
+          background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+          borderRadius: 14,
+          padding: '26px 28px',
+          color: '#fff',
           marginBottom: 20,
-          background: dist?.bg ?? '#fff',
-          borderRadius: 12,
-          boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}
-        styles={{ body: { padding: '28px 32px' } }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Space size={40}>
-            <div>
-              <Text type="secondary" style={{ fontSize: 13, letterSpacing: 1 }}>TOTAL</Text>
-              <div style={{
-                fontSize: 44, fontWeight: 800, lineHeight: 1.15,
-                color: scoreColor(totalScore),
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                {totalScore.toFixed(1)}
-              </div>
-            </div>
-            <div style={{ width: 1, height: 52, background: 'linear-gradient(180deg, transparent, #d9d9d9, transparent)' }} />
-            <Space size={24}>
-              <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>岗位分</Text>
-                <div style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{positionScore.toFixed(1)}</div>
-              </div>
-              <div style={{ color: '#d9d9d9' }}>+</div>
-              <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>组织分</Text>
-                <div style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{orgScore.toFixed(1)}</div>
-              </div>
-            </Space>
-          </Space>
-          <Space size={24}>
-            {rank && (
-              <div style={{
-                textAlign: 'center',
-                background: 'linear-gradient(135deg, #fffbe6, #fff1b8)',
-                borderRadius: 12,
-                padding: '8px 20px',
-              }}>
-                <TrophyOutlined style={{ color: '#d4b106', fontSize: 16 }} />
-                <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>#{rank}</div>
-              </div>
-            )}
-            {dist && (
-              <Tag
-                style={{
-                  fontSize: 13, padding: '6px 18px', borderRadius: 20, margin: 0,
-                  background: dist.color, color: '#fff', border: 'none',
-                  fontWeight: 500,
-                }}
-              >
-                {dist.icon} {dist.label}
-              </Tag>
-            )}
-          </Space>
+        <div>
+          <div style={{ fontSize: 13, opacity: 0.8 }}>综合总分</div>
+          <div style={{ fontSize: 48, fontWeight: 700, letterSpacing: -0.5 }}>{totalScore.toFixed(1)}</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>岗位分 {positionScore.toFixed(1)} + 组织分 {orgScore.toFixed(1)}</div>
         </div>
-      </Card>
+        <div style={{ textAlign: 'right' }}>
+          {rank && (
+            <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: '7px 16px', fontSize: 14, marginBottom: 8 }}>
+              #{rank} / {myMember.total_members ?? '-'}
+            </div>
+          )}
+          {dist && (
+            <div style={{ background: '#fff', borderRadius: 10, padding: '4px 14px', fontSize: 12, fontWeight: 600, color: '#0284c7', display: 'inline-block' }}>
+              {dist.icon} {dist.label}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* 维度进度条 + 能力雷达 */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
@@ -263,13 +241,13 @@ export default function Dashboard() {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         width: 28, height: 28, borderRadius: 8,
-                        background: `${scoreColor(normalized)}14`,
-                        color: scoreColor(normalized), fontSize: 14,
+                        background: '#eff6ff',
+                        color: '#0ea5e9', fontSize: 14,
                       }}>
                         {dimIcons[g.name] ?? <FireOutlined />}
                       </span>
                       <Text strong>{g.name}</Text>
-                      <Text type="secondary" style={{ fontSize: 12, background: '#f5f5f5', padding: '0 6px', borderRadius: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 12, background: '#f8fafc', padding: '0 6px', borderRadius: 4 }}>
                         {(g.weight * 100).toFixed(0)}%
                       </Text>
                     </Space>
@@ -277,13 +255,9 @@ export default function Dashboard() {
                       {dimScore?.toFixed(1) ?? '-'}
                     </Text>
                   </div>
-                  <Progress
-                    percent={dimScore != null ? pct : 0}
-                    strokeColor={dimScore != null ? scoreGradient(normalized) : '#f0f0f0'}
-                    showInfo={false}
-                    size={['100%', 8]}
-                    style={{ margin: 0 }}
-                  />
+                  <div style={{ background: '#e0f2fe', borderRadius: 4, height: 6 }}>
+                    <div style={{ background: dimGradient(normalized), borderRadius: 4, height: '100%', width: `${pct}%` }} />
+                  </div>
                 </div>
               )
             })}
@@ -297,13 +271,13 @@ export default function Dashboard() {
           {radarData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="62%">
-                <PolarGrid stroke="#f0f0f0" />
-                <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 12, fill: '#8c8c8c' }} />
+                <PolarGrid stroke="#e2e8f0" />
+                <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 12, fill: '#94a3b8' }} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
                 <Radar
                   name="得分" dataKey="score"
-                  stroke="#1677ff" fill="#1677ff" fillOpacity={0.15} strokeWidth={2}
-                  dot={{ r: 3, fill: '#1677ff', fillOpacity: 1 }}
+                  stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.15} strokeWidth={2}
+                  dot={{ r: 3, fill: '#0ea5e9', fillOpacity: 1 }}
                 />
                 <Tooltip
                   contentStyle={{ borderRadius: 8, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
