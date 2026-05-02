@@ -128,12 +128,10 @@ export default function SeasonManager() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <Typography.Title level={4} style={{ margin: 0 }}>赛季管理</Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            这里仅处理赛季生命周期和成员管理。评分录入、组织分和数据同步已拆到独立后台入口。
-          </Typography.Paragraph>
+          <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>赛季管理</Typography.Title>
+          <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>创建和管理竞赛赛季</Typography.Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建赛季</Button>
       </div>
@@ -156,7 +154,7 @@ export default function SeasonManager() {
 
       <Modal title="成员管理" open={!!selectedSeason} onCancel={() => setSelectedSeason(undefined)} footer={null} width={700}>
         <Table dataSource={members} columns={memberColumns} rowKey="id" size="small" pagination={false} />
-        <Card title="添加成员" size="small" style={{ marginTop: 16 }}>
+        <Card title="添加成员" size="small" style={{ marginTop: 16, borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
             上期绩效仅作为增长保护基线，可选填写；本赛季分数仍由飞书数据、举证审批和管理员录分共同计算。
           </Typography.Paragraph>

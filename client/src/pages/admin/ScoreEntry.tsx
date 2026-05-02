@@ -186,10 +186,11 @@ export default function ScoreEntry() {
   if (members.length === 0) {
     return (
       <div>
-        <Typography.Title level={4} style={{ margin: 0 }}>岗位分录入</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ margin: '6px 0 16px' }}>
-          当前岗位下还没有赛季成员。
-        </Typography.Paragraph>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>岗位分录入</Typography.Title>
+          </div>
+        </div>
         <Space style={{ marginBottom: 16 }}>
           <Select value={jobRole} onChange={setJobRole} options={jobRoleOptions} style={{ width: 120 }} />
         </Space>
@@ -200,12 +201,9 @@ export default function ScoreEntry() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <Typography.Title level={4} style={{ margin: 0 }}>岗位分录入</Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            先选岗位和成员，再按指标逐项录入，和组织分录入保持同一套操作方式。
-          </Typography.Paragraph>
+          <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>岗位分录入</Typography.Title>
         </div>
         <Space wrap>
           <Select value={jobRole} onChange={setJobRole} options={jobRoleOptions} style={{ width: 110 }} />
@@ -245,7 +243,7 @@ export default function ScoreEntry() {
       <Row gutter={[16, 16]}>
         {adminDims.map(dim => (
           <Col key={dim.id} xs={24} md={12} xl={8}>
-            <Card size="small" title={dim.indicator_name} style={{ height: '100%' }}>
+            <Card size="small" title={dim.indicator_name} style={{ height: '100%', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <Space direction="vertical" size={10} style={{ width: '100%' }}>
                 <Typography.Text type="secondary">
                   维度：{dim.dimension_name} · 权重 {(dim.indicator_weight * 100).toFixed(0)}%

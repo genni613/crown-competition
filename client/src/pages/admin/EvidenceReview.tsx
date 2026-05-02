@@ -209,11 +209,15 @@ export default function EvidenceReview() {
 
   return (
     <div>
-      <Typography.Title level={4}>举证审核</Typography.Title>
-      <Space style={{ marginBottom: 16 }}>
-        <Button type={tab === 'pending' ? 'primary' : 'default'} onClick={() => setTab('pending')}>待审核</Button>
-        <Button type={tab === 'reviewed' ? 'primary' : 'default'} onClick={() => setTab('reviewed')}>审核记录</Button>
-      </Space>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>举证审核</Typography.Title>
+        </div>
+        <Space>
+          <Button type={tab === 'pending' ? 'primary' : 'default'} onClick={() => setTab('pending')}>待审核</Button>
+          <Button type={tab === 'reviewed' ? 'primary' : 'default'} onClick={() => setTab('reviewed')}>审核记录</Button>
+        </Space>
+      </div>
       <Table dataSource={data} columns={columns} rowKey="id" loading={loading} size="middle" />
       <Image
         style={{ display: 'none' }}

@@ -42,7 +42,12 @@ export default function AdminDataSyncHub() {
   if (seasons.length === 0) {
     return (
       <div>
-        <Typography.Title level={4}>数据同步</Typography.Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>数据同步</Typography.Title>
+            <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>飞书项目数据同步管理</Typography.Text>
+          </div>
+        </div>
         <Empty description="还没有赛季，先去赛季管理创建赛季" />
       </div>
     )
@@ -50,12 +55,10 @@ export default function AdminDataSyncHub() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <Typography.Title level={4} style={{ margin: 0 }}>数据同步</Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            同步入口单独放出来，赛季只作为上下文，不再额外占一块大卡片。
-          </Typography.Paragraph>
+          <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>数据同步</Typography.Title>
+          <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>飞书项目数据同步管理</Typography.Text>
         </div>
         <Space wrap>
           <Select
@@ -90,6 +93,7 @@ export default function AdminDataSyncHub() {
         size="small"
         title="飞书数据同步"
         extra={<CloudSyncOutlined />}
+        style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
       >
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
           这里进入飞书同步页，处理工时、项目、用户等赛季相关数据同步，不再混在赛季维护动作里。

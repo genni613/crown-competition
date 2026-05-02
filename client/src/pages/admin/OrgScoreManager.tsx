@@ -235,11 +235,10 @@ export default function OrgScoreManager() {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>组织分管理</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-          先选成员，再点具体加分/减分项录入，避免在大表里找项。
-        </Typography.Paragraph>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>组织分录入</Typography.Title>
+        </div>
       </div>
 
       {copilotDraft && copilotDraft.seasonId === Number(seasonId) && (
@@ -314,7 +313,7 @@ export default function OrgScoreManager() {
 
       <Row gutter={12} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={14}>
-          <Card size="small" title="选择成员">
+          <Card size="small" title="选择成员" style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <Space direction="vertical" style={{ width: '100%' }} size={12}>
               <Select
                 showSearch
@@ -338,7 +337,7 @@ export default function OrgScoreManager() {
           </Card>
         </Col>
         <Col xs={24} lg={10}>
-          <Card size="small" title="快速说明">
+          <Card size="small" title="快速说明" style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <Typography.Paragraph style={{ marginBottom: 0 }}>
               当前页只负责给个人加减组织分。选择成员后，直接点规则卡片即可录入，录完会自动刷新总分。
             </Typography.Paragraph>
@@ -363,7 +362,7 @@ export default function OrgScoreManager() {
                   hoverable
                   size="small"
                   onClick={() => openRecord(type)}
-                  style={{ height: '100%', cursor: 'pointer' }}
+                  style={{ height: '100%', cursor: 'pointer', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
                 >
                   <Space direction="vertical" style={{ width: '100%' }} size={8}>
                     <Space align="start" style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -393,7 +392,7 @@ export default function OrgScoreManager() {
 
       <Divider style={{ margin: '20px 0' }} />
 
-      <Card size="small" title="当前成员已录记录">
+      <Card size="small" title="当前成员已录记录" style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         {records.length > 0 ? (
           <Space direction="vertical" style={{ width: '100%' }} size={8}>
             {records.map(record => (

@@ -42,7 +42,12 @@ export default function AdminScoringHub() {
   if (seasons.length === 0) {
     return (
       <div>
-        <Typography.Title level={4}>评分管理</Typography.Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>评分管理</Typography.Title>
+            <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>岗位分与组织分录入</Typography.Text>
+          </div>
+        </div>
         <Empty description="还没有赛季，先去赛季管理创建赛季" />
       </div>
     )
@@ -50,12 +55,10 @@ export default function AdminScoringHub() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <Typography.Title level={4} style={{ margin: 0 }}>评分管理</Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            从这里进入岗位分和组织分录入，赛季只作为上下文，不单独占一个页面区域。
-          </Typography.Paragraph>
+          <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>评分管理</Typography.Title>
+          <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>岗位分与组织分录入</Typography.Text>
         </div>
         <Space wrap>
           <Select
@@ -92,7 +95,7 @@ export default function AdminScoringHub() {
             size="small"
             title="岗位分录入"
             extra={<EditOutlined />}
-            style={{ height: '100%' }}
+            style={{ height: '100%', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
           >
             <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
               处理产品、设计、研发的管理员录分项。页面内按岗位切换，适合批量录入和重新计算。
@@ -108,7 +111,7 @@ export default function AdminScoringHub() {
             size="small"
             title="组织分录入"
             extra={<CalculatorOutlined />}
-            style={{ height: '100%' }}
+            style={{ height: '100%', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
           >
             <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
               给个人录入组织分加减项。页面内先选成员，再点具体规则，适合按人处理。

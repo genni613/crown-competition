@@ -252,14 +252,12 @@ export default function DimensionManager() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Card>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          维度规则管理
-        </Typography.Title>
-        <Typography.Text type="secondary">
-          管理各岗位的评分维度、指标阈值和扣分参数。修改后即时生效。
-        </Typography.Text>
-      </Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>维度规则</Typography.Title>
+          <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>配置各岗位评分维度和指标</Typography.Text>
+        </div>
+      </div>
 
       <Tabs
         items={['product', 'design', 'tech'].map(role => ({
