@@ -15,7 +15,9 @@ import {
   Typography,
 } from 'antd'
 import { EditOutlined } from '@ant-design/icons'
+import { useCopilotAction } from '@copilotkit/react-core'
 import { getDimensions, updateDimension } from '../../api/dimensions'
+import { copilotConfig } from '../../components/copilot/config'
 import type { ScoringDimension } from '../../types/models'
 
 const roleLabels: Record<string, string> = { product: '产品', design: '设计', tech: '技术' }
@@ -32,6 +34,58 @@ export default function DimensionManager() {
   const [form] = Form.useForm()
 
   useEffect(() => { loadData() }, [])
+
+  useCopilotAction(
+    copilotConfig.enabled ? {
+      name: 'query_dimensions',
+      description: '查询评分维度规则，可按岗位筛选，包括维度名、指标名、权重、阈值和扣分规则',
+      parameters: [
+        { name: 'jobRole', type: 'string', required: false, description: '岗位筛选：product/design/tech，不传则显示全部' },
+      ],
+      handler: async ({ jobRole }: { jobRole?: string }) => {
+        try {
+          const res = await getDimensions()
+          const filtered = jobRole ? res.data.filter((d: ScoringDimension) => d.job_role === jobRole) : res.data
+          return { dimensions: filtered }
+        } catch (e: any) {
+          return { error: e.message || '查询维度失败' }
+        }
+      },
+      render: ({ status, result }: { status: string; result: any }) => {
+        if (status === 'executing') return <Typography.Text type="secondary">正在查询...</Typography.Text>
+        if (!result) return null
+        if (result.error) return <Typography.Text type="danger">{result.error}</Typography.Text>
+        const dims: ScoringDimension[] = result.dimensions
+        if (!dims?.length) return <Typography.Text type="secondary">暂无维度规则</Typography.Text>
+        const grouped = new Map<string, ScoringDimension[]>()
+        dims.forEach(d => {
+          const list = grouped.get(d.dimension_name) || []
+          list.push(d)
+          grouped.set(d.dimension_name, list)
+        })
+        return (
+          <Card size="small" style={{ maxWidth: 480, maxHeight: 320, overflow: 'auto' }}>
+            {Array.from(grouped.entries()).map(([dimName, items]) => (
+              <div key={dimName} style={{ marginBottom: 8 }}>
+                <Typography.Text strong style={{ fontSize: 13 }}>{dimName}</Typography.Text>
+                <Tag color="blue" style={{ marginLeft: 6 }}>{(items[0].dimension_weight * 100).toFixed(0)}%</Tag>
+                <div style={{ paddingLeft: 8 }}>
+                  {items.map(item => (
+                    <div key={item.id} style={{ display: 'flex', gap: 8, padding: '2px 0', fontSize: 12 }}>
+                      <span>{item.indicator_name}</span>
+                      <Tag style={{ margin: 0, fontSize: 11 }}>{(item.indicator_weight * 100).toFixed(0)}%</Tag>
+                      <Tag color={sourceColors[item.data_source]} style={{ margin: 0, fontSize: 11 }}>{sourceLabels[item.data_source]}</Tag>
+                      {item.threshold_100 != null && <span style={{ color: '#8c8c8c' }}>≥{item.threshold_100}=100</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </Card>
+        )
+      },
+    } : null as any,
+  )
 
   async function loadData() {
     setLoading(true)

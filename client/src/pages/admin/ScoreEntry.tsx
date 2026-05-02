@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Avatar, Button, Card, Col, Empty, InputNumber, Row, Select, Space, Tag, Typography, message } from 'antd'
+import { Avatar, Button, Card, Col, Divider, Empty, InputNumber, Row, Select, Space, Tag, Typography, message } from 'antd'
 import { UserOutlined } from '@ant-design/icons'
+import { useCopilotAction } from '@copilotkit/react-core'
 import { calculateSeason, getDimensions } from '../../api/scoring'
 import { getMembers } from '../../api/seasons'
 import { batchUpdateScores, getScores } from '../../api/scores'
+import { copilotConfig } from '../../components/copilot/config'
 import type { IndicatorScore, ScoringDimension, SeasonMember } from '../../types/models'
 
 const jobRoleOptions = [
@@ -113,6 +115,67 @@ export default function ScoreEntry() {
   const adminDims = useMemo(
     () => dimensions.filter(d => d.data_source === 'admin' && d.score_type === 'threshold'),
     [dimensions],
+  )
+
+  useCopilotAction(
+    copilotConfig.enabled ? {
+      name: 'query_member_scores',
+      description: '查询当前选中成员在当前赛季的评分明细，包括各指标原始值和阈值分数',
+      parameters: [],
+      handler: async () => {
+        if (!seasonId || !selectedMemberId) return { error: '请先选择赛季和成员' }
+        try {
+          const [sRes, dRes] = await Promise.all([
+            getScores(Number(seasonId), selectedMemberId),
+            getDimensions(jobRole),
+          ])
+          const member = members.find(m => m.id === selectedMemberId)
+          return { scores: sRes.data, dimensions: dRes.data, memberName: member?.user_name, jobRole }
+        } catch (e: any) {
+          return { error: e.message || '查询分数失败' }
+        }
+      },
+      render: ({ status, result }: { status: string; result: any }) => {
+        if (status === 'executing') return <Typography.Text type="secondary">正在查询...</Typography.Text>
+        if (!result) return null
+        if (result.error) return <Typography.Text type="danger">{result.error}</Typography.Text>
+        const scoreList: IndicatorScore[] = result.scores
+        const dims: ScoringDimension[] = result.dimensions
+        if (!scoreList?.length) return <Typography.Text type="secondary">{result.memberName}暂无评分数据</Typography.Text>
+        return (
+          <Card size="small" style={{ maxWidth: 460 }}>
+            <Typography.Text strong>{result.memberName}</Typography.Text>
+            <Tag color="blue" style={{ marginLeft: 8 }}>{result.jobRole}</Tag>
+            <Divider style={{ margin: '8px 0' }} />
+            <div style={{ maxHeight: 260, overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                    <th style={{ padding: 4, textAlign: 'left' }}>指标</th>
+                    <th style={{ padding: 4, textAlign: 'center' }}>原始值</th>
+                    <th style={{ padding: 4, textAlign: 'center' }}>阈值分</th>
+                    <th style={{ padding: 4, textAlign: 'center' }}>来源</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scoreList.map((s: any) => {
+                    const dim = dims.find((d: any) => d.id === s.dimension_id)
+                    return (
+                      <tr key={s.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                        <td style={{ padding: 4 }}>{dim?.indicator_name || s.dimension_id}</td>
+                        <td style={{ padding: 4, textAlign: 'center' }}>{s.raw_value ?? '-'}</td>
+                        <td style={{ padding: 4, textAlign: 'center', fontWeight: 600 }}>{s.threshold_score?.toFixed(1) ?? '-'}</td>
+                        <td style={{ padding: 4, textAlign: 'center' }}>{s.source || '-'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )
+      },
+    } : null as any,
   )
 
   const selectedMember = useMemo(

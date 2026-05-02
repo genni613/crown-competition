@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Card, Image, Input, Modal, Space, Table, Tag, Typography, message } from 'antd'
-import { useCopilotAction } from '@copilotkit/react-core'
+import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
 import { getPendingEvidence, getReviewedEvidence, reviewEvidence } from '../../api/evidence'
 import { copilotConfig } from '../../components/copilot/config'
 import type { EvidenceSubmission } from '../../types/models'
@@ -74,6 +74,17 @@ export default function EvidenceReview() {
   useEffect(() => {
     void load(tab)
   }, [tab])
+
+  useCopilotReadable(
+    copilotConfig.enabled ? {
+      description: '用户当前在举证审核页面。如果用户问"有什么要处理的"、"今天要做什么"之类的问题，请优先关注待审核举证',
+      value: {
+        currentTab: tab,
+        pendingCount: tab === 'pending' ? data.length : data.filter(d => d.status === 'pending').length,
+      },
+    } : null as any,
+    [tab, data],
+  )
 
   async function load(view: 'pending' | 'reviewed') {
     setLoading(true)

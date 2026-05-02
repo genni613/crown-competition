@@ -134,22 +134,35 @@ flowchart LR
 | 页面 | Action | 触发示例 | 聊天内渲染 |
 |------|--------|----------|-----------|
 | EvidenceReview (`/admin/evidence`) | `query_pending_evidence` | "待审核举证"、"有多少条待审核" | 待审核数量+提交人/标题/赛季列表 |
+| SeasonManager (`/admin/seasons`) | `query_seasons` | "赛季列表"、"有哪些赛季" | 赛季名称+时间范围+状态标签 |
+| ScoreEntry (`/admin/scores/:seasonId`) | `query_member_scores` | "当前成员分数"、"张三的评分明细" | 指标名+原始值+阈值分+来源表格 |
+| DimensionManager (`/admin/dimensions`) | `query_dimensions` | "维度规则"、"研发岗位有哪些指标" | 按维度分组+指标名+权重+阈值 |
+
+### 页面上下文（useCopilotReadable）
+
+用户打开聊天时，AI 可以感知以下页面状态并主动给出建议：
+
+| 页面 | 注入的上下文 | AI 可主动提示 |
+|------|-------------|-------------|
+| Dashboard | 赛季名称、是否参赛、总分、排名、271分布、维度数 | "当前赛季XXX，你的总分是YY" |
+| EvidenceReview | 当前标签页、待审核数量 | "你有 N 条待审核举证" |
+| SeasonManager | 赛季总数、各状态数量、当前赛季名 | "当前有 X 个赛季，其中 Y 个进行中" |
 
 ### 实现要点
 
-- 所有 action 通过 `copilotConfig.enabled` 条件注册，未启用时不会调用 hook
+- 所有 action 和 readable 通过 `copilotConfig.enabled` 条件注册，未启用时不会调用 hook
 - handler 直接调用 `client/src/api/` 下已有函数，无后端改动
 - render 函数使用 Ant Design 组件（Card、Tag、Progress、Descriptions），保持风格一致
 - action 挂载在对应页面组件内，用户离开页面时自动卸载
+- readable 的 value 随页面状态变化自动更新（通过 deps 数组）
 
 ### 待扩展
 
 后续可在更多页面注册 action：
 
-- `SeasonManager`：`query_seasons`（查询赛季列表和状态）
-- `ScoreEntry`：`query_member_scores`（查询某成员的评分明细）
 - `OrgScoreManager`：`query_org_scores`（查询某成员的组织分）
-- `DimensionManager`：`query_dimensions`（查询评分维度规则）
+- `FeishuManager`：`query_sync_status`（查询飞书同步状态）
+- `AdminDataSyncHub`：`query_data_sync_overview`（查询数据同步概览）
 
 ## 还需要补充的部分
 

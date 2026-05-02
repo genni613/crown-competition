@@ -7,7 +7,7 @@ import {
   CheckCircleOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
-import { useCopilotAction } from '@copilotkit/react-core'
+import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
 import { useAuthStore } from '../store/authStore'
 import { getSeasons, getMembers } from '../api/seasons'
 import { getBreakdown } from '../api/scoring'
@@ -49,6 +49,21 @@ export default function Dashboard() {
   const [workSummary, setWorkSummary] = useState<MyWorkSummaryResponse | null>(null)
 
   useEffect(() => { loadData() }, [])
+
+  useCopilotReadable(
+    copilotConfig.enabled ? {
+      description: '用户当前在个人成绩总览页面。如果用户问关于成绩、排名、分数的问题，请直接基于这些数据回答',
+      value: {
+        activeSeason: seasons.find(s => s.status === 'active')?.name || null,
+        isParticipant: !!myMember,
+        totalScore: myMember?.total_score?.toFixed(1) ?? null,
+        rank: myMember?.rank ?? null,
+        distribution: myMember?.distribution ?? null,
+        dimensionCount: breakdown?.scores ? groupByDimension(breakdown.scores).length : 0,
+      },
+    } : null as any,
+    [seasons, myMember, breakdown],
+  )
 
   async function loadData() {
     try {

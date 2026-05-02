@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card, Avatar } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
 import { getSeasons, createSeason, activateSeason, endSeason, getMembers, addMember, removeMember } from '../../api/seasons'
 import { getLocalFeishuUsers } from '../../api/feishu'
+import { copilotConfig } from '../../components/copilot/config'
 import type { LocalFeishuUser } from '../../api/feishu'
 import type { Season, SeasonMember } from '../../types/models'
 import { formatDate } from '../../utils/datetime'
@@ -27,6 +29,51 @@ export default function SeasonManager() {
   const [memberForm] = Form.useForm()
 
   useEffect(() => { loadSeasons(); getLocalFeishuUsers().then(r => setFeishuUsers(r.data)) }, [])
+
+  useCopilotReadable(
+    copilotConfig.enabled ? {
+      description: '用户当前在赛季管理页面。如果用户问赛季相关问题，请基于这些数据回答',
+      value: seasons.length > 0
+        ? { total: seasons.length, active: seasons.filter(s => s.status === 'active').length, draft: seasons.filter(s => s.status === 'draft').length, ended: seasons.filter(s => s.status === 'ended').length, activeSeasonName: seasons.find(s => s.status === 'active')?.name || null }
+        : '暂无赛季',
+    } : null as any,
+  )
+
+  useCopilotAction(
+    copilotConfig.enabled ? {
+      name: 'query_seasons',
+      description: '查询所有赛季列表，包括名称、时间范围和状态',
+      parameters: [],
+      handler: async () => {
+        try {
+          const res = await getSeasons()
+          return { seasons: res.data }
+        } catch (e: any) {
+          return { error: e.message || '查询赛季失败' }
+        }
+      },
+      render: ({ status, result }: { status: string; result: any }) => {
+        if (status === 'executing') return <Typography.Text type="secondary">正在查询...</Typography.Text>
+        if (!result) return null
+        if (result.error) return <Typography.Text type="danger">{result.error}</Typography.Text>
+        const list: Season[] = result.seasons
+        if (!list?.length) return <Typography.Text type="secondary">暂无赛季</Typography.Text>
+        return (
+          <Card size="small" style={{ maxWidth: 440 }}>
+            {list.map(s => (
+              <div key={s.id} style={{ padding: '6px 0', borderBottom: '1px solid #fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Typography.Text strong style={{ fontSize: 13 }}>{s.name}</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>{formatDate(s.start_date)} ~ {formatDate(s.end_date)}</Typography.Text>
+                </div>
+                <Tag color={statusColors[s.status]} style={{ margin: 0 }}>{statusLabels[s.status]}</Tag>
+              </div>
+            ))}
+          </Card>
+        )
+      },
+    } : null as any,
+  )
 
   async function loadSeasons() {
     const res = await getSeasons()
