@@ -1,3 +1,7 @@
+---
+---
+
+{% raw %}
 # UI Redesign Design Spec
 
 > Date: 2026-05-02
@@ -223,3 +227,5 @@ All cards follow:
 - No routing changes
 - CopilotKit chat popup styling left as-is (third-party component)
 - Mobile-specific layouts beyond sidebar collapse (future work)
+
+{% endraw %}
