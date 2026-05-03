@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>皇冠竞赛 - 绩效竞赛平台</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ===========================================
+   CSS CUSTOM PROPERTIES — Split Pastel Theme
+   =========================================== */
+:root {
+  --bg-peach: #f5e6dc;
+  --bg-lavender: #e4dff0;
+  --bg-cream: #faf5f0;
+  --bg-sage: #e8f0e8;
+  --text-dark: #1a1a1a;
+  --text-secondary: #555;
+  --text-muted: #888;
+  --badge-mint: #c8f0d8;
+  --badge-mint-text: #2d6a4f;
+  --badge-yellow: #f0f0c8;
+  --badge-yellow-text: #7a6c1a;
+  --badge-pink: #f0d4e0;
+  --badge-pink-text: #8b3a5e;
+  --badge-blue: #d4e8f0;
+  --badge-blue-text: #3a5e8b;
+  --badge-lavender: #e0d4f0;
+  --badge-lavender-text: #5e3a8b;
+  --accent-purple: #8b6cc1;
+  --accent-coral: #d4836b;
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --title-size: clamp(2rem, 5vw, 4rem);
+  --h2-size: clamp(1.25rem, 3vw, 2.2rem);
+  --h3-size: clamp(1rem, 2vw, 1.5rem);
+  --body-size: clamp(0.75rem, 1.3vw, 1rem);
+  --small-size: clamp(0.65rem, 1vw, 0.85rem);
+  --slide-padding: clamp(1.5rem, 4vw, 4rem);
+  --content-gap: clamp(0.75rem, 2vw, 1.5rem);
+  --element-gap: clamp(0.4rem, 1vw, 0.8rem);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-normal: 0.6s;
+}
+
+/* ===========================================
+   VIEWPORT FITTING: MANDATORY BASE STYLES
+   =========================================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow-x: hidden; font-family: var(--font-body); }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+
+.slide {
+  width: 100vw; height: 100vh; height: 100dvh;
+  overflow: hidden; scroll-snap-align: start;
+  display: flex; position: relative;
+}
+
+.slide-content {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; max-height: 100%;
+  overflow: hidden; padding: var(--slide-padding);
+}
+
+.card, .container, .content-box {
+  max-width: min(90vw, 1000px);
+  max-height: min(80vh, 700px);
+}
+
+.feature-list, .bullet-list { gap: clamp(0.4rem, 1vh, 1rem); }
+.feature-list li, .bullet-list li { font-size: var(--body-size); line-height: 1.5; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: clamp(0.5rem, 1.5vw, 1rem);
+}
+
+img, .image-container { max-width: 100%; max-height: min(50vh, 400px); object-fit: contain; }
+
+@media (max-height: 700px) {
+  :root {
+    --slide-padding: clamp(0.75rem, 3vw, 2rem);
+    --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+    --title-size: clamp(1.5rem, 4.5vw, 2.8rem);
+    --h2-size: clamp(1rem, 2.8vw, 1.6rem);
+  }
+}
+@media (max-height: 600px) {
+  :root {
+    --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+    --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+    --title-size: clamp(1.2rem, 4vw, 2.2rem);
+    --body-size: clamp(0.7rem, 1.1vw, 0.9rem);
+  }
+  .nav-dots, .keyboard-hint, .decorative { display: none; }
+}
+@media (max-height: 500px) {
+  :root {
+    --slide-padding: clamp(0.4rem, 2vw, 1rem);
+    --title-size: clamp(1rem, 3.5vw, 1.8rem);
+    --h2-size: clamp(0.9rem, 2.5vw, 1.3rem);
+    --body-size: clamp(0.6rem, 0.9vw, 0.8rem);
+  }
+}
+@media (max-width: 600px) {
+  :root { --title-size: clamp(1.5rem, 7vw, 2.5rem); }
+  .grid { grid-template-columns: 1fr; }
+  .split-slide { flex-direction: column; }
+  .split-left, .split-right { width: 100% !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* ===========================================
+   REVEAL ANIMATIONS
+   =========================================== */
+.reveal {
+  opacity: 0; transform: translateY(25px);
+  transition: opacity var(--duration-normal) var(--ease-out-expo),
+              transform var(--duration-normal) var(--ease-out-expo);
+}
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+
+.reveal:nth-child(1) { transition-delay: 0.05s; }
+.reveal:nth-child(2) { transition-delay: 0.15s; }
+.reveal:nth-child(3) { transition-delay: 0.25s; }
+.reveal:nth-child(4) { transition-delay: 0.35s; }
+.reveal:nth-child(5) { transition-delay: 0.45s; }
+.reveal:nth-child(6) { transition-delay: 0.55s; }
+
+.reveal-scale {
+  opacity: 0; transform: scale(0.9);
+  transition: opacity var(--duration-normal) var(--ease-out-expo),
+              transform var(--duration-normal) var(--ease-out-expo);
+}
+.slide.visible .reveal-scale { opacity: 1; transform: scale(1); }
+
+/* ===========================================
+   SPLIT LAYOUT — Two-panel slides
+   =========================================== */
+.split-slide { display: flex; }
+.split-left {
+  width: 50%; height: 100%;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  padding: var(--slide-padding);
+  position: relative; overflow: hidden;
+}
+.split-right {
+  width: 50%; height: 100%;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  padding: var(--slide-padding);
+  position: relative;
+}
+
+/* Grid pattern overlay for lavender panels */
+.pattern-overlay::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(139,108,193,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139,108,193,0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* ===========================================
+   BADGES — Playful pills
+   =========================================== */
+.badge {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-body); font-weight: 600;
+  font-size: clamp(0.65rem, 1vw, 0.85rem);
+  padding: clamp(5px, 0.6vw, 10px) clamp(12px, 1.5vw, 22px);
+  border-radius: 50px;
+}
+
+.badges-column {
+  display: flex; flex-direction: column;
+  gap: clamp(6px, 0.8vh, 12px);
+  position: relative; z-index: 1;
+}
+
+.badges-row {
+  display: flex; flex-wrap: wrap;
+  gap: clamp(5px, 0.6vw, 10px);
+}
+
+/* ===========================================
+   TYPOGRAPHY
+   =========================================== */
+h1, h2, h3 { font-family: var(--font-display); color: var(--text-dark); line-height: 1.1; }
+
+.section-label {
+  font-family: var(--font-body); font-weight: 500;
+  font-size: clamp(0.55rem, 0.8vw, 0.75rem);
+  text-transform: uppercase; letter-spacing: 0.2em;
+  color: var(--text-muted); margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
+}
+
+p, li { font-size: var(--body-size); line-height: 1.6; color: var(--text-secondary); }
+
+.highlight { color: var(--accent-purple); font-weight: 700; }
+.highlight-coral { color: var(--accent-coral); font-weight: 700; }
+
+/* ===========================================
+   FLOW CHART / PIPELINE
+   =========================================== */
+.pipeline {
+  display: flex; align-items: center;
+  gap: clamp(4px, 0.5vw, 8px);
+  flex-wrap: wrap; justify-content: center;
+}
+.pipeline-step {
+  background: var(--bg-lavender); border-radius: 10px;
+  padding: clamp(6px, 0.8vw, 12px) clamp(10px, 1.2vw, 18px);
+  font-size: clamp(0.6rem, 0.9vw, 0.8rem); font-weight: 600;
+  color: var(--text-dark); text-align: center;
+  max-width: clamp(80px, 12vw, 140px);
+}
+.pipeline-arrow {
+  font-size: clamp(0.8rem, 1.2vw, 1.1rem);
+  color: var(--accent-purple); font-weight: 700;
+}
+
+/* ===========================================
+   DATA TABLE STYLE
+   =========================================== */
+.mini-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: clamp(0.6rem, 0.9vw, 0.8rem);
+  background: rgba(255,255,255,0.5); border-radius: 12px;
+  overflow: hidden;
+}
+.mini-table th {
+  background: var(--accent-purple); color: #fff;
+  padding: clamp(5px, 0.6vw, 10px) clamp(8px, 1vw, 14px);
+  font-weight: 600; text-align: left;
+}
+.mini-table td {
+  padding: clamp(4px, 0.5vw, 8px) clamp(8px, 1vw, 14px);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  color: var(--text-secondary);
+}
+.mini-table tr:last-child td { border-bottom: none; }
+
+/* ===========================================
+   PROGRESS BAR
+   =========================================== */
+.progress-bar {
+  position: fixed; top: 0; left: 0; height: 3px;
+  background: var(--accent-purple); z-index: 9999;
+  transition: width 0.15s ease-out; border-radius: 0 2px 2px 0;
+}
+
+/* ===========================================
+   NAV DOTS
+   =========================================== */
+.nav-dots {
+  position: fixed; right: clamp(10px, 1.5vw, 20px);
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 9998;
+}
+.nav-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(139,108,193,0.25);
+  cursor: pointer; transition: all 0.3s ease;
+  border: none; padding: 0;
+}
+.nav-dot.active { background: var(--accent-purple); transform: scale(1.4); }
+
+/* ===========================================
+   INLINE EDITING
+   =========================================== */
+.edit-hotzone {
+  position: fixed; top: 0; left: 0;
+  width: 80px; height: 80px; z-index: 10000; cursor: pointer;
+}
+.edit-toggle {
+  position: fixed; top: 12px; left: 12px; z-index: 10001;
+  background: rgba(139,108,193,0.9); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 6px 12px; font-size: 14px; cursor: pointer;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+  font-family: var(--font-body);
+}
+.edit-toggle.show, .edit-toggle.active {
+  opacity: 1; pointer-events: auto;
+}
+.edit-toggle.active { background: var(--accent-coral); }
+[contenteditable="true"] {
+  outline: 2px dashed var(--accent-purple);
+  outline-offset: 2px; border-radius: 4px;
+}
+.edit-save-hint {
+  position: fixed; bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(26,26,26,0.8); color: #fff;
+  padding: 6px 16px; border-radius: 20px;
+  font-size: 12px; z-index: 10002;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none;
+}
+.edit-save-hint.show { opacity: 1; }
+
+/* ===========================================
+   DECO CIRCLE
+   =========================================== */
+.deco-circle {
+  position: absolute;
+  width: clamp(100px, 18vw, 240px);
+  height: clamp(100px, 18vw, 240px);
+  border-radius: 50%;
+  border: 2px dashed rgba(139,108,193,0.12);
+  animation: spinSlow 25s linear infinite;
+}
+@keyframes spinSlow { to { transform: rotate(360deg); } }
+
+/* ===========================================
+   SLIDE-SPECIFIC STYLES
+   =========================================== */
+
+/* Full-width single panel slides */
+.single-slide {
+  width: 100%; height: 100%;
+  justify-content: center; align-items: center;
+  padding: var(--slide-padding);
+}
+
+/* Three-column cards */
+.card-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(8px, 1.2vw, 16px);
+  width: 100%;
+}
+.info-card {
+  background: rgba(255,255,255,0.55);
+  border-radius: 14px;
+  padding: clamp(12px, 1.5vw, 24px);
+  border: 1px solid rgba(139,108,193,0.1);
+}
+.info-card h3 {
+  font-size: clamp(0.75rem, 1.2vw, 1.05rem);
+  margin-bottom: clamp(4px, 0.5vh, 8px);
+}
+.info-card p, .info-card li {
+  font-size: clamp(0.6rem, 0.85vw, 0.78rem);
+  line-height: 1.5;
+}
+.info-card ul { padding-left: clamp(12px, 1.2vw, 18px); }
+
+/* Role comparison row */
+.role-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: clamp(6px, 1vw, 14px);
+}
+.role-card {
+  background: rgba(255,255,255,0.5);
+  border-radius: 12px; padding: clamp(10px, 1.2vw, 20px);
+}
+.role-card h3 {
+  font-size: clamp(0.7rem, 1vw, 0.95rem);
+  margin-bottom: clamp(4px, 0.5vh, 8px);
+}
+.role-weight {
+  font-size: clamp(0.55rem, 0.75vw, 0.7rem);
+  color: var(--text-muted); line-height: 1.6;
+}
+
+/* Architecture layers */
+.arch-layer {
+  background: rgba(255,255,255,0.5);
+  border-radius: 10px;
+  padding: clamp(8px, 1vw, 16px) clamp(12px, 1.5vw, 24px);
+  border-left: 3px solid var(--accent-purple);
+  margin-bottom: clamp(4px, 0.5vh, 8px);
+}
+.arch-layer h4 {
+  font-size: clamp(0.65rem, 0.9vw, 0.85rem);
+  color: var(--accent-purple); margin-bottom: clamp(2px, 0.3vh, 4px);
+}
+.arch-layer p { font-size: clamp(0.55rem, 0.75vw, 0.7rem); }
+
+@media (max-width: 900px) {
+  .card-grid-3 { grid-template-columns: 1fr; }
+  .role-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<nav class="nav-dots" id="navDots"></nav>
+
+<!-- Edit mode UI -->
+<div class="edit-hotzone" id="editHotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️ Edit</button>
+<div class="edit-save-hint" id="editSaveHint">Ctrl+S to save · Esc to exit edit mode</div>
+
+<!-- ========== SLIDE 1: TITLE ========== -->
+<section class="slide split-slide" data-slide="0" style="background: var(--bg-peach);">
+  <div class="split-left">
+    <div class="section-label reveal">Tech Center · 2026 Season 1</div>
+    <h1 class="reveal" style="font-size: var(--title-size); font-weight: 800;">皇冠<span style="color: var(--accent-purple); display: block;">竞赛</span></h1>
+    <p class="reveal" style="margin-top: clamp(0.8rem, 2vh, 1.5rem); max-width: 420px;">
+      会员数字化团队绩效竞赛平台<br>
+      面向全模块正式员工的公平量化评估体系
+    </p>
+  </div>
+  <div class="split-right pattern-overlay" style="background: var(--bg-lavender);">
+    <div class="deco-circle" style="top: 10%; right: 8%;"></div>
+    <div class="badges-column">
+      <div class="badge reveal" style="background: var(--badge-mint); color: var(--badge-mint-text);">React + TypeScript</div>
+      <div class="badge reveal" style="background: var(--badge-yellow); color: var(--badge-yellow-text);">CopilotKit AI 助手</div>
+      <div class="badge reveal" style="background: var(--badge-pink); color: var(--badge-pink-text);">飞书数据同步</div>
+      <div class="badge reveal" style="background: var(--badge-blue); color: var(--badge-blue-text);">智能评分引擎</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 2: BACKGROUND ========== -->
+<section class="slide split-slide" data-slide="1" style="background: var(--bg-lavender);">
+  <div class="split-left pattern-overlay">
+    <div class="section-label reveal">01 / Background</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">项目背景</h2>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      科技中心会员数字化模块需要一个 <span class="highlight">公平、透明、可量化</span> 的绩效竞赛机制，替代传统主观评价方式。
+    </p>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      首个赛季（试点）：<span class="highlight-coral">2026年5月1日 — 6月30日</span><br>
+      覆盖全模块正式员工（不含 Team Lead）
+    </p>
+  </div>
+  <div class="split-right" style="background: var(--bg-peach);">
+    <div class="section-label reveal">核心目标</div>
+    <ul class="feature-list reveal" style="list-style: none; padding: 0;">
+      <li style="margin-bottom: var(--element-gap);">▸ 多维度量化评分，覆盖产品/设计/研发三个岗位</li>
+      <li style="margin-bottom: var(--element-gap);">▸ 飞书项目数据自动同步，减少人工录入</li>
+      <li style="margin-bottom: var(--element-gap);">▸ AI 助手辅助举证提交与评分匹配</li>
+      <li>▸ 增长率排名 + 保护机制，兼顾绝对值与进步</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== SLIDE 3: TECH STACK ========== -->
+<section class="slide single-slide" data-slide="2" style="background: var(--bg-cream);">
+  <div class="slide-content" style="align-items: center; text-align: center;">
+    <div class="section-label reveal">02 / Tech Stack</div>
+    <h2 class="reveal" style="font-size: var(--h2-size); margin-bottom: clamp(1rem, 2.5vh, 2rem);">技术选型</h2>
+    <div class="card-grid-3 reveal-scale" style="max-width: 900px;">
+      <div class="info-card">
+        <h3 style="color: var(--accent-purple);">前端</h3>
+        <ul>
+          <li>React 18 + TypeScript</li>
+          <li>Vite 构建</li>
+          <li>Ant Design 组件库</li>
+          <li>Zustand 状态管理</li>
+          <li>CopilotKit AI 集成</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h3 style="color: var(--accent-coral);">后端</h3>
+        <ul>
+          <li>Node.js + Express</li>
+          <li>TypeScript 全链路</li>
+          <li>MySQL数据库</li>
+          <li>Zod 参数校验</li>
+          <li>飞书 OAuth 2.0 + IronSession</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h3 style="color: var(--badge-mint-text);">AI 层</h3>
+        <ul>
+          <li>CopilotKit Runtime</li>
+          <li>OpenAI 兼容模型</li>
+          <li>评分规则知识注入</li>
+          <li>自然语言匹配指标</li>
+          <li>举证辅助提交</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 4: SCORING OVERVIEW ========== -->
+<section class="slide split-slide" data-slide="3" style="background: var(--bg-peach);">
+  <div class="split-left">
+    <div class="section-label reveal">03 / Scoring System</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">评分体系</h2>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      总分 = <span class="highlight">岗位分</span> + <span class="highlight-coral">组织分</span>（上限 25 分）
+    </p>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      岗位分通过五步流水线计算，从原始指标值到最终排名分布，确保公平性与区分度。
+    </p>
+  </div>
+  <div class="split-right pattern-overlay" style="background: var(--bg-lavender);">
+    <div class="section-label reveal">五步评分流水线</div>
+    <div class="pipeline reveal" style="margin-top: var(--element-gap);">
+      <div class="pipeline-step">① 阈值评分<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem); color: var(--text-muted);">0→100</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">② 维度加权<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem); color: var(--text-muted);">指标→维度</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">③ 原始岗位分<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem); color: var(--text-muted);">维度求和</span></div>
+    </div>
+    <div class="pipeline reveal" style="margin-top: clamp(6px, 1vh, 12px);">
+      <div class="pipeline-step">④ 增长排名<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem); color: var(--text-muted);">线性60-100</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">⑤ 保护机制<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem); color: var(--text-muted);">≥85取max</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" style="background: var(--badge-pink); color: var(--badge-pink-text);">271分布<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem);">20/70/10</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 5: THREE ROLES ========== -->
+<section class="slide single-slide" data-slide="4" style="background: var(--bg-sage);">
+  <div class="slide-content" style="align-items: center;">
+    <div class="section-label reveal">04 / Role Dimensions</div>
+    <h2 class="reveal" style="font-size: var(--h2-size); margin-bottom: clamp(0.8rem, 2vh, 1.5rem); text-align: center;">三大岗位维度对比</h2>
+    <div class="role-row reveal-scale" style="width: 100%; max-width: 950px;">
+      <div class="role-card">
+        <h3 style="color: var(--accent-purple);">产品 Product</h3>
+        <div class="role-weight">
+          交付效率 30% · 需求价值 30%<br>
+          创新突破 15% · 交付质量 10%<br>
+          协作贡献 15% + 扣分项
+        </div>
+      </div>
+      <div class="role-card">
+        <h3 style="color: var(--accent-coral);">设计 Design</h3>
+        <div class="role-weight">
+          交付效率 25% · 需求价值 20%<br>
+          创新突破 15% · 交付质量 25%<br>
+          协作贡献 15% + 扣分项
+        </div>
+      </div>
+      <div class="role-card">
+        <h3 style="color: var(--badge-mint-text);">研发 Tech</h3>
+        <div class="role-weight">
+          交付效率 40%<br>
+          创新突破 15%<br>
+          交付质量 30% + 扣分项<br>
+          协作贡献 15%
+        </div>
+      </div>
+    </div>
+    <p class="reveal" style="margin-top: var(--element-gap); text-align: center; font-size: var(--small-size);">
+      通用指标：微社区点赞、线上问题解决（举证） | 通用创新：AI/数字化工具解决真问题数（举证）
+    </p>
+  </div>
+</section>
+
+<!-- ========== SLIDE 6: DATA SOURCES ========== -->
+<section class="slide split-slide" data-slide="5" style="background: var(--bg-lavender);">
+  <div class="split-left pattern-overlay">
+    <div class="section-label reveal">05 / Data Sources</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">三大数据来源</h2>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      每个指标根据其特性，采用不同的数据采集方式，确保数据的 <span class="highlight">真实性</span> 与 <span class="highlight">可审计性</span>。
+    </p>
+  </div>
+  <div class="split-right" style="background: var(--bg-peach);">
+    <div class="badges-column">
+      <div class="info-card reveal" style="border-left: 3px solid var(--accent-purple);">
+        <h3 style="color: var(--accent-purple);">飞书同步</h3>
+        <p style="font-size: var(--small-size);">工时、需求、缺陷等数据自动从飞书项目聚合</p>
+      </div>
+      <div class="info-card reveal" style="border-left: 3px solid var(--accent-coral);">
+        <h3 style="color: var(--accent-coral);">管理员录入</h3>
+        <p style="font-size: var(--small-size);">业务价值完成度、UX度量分等需人工评定</p>
+      </div>
+      <div class="info-card reveal" style="border-left: 3px solid var(--badge-mint-text);">
+        <h3 style="color: var(--badge-mint-text);">用户举证</h3>
+        <p style="font-size: var(--small-size);">创新成果、社区贡献等由员工提交并经审核</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 7: FEISHU SYNC ========== -->
+<section class="slide split-slide" data-slide="6" style="background: var(--bg-peach);">
+  <div class="split-left">
+    <div class="section-label reveal">06 / Feishu Sync</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">飞书数据同步</h2>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      采用 <span class="highlight">无缓存架构</span>，管理员触发同步 → 按成员查询飞书项目 → 按岗位聚合 → 直写 indicator_scores → 触发评分重算。
+    </p>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      人员映射优先级：<span class="highlight-coral">open_id > email > 姓名</span>（兜底），映射失败跳过并告警。
+    </p>
+  </div>
+  <div class="split-right pattern-overlay" style="background: var(--bg-lavender);">
+    <div class="section-label reveal">可自动聚合指标</div>
+    <div class="badges-column reveal" style="margin-top: var(--element-gap);">
+      <div class="badge" style="background: var(--badge-mint); color: var(--badge-mint-text);">研发标准工时 ✓</div>
+      <div class="badge" style="background: var(--badge-mint); color: var(--badge-mint-text);">产品需求PD数 ✓</div>
+      <div class="badge" style="background: var(--badge-yellow); color: var(--badge-yellow-text);">线上故障P1/P2 ✓</div>
+      <div class="badge" style="background: var(--badge-yellow); color: var(--badge-yellow-text);">过程问题P0/P1/P2 ✓</div>
+      <div class="badge" style="background: var(--badge-pink); color: var(--badge-pink-text);">需求变更消耗PD ~半自动</div>
+      <div class="badge" style="background: rgba(200,200,200,0.4); color: var(--text-muted);">评审通过准时率 ✗ 需人工</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 8: AI COPILOT ========== -->
+<section class="slide split-slide" data-slide="7" style="background: var(--bg-lavender);">
+  <div class="split-left pattern-overlay">
+    <div class="section-label reveal">07 / AI Copilot</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">CopilotKit 智能助手</h2>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      内嵌 AI 助手，基于 CopilotKit 构建，理解评分规则，辅助日常操作。
+    </p>
+  </div>
+  <div class="split-right" style="background: var(--bg-peach);">
+    <div class="section-label reveal">已注册能力</div>
+    <ul class="feature-list reveal" style="list-style: none; padding: 0; margin-top: var(--element-gap);">
+      <li style="margin-bottom: var(--element-gap);"><span class="highlight">问答</span> — 解释评分规则、维度含义、举证要求</li>
+      <li style="margin-bottom: var(--element-gap);"><span class="highlight">查询</span> — 我的分数、排名、举证状态（管理员可查更多）</li>
+      <li style="margin-bottom: var(--element-gap);"><span class="highlight">匹配</span> — 自然语言描述 → 自动匹配评分指标</li>
+      <li style="margin-bottom: var(--element-gap);"><span class="highlight">操作</span> — 新建赛季、触发评分计算、提交举证</li>
+      <li><span class="highlight">感知</span> — 根据用户角色和当前页面给出不同回答</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== SLIDE 9: EVIDENCE WORKFLOW ========== -->
+<section class="slide single-slide" data-slide="8" style="background: var(--bg-cream);">
+  <div class="slide-content" style="align-items: center; text-align: center;">
+    <div class="section-label reveal">08 / Evidence Workflow</div>
+    <h2 class="reveal" style="font-size: var(--h2-size); margin-bottom: clamp(0.8rem, 2vh, 1.5rem);">举证流程</h2>
+    <div class="pipeline reveal" style="margin-bottom: clamp(6px, 1vh, 12px);">
+      <div class="pipeline-step" style="background: var(--badge-blue); color: var(--badge-blue-text);">用户描述成果<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem);">自然语言输入</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" style="background: var(--badge-lavender); color: var(--badge-lavender-text);">AI 匹配指标<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem);">match_scoring_points</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" style="background: var(--badge-yellow); color: var(--badge-yellow-text);">确认提交<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem);">用户二次确认</span></div>
+    </div>
+    <div class="pipeline reveal">
+      <div class="pipeline-step" style="background: var(--badge-pink); color: var(--badge-pink-text);">管理员审核<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem);">通过 / 驳回</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" style="background: var(--badge-mint); color: var(--badge-mint-text);">自动评分入库<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem);">threshold_score</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" style="background: var(--accent-purple); color: #fff;">触发赛季重算<br><span style="font-size: clamp(0.5rem, 0.7vw, 0.65rem);">排名更新</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 10: ARCHITECTURE ========== -->
+<section class="slide split-slide" data-slide="9" style="background: var(--bg-sage);">
+  <div class="split-left">
+    <div class="section-label reveal">09 / Architecture</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">系统架构</h2>
+    <div style="margin-top: var(--element-gap);">
+      <div class="arch-layer reveal">
+        <h4>表现层</h4>
+        <p>React SPA · Ant Design · CopilotKit Popup · 飞书 H5 嵌入</p>
+      </div>
+      <div class="arch-layer reveal" style="border-left-color: var(--accent-coral);">
+        <h4 style="color: var(--accent-coral);">AI 层</h4>
+        <p>CopilotKit Runtime · OpenAI 兼容模型 · 评分规则知识注入</p>
+      </div>
+      <div class="arch-layer reveal" style="border-left-color: var(--badge-mint-text);">
+        <h4 style="color: var(--badge-mint-text);">服务层</h4>
+        <p>Express API · 评分引擎 · 飞书同步 · 铁会话鉴权</p>
+      </div>
+      <div class="arch-layer reveal" style="border-left-color: var(--badge-blue-text);">
+        <h4 style="color: var(--badge-blue-text);">数据层</h4>
+        <p>MySQL · 飞书项目 OpenAPI · 本地持久化</p>
+      </div>
+    </div>
+  </div>
+  <div class="split-right" style="background: var(--bg-cream);">
+    <div class="section-label reveal">权限模型</div>
+    <div class="info-card reveal" style="margin-bottom: var(--element-gap);">
+      <h3 style="color: var(--accent-purple);">MEMBER 角色</h3>
+      <p style="font-size: var(--small-size);">查看排名 · 提交举证 · 查看个人分数 · Copilot 问答</p>
+    </div>
+    <div class="info-card reveal">
+      <h3 style="color: var(--accent-coral);">ADMIN 角色</h3>
+      <p style="font-size: var(--small-size);">赛季管理 · 成员管理 · 分数录入 · 举证审核 · 飞书同步 · 组织分录入</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 11: ORG SCORES ========== -->
+<section class="slide split-slide" data-slide="10" style="background: var(--bg-peach);">
+  <div class="split-left">
+    <div class="section-label reveal">10 / Org Scores</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">组织分体系</h2>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      所有岗位通用的加分/扣分项，赛季上限 <span class="highlight">25 分</span>。
+    </p>
+    <p class="reveal" style="margin-top: var(--element-gap);">
+      涵盖带教、分享、花匠、内推、值班、价值观、基建项目、特别贡献等 <span class="highlight-coral">13 类</span>组织行为。
+    </p>
+  </div>
+  <div class="split-right pattern-overlay" style="background: var(--bg-lavender);">
+    <table class="mini-table reveal" style="max-width: 420px;">
+      <thead><tr><th>类型</th><th>分值</th><th>上限</th></tr></thead>
+      <tbody>
+        <tr><td>带教伙伴 (>50天)</td><td>+2/人</td><td>无上限</td></tr>
+        <tr><td>集团认证讲师</td><td>+5</td><td>5 分</td></tr>
+        <tr><td>分享（组内/部门/集团）</td><td>+0.5/1/3</td><td>3 分</td></tr>
+        <tr><td>花匠工作 (>50天)</td><td>+3</td><td>3 分</td></tr>
+        <tr><td>复杂基建（核心/参与）</td><td>+10/+5</td><td>无上限</td></tr>
+        <tr><td>值班未响应</td><td>-1/次</td><td>无上限</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ========== SLIDE 12: ROADMAP ========== -->
+<section class="slide split-slide" data-slide="11" style="background: var(--bg-lavender);">
+  <div class="split-left pattern-overlay">
+    <div class="section-label reveal">11 / Roadmap</div>
+    <h2 class="reveal" style="font-size: var(--h2-size);">当前进展与规划</h2>
+    <ul class="feature-list reveal" style="list-style: none; padding: 0; margin-top: var(--element-gap);">
+      <li style="margin-bottom: var(--element-gap);"><span class="badge" style="background: var(--badge-mint); color: var(--badge-mint-text); font-size: clamp(0.55rem, 0.7vw, 0.65rem);">已完成</span> 飞书登录 · 评分引擎 · 赛季管理 · 分数录入 · 举证流程 · 组织分 · 排名看板</li>
+      <li style="margin-bottom: var(--element-gap);"><span class="badge" style="background: var(--badge-yellow); color: var(--badge-yellow-text); font-size: clamp(0.55rem, 0.7vw, 0.65rem);">进行中</span> 飞书项目数据同步 · Copilot 操作能力扩展 · 结果层数据模型优化</li>
+      <li><span class="badge" style="background: var(--badge-pink); color: var(--badge-pink-text); font-size: clamp(0.55rem, 0.7vw, 0.65rem);">规划中</span> 细粒度权限（Reviewer 角色）· 评分规则自然语言配置 · 移动端适配</li>
+    </ul>
+  </div>
+  <div class="split-right" style="background: var(--bg-peach);">
+    <div class="section-label reveal">试点赛季</div>
+    <div style="text-align: center; margin-top: clamp(1rem, 3vh, 2.5rem);">
+      <h2 class="reveal" style="font-size: clamp(3rem, 6vw, 5rem); font-weight: 800; color: var(--accent-purple);">2026.05</h2>
+      <p class="reveal" style="font-size: var(--body-size); margin-top: var(--element-gap);">试点赛季启动</p>
+      <p class="reveal" style="font-size: var(--small-size); margin-top: var(--element-gap); color: var(--text-muted);">
+        仅统计 5-6 月数据<br>
+        上次绩效等级作为初始分数基准
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 13: CLOSING ========== -->
+<section class="slide single-slide" data-slide="12" style="background: var(--bg-lavender);">
+  <div class="slide-content" style="align-items: center; text-align: center;">
+    <div class="deco-circle decorative" style="top: 8%; left: 8%;"></div>
+    <h1 class="reveal" style="font-size: var(--title-size); font-weight: 800;">
+      Thank <span style="color: var(--accent-purple);">You</span>
+    </h1>
+    <p class="reveal" style="margin-top: clamp(1rem, 2.5vh, 2rem); font-size: var(--body-size);">
+      皇冠竞赛 · 会员数字化绩效竞赛平台
+    </p>
+    <div class="badges-row reveal" style="margin-top: clamp(1rem, 2vh, 1.5rem);">
+      <span class="badge" style="background: var(--badge-mint); color: var(--badge-mint-text);">公平</span>
+      <span class="badge" style="background: var(--badge-yellow); color: var(--badge-yellow-text);">透明</span>
+      <span class="badge" style="background: var(--badge-pink); color: var(--badge-pink-text);">量化</span>
+      <span class="badge" style="background: var(--badge-blue); color: var(--badge-blue-text);">AI 驱动</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===========================================
+     JAVASCRIPT — Slide Controller + Edit Mode
+     =========================================== -->
+<script>
+class SlidePresentation {
+  constructor() {
+    this.slides = document.querySelectorAll('.slide');
+    this.currentSlide = 0;
+    this.totalSlides = this.slides.length;
+    this.setupIntersectionObserver();
+    this.setupKeyboardNav();
+    this.setupTouchNav();
+    this.setupProgressBar();
+    this.setupNavDots();
+  }
+
+  setupIntersectionObserver() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          const idx = parseInt(entry.target.dataset.slide);
+          if (!isNaN(idx)) {
+            this.currentSlide = idx;
+            this.updateProgressBar();
+            this.updateNavDots();
+          }
+        }
+      });
+    }, { threshold: 0.5 });
+    this.slides.forEach(slide => observer.observe(slide));
+  }
+
+  goToSlide(index) {
+    if (index >= 0 && index < this.totalSlides) {
+      this.slides[index].scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  nextSlide() { this.goToSlide(this.currentSlide + 1); }
+  prevSlide() { this.goToSlide(this.currentSlide - 1); }
+
+  setupKeyboardNav() {
+    document.addEventListener('keydown', (e) => {
+      if (e.target.getAttribute('contenteditable')) return;
+      switch(e.key) {
+        case 'ArrowDown': case 'ArrowRight': case ' ': case 'PageDown':
+          e.preventDefault(); this.nextSlide(); break;
+        case 'ArrowUp': case 'ArrowLeft': case 'PageUp':
+          e.preventDefault(); this.prevSlide(); break;
+        case 'Home': e.preventDefault(); this.goToSlide(0); break;
+        case 'End': e.preventDefault(); this.goToSlide(this.totalSlides - 1); break;
+      }
+    });
+  }
+
+  setupTouchNav() {
+    let startY = 0;
+    document.addEventListener('touchstart', (e) => { startY = e.touches[0].clientY; }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      const diff = startY - e.changedTouches[0].clientY;
+      if (Math.abs(diff) > 50) { diff > 0 ? this.nextSlide() : this.prevSlide(); }
+    }, { passive: true });
+  }
+
+  setupProgressBar() {
+    this.progressBar = document.getElementById('progressBar');
+    this.updateProgressBar();
+  }
+
+  updateProgressBar() {
+    if (this.progressBar) {
+      const pct = ((this.currentSlide + 1) / this.totalSlides) * 100;
+      this.progressBar.style.width = pct + '%';
+    }
+  }
+
+  setupNavDots() {
+    const container = document.getElementById('navDots');
+    if (!container) return;
+    this.slides.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.className = 'nav-dot';
+      dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+      dot.addEventListener('click', () => this.goToSlide(i));
+      container.appendChild(dot);
+    });
+    this.navDotEls = container.querySelectorAll('.nav-dot');
+    this.updateNavDots();
+  }
+
+  updateNavDots() {
+    if (!this.navDotEls) return;
+    this.navDotEls.forEach((dot, i) => {
+      dot.classList.toggle('active', i === this.currentSlide);
+    });
+  }
+}
+
+/* ===========================================
+   INLINE EDITOR
+   =========================================== */
+class InlineEditor {
+  constructor() {
+    this.isActive = false;
+    this.editables = document.querySelectorAll('h1, h2, h3, p, li, td, th, .section-label');
+    this.saveHint = document.getElementById('editSaveHint');
+    this.toggleBtn = document.getElementById('editToggle');
+    this.storageKey = 'crown-slides-edits';
+    this.loadSavedEdits();
+  }
+
+  toggleEditMode() {
+    this.isActive = !this.isActive;
+    this.toggleBtn.classList.toggle('active', this.isActive);
+    this.toggleBtn.textContent = this.isActive ? '✏️ Editing' : '✏️ Edit';
+    this.saveHint.classList.toggle('show', this.isActive);
+    this.editables.forEach(el => {
+      el.setAttribute('contenteditable', this.isActive ? 'true' : 'false');
+    });
+    if (!this.isActive) this.saveEdits();
+  }
+
+  saveEdits() {
+    const edits = {};
+    this.editables.forEach((el, i) => {
+      if (el.getAttribute('contenteditable') === 'true' || el.textContent.trim()) {
+        edits[i] = el.innerHTML;
+      }
+    });
+    localStorage.setItem(this.storageKey, JSON.stringify(edits));
+  }
+
+  loadSavedEdits() {
+    const saved = localStorage.getItem(this.storageKey);
+    if (!saved) return;
+    try {
+      const edits = JSON.parse(saved);
+      this.editables.forEach((el, i) => {
+        if (edits[i]) el.innerHTML = edits[i];
+      });
+    } catch(e) {}
+  }
+}
+
+/* Init */
+const presentation = new SlidePresentation();
+const editor = new InlineEditor();
+
+/* Edit hotzone + toggle */
+const hotzone = document.getElementById('editHotzone');
+const editToggle = document.getElementById('editToggle');
+let hideTimeout = null;
+
+hotzone.addEventListener('mouseenter', () => {
+  clearTimeout(hideTimeout);
+  editToggle.classList.add('show');
+});
+hotzone.addEventListener('mouseleave', () => {
+  hideTimeout = setTimeout(() => {
+    if (!editor.isActive) editToggle.classList.remove('show');
+  }, 400);
+});
+editToggle.addEventListener('mouseenter', () => { clearTimeout(hideTimeout); });
+editToggle.addEventListener('mouseleave', () => {
+  hideTimeout = setTimeout(() => {
+    if (!editor.isActive) editToggle.classList.remove('show');
+  }, 400);
+});
+hotzone.addEventListener('click', () => { editor.toggleEditMode(); });
+editToggle.addEventListener('click', () => { editor.toggleEditMode(); });
+
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+    editor.toggleEditMode();
+  }
+  if (e.key === 's' && (e.ctrlKey || e.metaKey) && editor.isActive) {
+    e.preventDefault();
+    editor.saveEdits();
+    editor.saveHint.textContent = '✓ Saved!';
+    setTimeout(() => {
+      editor.saveHint.textContent = 'Ctrl+S to save · Esc to exit edit mode';
+    }, 1500);
+  }
+  if (e.key === 'Escape' && editor.isActive) {
+    editor.toggleEditMode();
+  }
+});
+</script>
+</body>
+</html>
