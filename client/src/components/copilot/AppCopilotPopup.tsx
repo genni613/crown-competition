@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
 import { Card, Typography } from 'antd'
 import { CopilotPopup } from '@copilotkit/react-core/v2'
+import copilotIcon from '../../new.png'
 import { matchOrgScoreType } from '../../api/orgScores'
 import { getSeasons } from '../../api/seasons'
 import type { Season } from '../../types/models'
@@ -241,6 +242,10 @@ export function AppCopilotPopup() {
     } : null as any,
   )
 
+  const CustomOpenIcon = () => (
+    <img src={copilotIcon} alt="助手" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }} />
+  )
+
   return (
     <CopilotPopup
       agentId={copilotConfig.agent}
@@ -248,6 +253,9 @@ export function AppCopilotPopup() {
       labels={{
         modalHeaderTitle: '皇冠赛助手',
         welcomeMessageText: '嗨，有什么可以帮你的？比如查规则、整理举证、录入组织分，跟我说就行 👋',
+      }}
+      toggleButton={{
+        openIcon: CustomOpenIcon,
       }}
     />
   )

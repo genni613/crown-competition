@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card, Avatar } from 'antd'
+import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card, Avatar, Checkbox } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
-import { getSeasons, createSeason, activateSeason, endSeason, getMembers, addMember, removeMember } from '../../api/seasons'
+import { getSeasons, createSeason, activateSeason, endSeason, getMembers, removeMember, addMembersBatch } from '../../api/seasons'
 import { getLocalFeishuUsers } from '../../api/feishu'
 import { copilotConfig } from '../../components/copilot/config'
 import type { LocalFeishuUser } from '../../api/feishu'
@@ -26,7 +26,6 @@ export default function SeasonManager() {
   const [createOpen, setCreateOpen] = useState(false)
   const [memberOpen, setMemberOpen] = useState(false)
   const [form] = Form.useForm()
-  const [memberForm] = Form.useForm()
 
   useEffect(() => { loadSeasons(); getLocalFeishuUsers().then(r => setFeishuUsers(r.data)) }, [])
 
@@ -94,11 +93,32 @@ export default function SeasonManager() {
     loadSeasons()
   }
 
-  async function onAddMember(values: any) {
-    if (!selectedSeason) return
-    await addMember(selectedSeason, values)
-    message.success('添加成功')
-    memberForm.resetFields()
+  const [selectedUserKeys, setSelectedUserKeys] = useState<string[]>([])
+  const [gradeMap, setGradeMap] = useState<Record<string, string>>({})
+  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set())
+
+  async function onAddMember() {
+    if (!selectedSeason || selectedUserKeys.length === 0) return
+
+    const res = await addMembersBatch(selectedSeason, {
+      members: selectedUserKeys.map(uk => ({ user_key: uk, performance_grade: gradeMap[uk] || undefined })),
+    })
+    const { added, skipped } = res.data
+    if (added > 0) message.success(`成功添加 ${added} 名成员`)
+    if (skipped.length > 0) {
+      Modal.info({
+        title: '部分成员已跳过',
+        content: (
+          <div>
+            {skipped.map((s, i) => (
+              <div key={i}>{s.name || s.user_key}：{s.reason}</div>
+            ))}
+          </div>
+        ),
+      })
+    }
+    setSelectedUserKeys([])
+    setGradeMap({})
     showMembers(selectedSeason)
   }
 
@@ -156,33 +176,96 @@ export default function SeasonManager() {
         <Table dataSource={members} columns={memberColumns} rowKey="id" size="small" pagination={false} />
         <Card title="添加成员" size="small" style={{ marginTop: 16, borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-            上期绩效仅作为增长保护基线，可选填写；本赛季分数仍由飞书数据、举证审批和管理员录分共同计算。
+            多选用户后批量添加，岗位自动从飞书用户信息带出。勾选多人后可点击绩效等级批量赋值。
           </Typography.Paragraph>
-          <Form form={memberForm} layout="inline" onFinish={onAddMember}>
-            <Form.Item name="user_key" rules={[{ required: true }]}>
-              <Select showSearch placeholder="选择用户" optionFilterProp="label" style={{ width: 180 }}
-                onChange={(val) => {
-                  const u = feishuUsers.find(f => f.user_key === val)
-                  if (u?.job_role) memberForm.setFieldValue('job_role', u.job_role)
-                }}
-                optionRender={({ data: { label, value } }) => {
-                  const u = feishuUsers.find(f => f.user_key === value)
-                  return <Space><Avatar src={u?.avatar_url} size="small" />{label}</Space>
-                }}
-              >
-                {feishuUsers.map(u => <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>)}
-              </Select>
-            </Form.Item>
-            <Form.Item name="job_role" rules={[{ required: true }]}>
-              <Select placeholder="岗位" style={{ width: 100 }}>{jobRoleOptions.map(o => <Select.Option key={o.value} value={o.value}>{o.label}</Select.Option>)}</Select>
-            </Form.Item>
-            <Form.Item name="performance_grade">
-              <Select placeholder="上期绩效" allowClear style={{ width: 110 }}>
-                {gradeOptions.map(o => <Select.Option key={o.value} value={o.value}>{o.label}</Select.Option>)}
-              </Select>
-            </Form.Item>
-            <Form.Item><Button type="primary" htmlType="submit">添加</Button></Form.Item>
-          </Form>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+            <Select
+              mode="multiple"
+              showSearch
+              placeholder="搜索并选择用户"
+              optionFilterProp="label"
+              style={{ minWidth: 320 }}
+              value={selectedUserKeys}
+              onChange={keys => { setSelectedUserKeys(keys); setCheckedKeys(new Set()) }}
+              optionRender={({ data: { label, value } }) => {
+                const u = feishuUsers.find(f => f.user_key === value)
+                return <Space><Avatar src={u?.avatar_url} size="small" />{label}</Space>
+              }}
+            >
+              {feishuUsers.map(u => <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>)}
+            </Select>
+            <Button type="primary" onClick={onAddMember} disabled={selectedUserKeys.length === 0}>
+              批量添加
+            </Button>
+          </div>
+          {selectedUserKeys.length > 0 && (
+            <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                <Checkbox
+                  checked={checkedKeys.size === selectedUserKeys.length && selectedUserKeys.length > 0}
+                  indeterminate={checkedKeys.size > 0 && checkedKeys.size < selectedUserKeys.length}
+                  onChange={e => setCheckedKeys(e.target.checked ? new Set(selectedUserKeys) : new Set())}
+                >
+                  全选
+                </Checkbox>
+                <span style={{ color: '#94a3b8', fontSize: 12 }}>已勾选 {checkedKeys.size} 人，批量设为：</span>
+                {gradeOptions.map(o => (
+                  <Tag
+                    key={o.value}
+                    style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
+                    color="blue"
+                    onClick={() => {
+                      if (checkedKeys.size === 0) return
+                      setGradeMap(prev => {
+                        const next = { ...prev }
+                        for (const k of checkedKeys) next[k] = o.value
+                        return next
+                      })
+                    }}
+                  >
+                    {o.label}
+                  </Tag>
+                ))}
+                <Tag
+                  style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
+                  onClick={() => {
+                    if (checkedKeys.size === 0) return
+                    setGradeMap(prev => {
+                      const next = { ...prev }
+                      for (const k of checkedKeys) delete next[k]
+                      return next
+                    })
+                  }}
+                >
+                  清除绩效
+                </Tag>
+              </div>
+              {selectedUserKeys.map(uk => {
+                const u = feishuUsers.find(f => f.user_key === uk)
+                const roleLabel = u?.job_role ? jobRoleOptions.find(j => j.value === u.job_role)?.label : null
+                return (
+                  <div key={uk} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+                    <Checkbox
+                      checked={checkedKeys.has(uk)}
+                      onChange={e => {
+                        setCheckedKeys(prev => {
+                          const next = new Set(prev)
+                          e.target.checked ? next.add(uk) : next.delete(uk)
+                          return next
+                        })
+                      }}
+                    />
+                    <Tag color={roleLabel ? 'green' : 'warning'}>
+                      {u?.name ?? uk} {roleLabel ? `· ${roleLabel}` : '· 岗位未设置'}
+                    </Tag>
+                    <Tag color={gradeMap[uk] ? 'geekblue' : undefined} style={{ marginRight: 0 }}>
+                      {gradeMap[uk] ? `绩效 ${gradeMap[uk]}` : '未设绩效'}
+                    </Tag>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </Card>
       </Modal>
     </div>

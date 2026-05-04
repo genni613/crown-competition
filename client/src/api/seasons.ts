@@ -11,3 +11,11 @@ export const getMembers = (seasonId: number) => api.get<SeasonMember[]>(`/season
 export const addMember = (seasonId: number, data: any) => api.post(`/seasons/${seasonId}/members`, data)
 export const updateMember = (seasonId: number, memberId: number, data: any) => api.put(`/seasons/${seasonId}/members/${memberId}`, data)
 export const removeMember = (seasonId: number, memberId: number) => api.delete(`/seasons/${seasonId}/members/${memberId}`)
+
+export interface BatchAddResult {
+  added: number
+  skipped: { user_key: string; name?: string; reason: string }[]
+}
+
+export const addMembersBatch = (seasonId: number, data: { members: { user_key: string; performance_grade?: string }[] }) =>
+  api.post<BatchAddResult>(`/seasons/${seasonId}/members/batch`, data)

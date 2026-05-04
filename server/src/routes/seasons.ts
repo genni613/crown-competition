@@ -90,6 +90,84 @@ seasonsRouter.get('/:id/members', authMiddleware, asyncHandler(async (req: Reque
   res.json(members)
 }))
 
+// POST /api/seasons/:id/members/batch — 批量添加成员
+seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { members } = req.body as { members: { user_key: string; performance_grade?: string }[] }
+  if (!Array.isArray(members) || members.length === 0) {
+    res.status(400).json({ error: '缺少成员列表' })
+    return
+  }
+
+  const seasonId = parseInt(req.params.id, 10)
+  const db = getDb()
+  const skipped: { user_key: string; name?: string; reason: string }[] = []
+  let added = 0
+
+  // 查出所有 user_key 对应的飞书用户信息
+  const userKeys = members.map(m => m.user_key)
+  const feishuRows = await db.query<{ user_key: string; job_role: string | null; name: string }>(
+    'SELECT user_key, job_role, name FROM feishu_user WHERE user_key IN (?)',
+    [userKeys]
+  )
+  const feishuMap = new Map(feishuRows.map(r => [r.user_key, r]))
+
+  // 查出已有的赛季成员
+  const existing = await db.query<{ user_key: string }>(
+    'SELECT user_key FROM season_members WHERE season_id = ? AND user_key IN (?)',
+    [seasonId, userKeys]
+  )
+  const existingSet = new Set(existing.map(r => r.user_key))
+
+  for (const m of members) {
+    const feishu = feishuMap.get(m.user_key)
+
+    if (existingSet.has(m.user_key)) {
+      skipped.push({ user_key: m.user_key, name: feishu?.name, reason: '已在此赛季中' })
+      continue
+    }
+
+    if (!feishu) {
+      skipped.push({ user_key: m.user_key, reason: '飞书用户不存在' })
+      continue
+    }
+
+    if (!feishu.job_role) {
+      skipped.push({ user_key: m.user_key, name: feishu.name, reason: '岗位未设置' })
+      continue
+    }
+
+    const prevRawScore = m.performance_grade ? getPerformanceScore(m.performance_grade) : null
+
+    try {
+      await withTransaction(async tx => {
+        const result = await tx.execute(
+          'INSERT INTO season_members (season_id, user_key, job_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?)',
+          [seasonId, m.user_key, feishu.job_role, m.performance_grade ?? null, prevRawScore]
+        )
+        const dimensions = await tx.query<{ id: number; data_source?: string }>(
+          'SELECT id, data_source FROM scoring_dimensions WHERE job_role = ?',
+          [feishu.job_role]
+        )
+        for (const dim of dimensions) {
+          await tx.execute(
+            'INSERT IGNORE INTO indicator_scores (season_member_id, dimension_id, source) VALUES (?, ?, ?)',
+            [result.insertId, dim.id, dim.data_source || 'admin']
+          )
+        }
+      })
+      added++
+    } catch (err: any) {
+      if (err.code === 'ER_DUP_ENTRY' || err.message?.includes('Duplicate')) {
+        skipped.push({ user_key: m.user_key, name: feishu.name, reason: '已在此赛季中' })
+      } else {
+        throw err
+      }
+    }
+  }
+
+  res.status(201).json({ added, skipped })
+}))
+
 // POST /api/seasons/:id/members — 添加成员
 seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { user_key, job_role, performance_grade } = req.body

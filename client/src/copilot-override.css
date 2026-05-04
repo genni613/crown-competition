@@ -4,3 +4,14 @@
   line-height: 1.5 !important;
   font-weight: 400 !important;
 }
+
+/* CopilotKit 浮动按钮背景透明，显示自定义图片 */
+.copilotKitButton {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.copilotKitButton:hover {
+  background: transparent !important;
+}
