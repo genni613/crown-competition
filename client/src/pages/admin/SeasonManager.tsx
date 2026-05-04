@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card, Avatar, Checkbox } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
-import { getSeasons, createSeason, activateSeason, endSeason, getMembers, removeMember, addMembersBatch } from '../../api/seasons'
+import { getSeasons, createSeason, activateSeason, endSeason, getMembers, updateMember, removeMember, addMembersBatch } from '../../api/seasons'
 import { getLocalFeishuUsers } from '../../api/feishu'
 import { copilotConfig } from '../../components/copilot/config'
 import type { LocalFeishuUser } from '../../api/feishu'
@@ -95,31 +95,43 @@ export default function SeasonManager() {
 
   const [selectedUserKeys, setSelectedUserKeys] = useState<string[]>([])
   const [gradeMap, setGradeMap] = useState<Record<string, string>>({})
+  const [roleMap, setRoleMap] = useState<Record<string, string>>({})
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set())
 
   async function onAddMember() {
     if (!selectedSeason || selectedUserKeys.length === 0) return
 
-    const res = await addMembersBatch(selectedSeason, {
-      members: selectedUserKeys.map(uk => ({ user_key: uk, performance_grade: gradeMap[uk] || undefined })),
-    })
-    const { added, skipped } = res.data
-    if (added > 0) message.success(`成功添加 ${added} 名成员`)
-    if (skipped.length > 0) {
-      Modal.info({
-        title: '部分成员已跳过',
-        content: (
-          <div>
-            {skipped.map((s, i) => (
-              <div key={i}>{s.name || s.user_key}：{s.reason}</div>
-            ))}
-          </div>
-        ),
+    try {
+      const res = await addMembersBatch(selectedSeason, {
+        members: selectedUserKeys.map(uk => ({
+          user_key: uk,
+          performance_grade: gradeMap[uk] || undefined,
+          job_role: roleMap[uk] || undefined,
+        })),
       })
+      console.log('[batch] response:', res.data)
+      const { added, skipped } = res.data
+      if (added > 0) message.success(`成功添加 ${added} 名成员`)
+      if (skipped.length > 0) {
+        Modal.info({
+          title: '部分成员已跳过',
+          content: (
+            <div>
+              {skipped.map((s, i) => (
+                <div key={i}>{s.name || s.user_key}：{s.reason}</div>
+              ))}
+            </div>
+          ),
+        })
+      }
+      setSelectedUserKeys([])
+      setGradeMap({})
+      setRoleMap({})
+      showMembers(selectedSeason)
+    } catch (err: any) {
+      console.error('[batch] error:', err)
+      message.error(`批量添加失败: ${err.message || '未知错误'}`)
     }
-    setSelectedUserKeys([])
-    setGradeMap({})
-    showMembers(selectedSeason)
   }
 
   const columns = [
@@ -135,10 +147,43 @@ export default function SeasonManager() {
     )},
   ]
 
+  async function onEditMember(member: SeasonMember, field: string, value: string | null) {
+    await updateMember(member.season_id, member.id, { [field]: value })
+    showMembers(member.season_id)
+  }
+
   const memberColumns = [
     { title: '成员', dataIndex: 'user_name' },
-    { title: '岗位', dataIndex: 'job_role', render: (v: string) => jobRoleOptions.find(j => j.value === v)?.label ?? '-' },
-    { title: '上期绩效', dataIndex: 'performance_grade', render: (value: string | null) => value || '-' },
+    {
+      title: '岗位',
+      dataIndex: 'job_role',
+      render: (v: string, r: SeasonMember) => (
+        <Select
+          size="small"
+          style={{ width: 90 }}
+          value={v || undefined}
+          placeholder="未设置"
+          allowClear
+          onChange={val => onEditMember(r, 'job_role', val ?? null)}
+          options={jobRoleOptions}
+        />
+      ),
+    },
+    {
+      title: '上期绩效',
+      dataIndex: 'performance_grade',
+      render: (v: string, r: SeasonMember) => (
+        <Select
+          size="small"
+          style={{ width: 90 }}
+          value={v || undefined}
+          placeholder="未设置"
+          allowClear
+          onChange={val => onEditMember(r, 'performance_grade', val ?? null)}
+          options={gradeOptions}
+        />
+      ),
+    },
     { title: '操作', render: (_: any, r: SeasonMember) => (
       <Popconfirm title="确认移除？" onConfirm={async () => { await removeMember(r.season_id, r.id); message.success('已移除'); showMembers(r.season_id) }}>
         <Button size="small" danger>移除</Button>
@@ -176,7 +221,7 @@ export default function SeasonManager() {
         <Table dataSource={members} columns={memberColumns} rowKey="id" size="small" pagination={false} />
         <Card title="添加成员" size="small" style={{ marginTop: 16, borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-            多选用户后批量添加，岗位自动从飞书用户信息带出。勾选多人后可点击绩效等级批量赋值。
+            多选用户后批量添加。勾选多人后可批量设置岗位和绩效等级。
           </Typography.Paragraph>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
             <Select
@@ -200,7 +245,7 @@ export default function SeasonManager() {
           </div>
           {selectedUserKeys.length > 0 && (
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                 <Checkbox
                   checked={checkedKeys.size === selectedUserKeys.length && selectedUserKeys.length > 0}
                   indeterminate={checkedKeys.size > 0 && checkedKeys.size < selectedUserKeys.length}
@@ -208,7 +253,26 @@ export default function SeasonManager() {
                 >
                   全选
                 </Checkbox>
-                <span style={{ color: '#94a3b8', fontSize: 12 }}>已勾选 {checkedKeys.size} 人，批量设为：</span>
+                <span style={{ color: '#94a3b8', fontSize: 12 }}>已勾选 {checkedKeys.size} 人</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                <span style={{ color: '#94a3b8', fontSize: 12, width: 48 }}>岗位：</span>
+                {jobRoleOptions.map(o => (
+                  <Tag
+                    key={o.value}
+                    style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
+                    color="green"
+                    onClick={() => {
+                      if (checkedKeys.size === 0) return
+                      setRoleMap(prev => { const next = { ...prev }; for (const k of checkedKeys) next[k] = o.value; return next })
+                    }}
+                  >
+                    {o.label}
+                  </Tag>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: '#94a3b8', fontSize: 12, width: 48 }}>绩效：</span>
                 {gradeOptions.map(o => (
                   <Tag
                     key={o.value}
@@ -216,11 +280,7 @@ export default function SeasonManager() {
                     color="blue"
                     onClick={() => {
                       if (checkedKeys.size === 0) return
-                      setGradeMap(prev => {
-                        const next = { ...prev }
-                        for (const k of checkedKeys) next[k] = o.value
-                        return next
-                      })
+                      setGradeMap(prev => { const next = { ...prev }; for (const k of checkedKeys) next[k] = o.value; return next })
                     }}
                   >
                     {o.label}
@@ -230,11 +290,7 @@ export default function SeasonManager() {
                   style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
                   onClick={() => {
                     if (checkedKeys.size === 0) return
-                    setGradeMap(prev => {
-                      const next = { ...prev }
-                      for (const k of checkedKeys) delete next[k]
-                      return next
-                    })
+                    setGradeMap(prev => { const next = { ...prev }; for (const k of checkedKeys) delete next[k]; return next })
                   }}
                 >
                   清除绩效
@@ -242,7 +298,10 @@ export default function SeasonManager() {
               </div>
               {selectedUserKeys.map(uk => {
                 const u = feishuUsers.find(f => f.user_key === uk)
-                const roleLabel = u?.job_role ? jobRoleOptions.find(j => j.value === u.job_role)?.label : null
+                const overrideRole = roleMap[uk]
+                const baseRole = u?.job_role
+                const effectiveRole = overrideRole || baseRole
+                const roleLabel = effectiveRole ? jobRoleOptions.find(j => j.value === effectiveRole)?.label : null
                 return (
                   <div key={uk} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
                     <Checkbox

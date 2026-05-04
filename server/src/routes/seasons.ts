@@ -92,7 +92,8 @@ seasonsRouter.get('/:id/members', authMiddleware, asyncHandler(async (req: Reque
 
 // POST /api/seasons/:id/members/batch — 批量添加成员
 seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { members } = req.body as { members: { user_key: string; performance_grade?: string }[] }
+  const { members } = req.body as { members: { user_key: string; performance_grade?: string; job_role?: string }[] }
+  console.log('[batch] received members:', JSON.stringify(members))
   if (!Array.isArray(members) || members.length === 0) {
     res.status(400).json({ error: '缺少成员列表' })
     return
@@ -105,16 +106,18 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
 
   // 查出所有 user_key 对应的飞书用户信息
   const userKeys = members.map(m => m.user_key)
+  const feishuPlaceholders = userKeys.map(() => '?').join(',')
   const feishuRows = await db.query<{ user_key: string; job_role: string | null; name: string }>(
-    'SELECT user_key, job_role, name FROM feishu_user WHERE user_key IN (?)',
-    [userKeys]
+    `SELECT user_key, job_role, name FROM feishu_user WHERE user_key IN (${feishuPlaceholders})`,
+    userKeys
   )
   const feishuMap = new Map(feishuRows.map(r => [r.user_key, r]))
+  console.log('[batch] feishuUsers found:', feishuRows.length, feishuRows.map(r => `${r.name}(${r.job_role})`))
 
   // 查出已有的赛季成员
   const existing = await db.query<{ user_key: string }>(
-    'SELECT user_key FROM season_members WHERE season_id = ? AND user_key IN (?)',
-    [seasonId, userKeys]
+    `SELECT user_key FROM season_members WHERE season_id = ? AND user_key IN (${feishuPlaceholders})`,
+    [seasonId, ...userKeys]
   )
   const existingSet = new Set(existing.map(r => r.user_key))
 
@@ -131,28 +134,29 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
       continue
     }
 
-    if (!feishu.job_role) {
-      skipped.push({ user_key: m.user_key, name: feishu.name, reason: '岗位未设置' })
-      continue
-    }
-
+    const jobRole = m.job_role || feishu.job_role || null
     const prevRawScore = m.performance_grade ? getPerformanceScore(m.performance_grade) : null
 
     try {
       await withTransaction(async tx => {
+        if (m.job_role && m.job_role !== feishu.job_role) {
+          await tx.execute('UPDATE feishu_user SET job_role = ? WHERE user_key = ?', [m.job_role, m.user_key])
+        }
         const result = await tx.execute(
           'INSERT INTO season_members (season_id, user_key, job_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?)',
-          [seasonId, m.user_key, feishu.job_role, m.performance_grade ?? null, prevRawScore]
+          [seasonId, m.user_key, jobRole, m.performance_grade ?? null, prevRawScore]
         )
-        const dimensions = await tx.query<{ id: number; data_source?: string }>(
-          'SELECT id, data_source FROM scoring_dimensions WHERE job_role = ?',
-          [feishu.job_role]
-        )
-        for (const dim of dimensions) {
-          await tx.execute(
-            'INSERT IGNORE INTO indicator_scores (season_member_id, dimension_id, source) VALUES (?, ?, ?)',
-            [result.insertId, dim.id, dim.data_source || 'admin']
+        if (jobRole) {
+          const dimensions = await tx.query<{ id: number; data_source?: string }>(
+            'SELECT id, data_source FROM scoring_dimensions WHERE job_role = ?',
+            [jobRole]
           )
+          for (const dim of dimensions) {
+            await tx.execute(
+              'INSERT IGNORE INTO indicator_scores (season_member_id, dimension_id, source) VALUES (?, ?, ?)',
+              [result.insertId, dim.id, dim.data_source || 'admin']
+            )
+          }
         }
       })
       added++
@@ -165,6 +169,7 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
     }
   }
 
+  console.log('[batch] result:', { added, skipped: skipped.length, reasons: skipped })
   res.status(201).json({ added, skipped })
 }))
 
