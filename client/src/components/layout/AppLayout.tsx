@@ -12,18 +12,31 @@ export default function AppLayout() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
-        width={210}
+        width={220}
         collapsedWidth={60}
         collapsed={collapsed}
         breakpoint="lg"
         onBreakpoint={(broken) => setCollapsed(broken)}
         theme="light"
-        style={{ borderRight: '1px solid #f1f5f9', overflow: 'auto', height: '100vh', position: 'sticky', top: 0 }}
+        style={{
+          borderRight: '1px solid #eef2ff',
+          overflow: 'auto',
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
+          background: '#ffffff',
+        }}
       >
         <Sidebar />
       </Sider>
       <Layout>
-        <Content style={{ padding: '24px 28px', background: '#f8fafc', minHeight: 'auto' }}>
+        <Content style={{
+          padding: '28px 32px',
+          background: '#f5f3ff',
+          minHeight: 'auto',
+          backgroundImage: 'radial-gradient(circle, #e0e7ff 0.6px, transparent 0.6px)',
+          backgroundSize: '32px 32px',
+        }}>
           <Outlet />
         </Content>
         <AppCopilotPopup />

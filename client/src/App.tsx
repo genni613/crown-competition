@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Modal, Select, Space, Typography, message } from 'antd'
 import { Spin } from 'antd'
+import { CrownOutlined } from '@ant-design/icons'
 import { useAuthStore } from './store/authStore'
 import { updateMyJobRole } from './api/feishu'
 import AppLayout from './components/layout/AppLayout'
@@ -56,31 +57,52 @@ export default function App() {
   }
 
   if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="login-bg">
       <Spin size="large" />
     </div>
   )
 
   if (!user) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
+    <div className="login-bg">
       <div style={{
-        maxWidth: 400, width: '100%', padding: '48px 40px', background: '#fff',
-        borderRadius: 16, boxShadow: '0 8px 30px rgba(0,0,0,0.08)', textAlign: 'center',
+        maxWidth: 420, width: '100%', padding: '52px 44px', background: 'rgba(255,255,255,0.9)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: 20, boxShadow: '0 8px 40px rgba(99, 102, 241, 0.12), 0 0 0 1px rgba(255,255,255,0.5)',
+        textAlign: 'center', position: 'relative', zIndex: 1,
+        animation: 'scaleIn 0.4s ease-out both',
       }}>
         <div style={{
-          width: 48, height: 48, borderRadius: 12, margin: '0 auto 20px',
-          background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+          width: 56, height: 56, borderRadius: 16, margin: '0 auto 24px',
+          background: 'linear-gradient(135deg, #6366f1, #a855f7)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 22, fontWeight: 700,
-        }}>C</div>
-        <div style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>皇冠赛</div>
-        <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 32 }}>团队绩效竞赛平台</div>
+          color: '#fff', fontSize: 26, boxShadow: '0 4px 20px rgba(99, 102, 241, 0.35)',
+        }}>
+          <CrownOutlined />
+        </div>
+        <div style={{
+          fontSize: 28, fontWeight: 800, color: '#1e1b4b', marginBottom: 6,
+          fontFamily: "'Outfit', system-ui, sans-serif",
+        }}>皇冠赛</div>
+        <div style={{
+          fontSize: 13, color: '#a5b4fc', marginBottom: 36, fontWeight: 500,
+          letterSpacing: 2, textTransform: 'uppercase',
+        }}>团队绩效竞赛平台</div>
         <a
           href="/api/auth/login"
           style={{
-            display: 'block', background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
-            color: '#fff', fontSize: 15, fontWeight: 600, lineHeight: '44px',
-            borderRadius: 10, textDecoration: 'none',
+            display: 'block', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: '48px',
+            borderRadius: 12, textDecoration: 'none',
+            boxShadow: '0 4px 16px rgba(99, 102, 241, 0.35)',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
+            ;(e.currentTarget as HTMLElement).style.boxShadow = '0 6px 24px rgba(99, 102, 241, 0.45)'
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
+            ;(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(99, 102, 241, 0.35)'
           }}
         >
           飞书扫码登录
@@ -93,7 +115,7 @@ export default function App() {
     <>
       <Modal
         open={jobRoleOpen}
-        title="选择你的岗位"
+        title={<span style={{ fontWeight: 700, color: '#1e1b4b' }}>选择你的岗位</span>}
         confirmLoading={saving}
         okButtonProps={{ disabled: !selectedRole }}
         onOk={onSaveJobRole}
@@ -105,7 +127,7 @@ export default function App() {
           首次登录需要选择你的岗位信息，用于皇冠赛评分分组。选择后管理员添加你为赛季成员时将自动带入岗位。
         </Typography.Paragraph>
         {selectedRole && (
-          <Typography.Text type="success">
+          <Typography.Text style={{ color: '#6366f1', fontWeight: 600 }}>
             你选择的岗位是：{jobRoleOptions.find(o => o.value === selectedRole)?.label}
           </Typography.Text>
         )}

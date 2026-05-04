@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Alert, Button, Card, Form, Image, Input, InputNumber, Modal, Select, Space, Typography, Upload, message } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, FileTextOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { getSeasons, getMembers } from '../api/seasons'
 import { submitEvidence, uploadEvidenceAttachment } from '../api/evidence'
 import { getDimensions } from '../api/scoring'
@@ -228,16 +228,28 @@ export default function EvidenceSubmit() {
   const activeSeasons = useMemo(() => seasons.filter(s => s.status === 'active'), [seasons])
 
   return (
-    <div>
-      <Typography.Title level={4} style={{ margin: '0 0 16px', color: '#0f172a' }}>提交举证</Typography.Title>
-      <Card style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+    <div style={{ maxWidth: 720 }} className="anim-fade-in-up">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'linear-gradient(135deg, #06b6d4, #6366f1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 18,
+          boxShadow: '0 2px 12px rgba(6, 182, 212, 0.3)',
+        }}>
+          <FileTextOutlined />
+        </div>
+        <Typography.Title level={4} style={{ margin: 0, color: '#1e1b4b' }}>提交举证</Typography.Title>
+      </div>
+      <Card style={{ borderRadius: 14, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         {copilotDraft && (
           <Alert
             type="info"
             showIcon
+            icon={<ThunderboltOutlined />}
             message="已载入 AI 草稿"
-            style={{ background: '#eff6ff', border: '1px solid #bae6fd', borderRadius: 10 }}
+            style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 12 }}
             description="系统已根据你在聊天里的自然语言预填了部分表单。请核对指标、数值、标题、描述，并补充至少一张举证图片后再提交。"
             action={(
               <Button
@@ -274,7 +286,7 @@ export default function EvidenceSubmit() {
                   <Select.Option key={d.id} value={d.id}>
                     {d.dimension_name} — {d.indicator_name}
                     {d.threshold_100 != null && d.threshold_60 != null && (
-                      <span style={{ color: '#999', marginLeft: 8 }}>
+                      <span style={{ color: '#a5b4fc', marginLeft: 8 }}>
                         (满分≥{d.threshold_100}，及格≥{d.threshold_60})
                       </span>
                     )}
@@ -337,15 +349,15 @@ export default function EvidenceSubmit() {
             >
               {fileList.length >= MAX_FILES ? null : (
                 <div>
-                  <PlusOutlined />
-                  <div style={{ marginTop: 8 }}>上传</div>
+                  <PlusOutlined style={{ color: '#6366f1' }} />
+                  <div style={{ marginTop: 8, color: '#6366f1', fontWeight: 500 }}>上传</div>
                 </div>
               )}
             </Upload>
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} disabled={!membershipReady || fileList.length === 0} style={{ background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)', border: 'none', borderRadius: 8 }}>
-              提交
+            <Button type="primary" htmlType="submit" loading={loading} disabled={!membershipReady || fileList.length === 0} size="large" style={{ borderRadius: 10, fontWeight: 600, paddingLeft: 32, paddingRight: 32 }}>
+              提交举证
             </Button>
           </Form.Item>
         </Form>

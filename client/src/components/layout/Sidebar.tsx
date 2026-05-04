@@ -5,7 +5,7 @@ import {
   DashboardOutlined, TrophyOutlined, FileTextOutlined,
   SettingOutlined, FormOutlined, AuditOutlined,
   TeamOutlined, CloudServerOutlined, ControlOutlined,
-  LogoutOutlined, UserOutlined,
+  LogoutOutlined, UserOutlined, CrownOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../store/authStore'
 
@@ -58,54 +58,72 @@ export default function Sidebar() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Logo */}
-      <div style={{ height: 60, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{
+        height: 64, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12,
+        borderBottom: '1px solid #eef2ff',
+      }}>
         <div style={{
-          width: 30, height: 30, borderRadius: 8,
-          background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+          width: 34, height: 34, borderRadius: 10,
+          background: 'linear-gradient(135deg, #6366f1, #a855f7)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 14, fontWeight: 700,
+          color: '#fff', fontSize: 16, fontWeight: 800,
+          boxShadow: '0 2px 12px rgba(99, 102, 241, 0.35)',
+          position: 'relative',
         }}>
-          C
+          <CrownOutlined style={{ fontSize: 18 }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#0f172a' }}>皇冠赛</span>
+        <div>
+          <span style={{ fontSize: 16, fontWeight: 700, color: '#1e1b4b', lineHeight: '20px' }}>皇冠赛</span>
+          <div style={{ fontSize: 10, color: '#a5b4fc', fontWeight: 500, letterSpacing: 1 }}>CROWN ARENA</div>
+        </div>
       </div>
 
       {/* Menu */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
         <Menu
           mode="inline"
           selectedKeys={[getSelectedKey(location.pathname)]}
           items={items}
           onClick={({ key }) => navigate(key)}
-          style={{ borderRight: 0 }}
+          style={{ borderRight: 0, background: 'transparent' }}
         />
       </div>
 
       {/* User info */}
       {user && (
         <Dropdown menu={{ items: logoutMenu }} placement="topRight" trigger={['click']}>
-          <div style={{
-            padding: '12px 14px', borderTop: '1px solid #f1f5f9',
-            display: 'flex', alignItems: 'center', gap: 10,
-            cursor: 'pointer', transition: 'background 0.15s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <Avatar src={user.avatar_url} icon={<UserOutlined />} size={36} style={{ background: '#e0f2fe', flexShrink: 0, boxShadow: '0 0 0 2px #fff, 0 0 0 3px #bae6fd' }} />
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', lineHeight: '20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                {(user as any).feishu_job_role && (
-                  <span style={{ fontSize: 11, lineHeight: 1, color: '#0284c7', background: '#f0f9ff', padding: '2px 6px', borderRadius: 4 }}>
-                    {jobRoleMap[(user as any).feishu_job_role] || (user as any).feishu_job_role}
-                  </span>
-                )}
-                {user.title && (
-                  <span style={{ fontSize: 11, lineHeight: 1, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user.title}
-                  </span>
-                )}
+          <div className="sidebar-user-section" style={{
+            padding: '14px 16px', cursor: 'pointer', transition: 'background 0.15s',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Avatar
+                src={user.avatar_url}
+                icon={<UserOutlined />}
+                size={36}
+                style={{
+                  background: 'linear-gradient(135deg, #c7d2fe, #e0e7ff)',
+                  flexShrink: 0,
+                  boxShadow: '0 0 0 2px #fff, 0 0 0 3px #a5b4fc',
+                }}
+              />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1e1b4b', lineHeight: '20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  {(user as any).feishu_job_role && (
+                    <span style={{
+                      fontSize: 11, lineHeight: 1, fontWeight: 600,
+                      color: '#6366f1', background: '#eef2ff',
+                      padding: '2px 8px', borderRadius: 6,
+                    }}>
+                      {jobRoleMap[(user as any).feishu_job_role] || (user as any).feishu_job_role}
+                    </span>
+                  )}
+                  {user.title && (
+                    <span style={{ fontSize: 11, lineHeight: 1, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user.title}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
