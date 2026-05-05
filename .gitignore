@@ -7,3 +7,6 @@ dist/
 .codex/
 .superpowers/
 =
+.DS_Store
+*.profraw
+*.sql

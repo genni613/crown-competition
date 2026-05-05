@@ -12,7 +12,7 @@ usersRouter.get('/', adminMiddleware, asyncHandler(async (_req: Request, res: Re
 
 // GET /api/users/:id — 用户详情
 usersRouter.get('/:id', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const user = await getUserById(req.params.id)
+  const user = await getUserById(parseInt(req.params.id, 10))
   if (!user) { res.status(404).json({ error: '用户不存在' }); return }
   res.json(user)
 }))
@@ -28,6 +28,6 @@ usersRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, res: 
     res.status(400).json({ error: '无效的岗位' })
     return
   }
-  const user = await updateUser(req.params.id, { role, job_role })
+  const user = await updateUser(parseInt(req.params.id, 10), { role, job_role })
   res.json(user)
 }))

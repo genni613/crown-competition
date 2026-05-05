@@ -3,7 +3,7 @@ import { config } from '../config'
 
 export interface SessionData {
   user?: {
-    id: string
+    id: number
     name: string
     avatar_url?: string | null
     department_name?: string | null
@@ -12,6 +12,7 @@ export interface SessionData {
   accessToken?: string
   refreshToken?: string
   state?: string
+  redirectTo?: string
 }
 
 export const defaultSession: SessionData = {

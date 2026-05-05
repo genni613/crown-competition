@@ -1,8 +1,14 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
 import { Card, Typography } from 'antd'
 import { CopilotPopup } from '@copilotkit/react-core/v2'
-import copilotIcon from '../../new.png'
+import gibbonFrame1 from '../../assets/copilot/1.png'
+import gibbonFrame2 from '../../assets/copilot/2.png'
+import gibbonFrame3 from '../../assets/copilot/3.png'
+import gibbonFrame4 from '../../assets/copilot/4.png'
+import gibbonFrame5 from '../../assets/copilot/5.png'
+import gibbonFrame6 from '../../assets/copilot/6.png'
 import { matchOrgScoreType } from '../../api/orgScores'
 import { getSeasons } from '../../api/seasons'
 import type { Season } from '../../types/models'
@@ -24,6 +30,227 @@ const supportedFeatures = [
 
 function buildDraftNavigationTarget(path: string) {
   return `${path}?draftTs=${Date.now()}`
+}
+
+const gibbonFrames = [
+  gibbonFrame1,
+  gibbonFrame2,
+  gibbonFrame3,
+  gibbonFrame4,
+  gibbonFrame5,
+  gibbonFrame6,
+] as const
+
+const idleTimeline = [
+  { frame: 0, duration: 1100 },
+  { frame: 1, duration: 140 },
+  { frame: 2, duration: 1100 },
+] as const
+
+const hoverFrames = [3, 4] as const
+
+const DRAG_THRESHOLD = 8
+const WAITING_TIMEOUT = 45000
+
+type AmbientState = 'idle' | 'waving' | 'review' | 'waiting'
+
+function loadPetPos(): { right: number; bottom: number } {
+  try {
+    const s = localStorage.getItem('copilot-pet-pos')
+    if (s) { const p = JSON.parse(s); if (typeof p.right === 'number' && typeof p.bottom === 'number') return p }
+  } catch { /* ignore */ }
+  return { right: 24, bottom: 24 }
+}
+
+function savePetPos(pos: { right: number; bottom: number }) {
+  try { localStorage.setItem('copilot-pet-pos', JSON.stringify(pos)) } catch { /* ignore */ }
+}
+
+function CopilotMascotIcon() {
+  const shellRef = useRef<HTMLSpanElement>(null)
+  const dragRef = useRef<{ startX: number; startY: number; startRight: number; startBottom: number; moved: boolean } | null>(null)
+  const didDragRef = useRef(false)
+  const releaseTimerRef = useRef<number | null>(null)
+  const waitingTimerRef = useRef<number | null>(null)
+  const ambientTimerRef = useRef<number | null>(null)
+  const posRef = useRef(loadPetPos())
+  const ambientRef = useRef<AmbientState>('idle')
+
+  const [isHovered, setIsHovered] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
+  const [isPressed, setIsPressed] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [idleStep, setIdleStep] = useState(0)
+  const [hoverStep, setHoverStep] = useState(0)
+  const [ambientState, setAmbientState] = useState<AmbientState>('idle')
+  const [bubbleOpen, setBubbleOpen] = useState(true)
+
+  // Keep ref in sync
+  useEffect(() => { ambientRef.current = ambientState }, [ambientState])
+
+  // Position sync to parent button via inline styles
+  const syncPosition = useCallback((pos: { right: number; bottom: number }) => {
+    posRef.current = pos
+    const btn = shellRef.current?.closest('button') as HTMLElement | null
+    if (btn) {
+      btn.style.setProperty('right', `${pos.right}px`, 'important')
+      btn.style.setProperty('bottom', `${pos.bottom}px`, 'important')
+    }
+  }, [])
+
+  useEffect(() => { syncPosition(posRef.current) }, [syncPosition])
+
+  // Bubble auto-hide
+  useEffect(() => {
+    if (!bubbleOpen) return
+    const t = window.setTimeout(() => setBubbleOpen(false), 4000)
+    return () => window.clearTimeout(t)
+  }, [bubbleOpen])
+
+  // Idle animation timeline
+  useEffect(() => {
+    if (ambientState !== 'idle' || isHovered || isFocused || isDragging || isPressed) return
+    const t = window.setTimeout(() => setIdleStep(s => (s + 1) % idleTimeline.length), idleTimeline[idleStep].duration)
+    return () => window.clearTimeout(t)
+  }, [idleStep, ambientState, isHovered, isFocused, isDragging, isPressed])
+
+  // Reset idle step when returning to idle
+  useEffect(() => {
+    if (ambientState === 'idle' && !isHovered && !isFocused && !isDragging && !isPressed) setIdleStep(0)
+  }, [ambientState, isHovered, isFocused, isDragging, isPressed])
+
+  // Hover animation timeline
+  useEffect(() => {
+    if (!isHovered && !isFocused && ambientState !== 'waving') return
+    const t = window.setTimeout(() => setHoverStep(s => (s + 1) % hoverFrames.length), 320)
+    return () => window.clearTimeout(t)
+  }, [hoverStep, isHovered, isFocused, ambientState])
+
+  useEffect(() => {
+    if (!isHovered && !isFocused && ambientState !== 'waving') setHoverStep(0)
+  }, [isHovered, isFocused, ambientState])
+
+  // Ambient animation — random state switch when idle
+  useEffect(() => {
+    if (ambientState !== 'idle' || isHovered || isFocused || isDragging || isPressed) return
+    const delay = 4000 + Math.random() * 3000
+    ambientTimerRef.current = window.setTimeout(() => {
+      const pool = ['waving', 'review'] as const
+      setAmbientState(pool[Math.floor(Math.random() * pool.length)])
+    }, delay)
+    return () => { if (ambientTimerRef.current != null) window.clearTimeout(ambientTimerRef.current) }
+  }, [ambientState, isHovered, isFocused, isDragging, isPressed])
+
+  // Return to idle from ambient
+  useEffect(() => {
+    if (ambientState === 'idle' || ambientState === 'waiting') return
+    const dur = 1400 + Math.random() * 900
+    const t = window.setTimeout(() => setAmbientState('idle'), dur)
+    return () => window.clearTimeout(t)
+  }, [ambientState])
+
+  // Waiting state after inactivity
+  const resetWaiting = useCallback(() => {
+    if (waitingTimerRef.current != null) window.clearTimeout(waitingTimerRef.current)
+    if (ambientRef.current === 'waiting') setAmbientState('idle')
+    waitingTimerRef.current = window.setTimeout(() => { setAmbientState('waiting'); waitingTimerRef.current = null }, WAITING_TIMEOUT)
+  }, [])
+
+  useEffect(() => { resetWaiting(); return () => { if (waitingTimerRef.current != null) window.clearTimeout(waitingTimerRef.current) } }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup
+  useEffect(() => () => { if (releaseTimerRef.current != null) window.clearTimeout(releaseTimerRef.current) }, [])
+
+  // Frame selection — priority: pressed > drag/hover/focus > ambient > idle timeline
+  const currentFrame = (() => {
+    if (isPressed) return gibbonFrames[5]
+    if (isDragging || isHovered || isFocused) return gibbonFrames[hoverFrames[hoverStep]]
+    if (ambientState === 'waving') return gibbonFrames[hoverFrames[hoverStep]]
+    if (ambientState === 'review' || ambientState === 'waiting') return gibbonFrames[2]
+    return gibbonFrames[idleTimeline[idleStep].frame]
+  })()
+
+  // --- Pointer handlers ---
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    didDragRef.current = false
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startRight: posRef.current.right, startBottom: posRef.current.bottom, moved: false }
+    setIsPressed(true)
+    resetWaiting()
+  }, [resetWaiting])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    const drag = dragRef.current
+    if (!drag) return
+    const dx = e.clientX - drag.startX
+    const dy = e.clientY - drag.startY
+    if (!drag.moved && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+      drag.moved = true
+      didDragRef.current = true
+      setIsDragging(true)
+      setBubbleOpen(false)
+      // Add is-dragging to parent button to disable transition
+      const btn = shellRef.current?.closest('button') as HTMLElement | null
+      if (btn) btn.classList.add('is-dragging')
+    }
+    if (drag.moved) {
+      syncPosition({
+        right: Math.max(8, Math.min(window.innerWidth - 100, drag.startRight - dx)),
+        bottom: Math.max(8, Math.min(window.innerHeight - 120, drag.startBottom - dy)),
+      })
+    }
+  }, [syncPosition])
+
+  const handlePointerUp = useCallback(() => {
+    const wasDragged = dragRef.current?.moved ?? false
+    dragRef.current = null
+    setIsDragging(false)
+    if (wasDragged) {
+      savePetPos(posRef.current)
+      const btn = shellRef.current?.closest('button') as HTMLElement | null
+      if (btn) btn.classList.remove('is-dragging')
+    }
+    if (releaseTimerRef.current != null) window.clearTimeout(releaseTimerRef.current)
+    releaseTimerRef.current = window.setTimeout(() => { setIsPressed(false); releaseTimerRef.current = null }, 520)
+    resetWaiting()
+  }, [resetWaiting])
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (didDragRef.current) { e.stopPropagation(); didDragRef.current = false; return }
+    if (ambientState !== 'idle') setAmbientState('idle')
+    resetWaiting()
+  }, [ambientState, resetWaiting])
+
+  return (
+    <span
+      ref={shellRef}
+      aria-hidden="true"
+      className={`copilot-mascot-shell${isPressed ? ' is-pressed' : ''}${isDragging ? ' is-dragging' : ''}${ambientState === 'waiting' ? ' is-waiting' : ''}`}
+      style={{ touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onClick={handleClick}
+      onPointerEnter={() => { setIsHovered(true); resetWaiting() }}
+      onPointerLeave={() => setIsHovered(false)}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          setIsPressed(true)
+          if (releaseTimerRef.current != null) window.clearTimeout(releaseTimerRef.current)
+          releaseTimerRef.current = window.setTimeout(() => { setIsPressed(false); releaseTimerRef.current = null }, 520)
+        }
+      }}
+    >
+      {bubbleOpen && (
+        <div className="pet-bubble">
+          <span>嗨！有什么可以帮你的？ 👋</span>
+        </div>
+      )}
+      <img className="copilot-mascot-frame" src={currentFrame} alt="助手" />
+    </span>
+  )
 }
 
 export function AppCopilotPopup() {
@@ -242,10 +469,6 @@ export function AppCopilotPopup() {
     } : null as any,
   )
 
-  const CustomOpenIcon = () => (
-    <img src={copilotIcon} alt="助手" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }} />
-  )
-
   return (
     <CopilotPopup
       agentId={copilotConfig.agent}
@@ -255,7 +478,7 @@ export function AppCopilotPopup() {
         welcomeMessageText: '嗨，有什么可以帮你的？比如查规则、整理举证、录入组织分，跟我说就行 👋',
       }}
       toggleButton={{
-        openIcon: CustomOpenIcon,
+        openIcon: CopilotMascotIcon,
       }}
     />
   )

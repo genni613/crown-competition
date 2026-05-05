@@ -3,7 +3,7 @@ import admins from '../config/admins.json'
 import type { User } from '../types/entities'
 
 export async function upsertUser(params: {
-  id: string
+  open_id: string
   name: string
   avatar_url?: string | null
   email?: string | null
@@ -13,31 +13,37 @@ export async function upsertUser(params: {
   role: string
 }): Promise<User> {
   const db = getDb()
-  const existing = await db.queryOne<User>('SELECT * FROM users WHERE id = ?', [params.id])
+  const existing = await db.queryOne<User>('SELECT * FROM users WHERE open_id = ?', [params.open_id])
+
+  // 通过姓名从 feishu_user 匹配 user_key
+  const feishuRow = await db.queryOne<{ user_key: string }>(
+    'SELECT user_key FROM feishu_user WHERE name = ? LIMIT 1',
+    [params.name]
+  )
+  const userKey = feishuRow?.user_key ?? null
 
   if (existing) {
-    // 老用户：更新信息，但保留数据库中的角色（除非是配置中的管理员）
-    const updateRole = admins.admins.includes(params.id) ? 'ADMIN' : existing.role
+    const updateRole = admins.admins.includes(params.open_id) ? 'ADMIN' : existing.role
     await db.execute(`
       UPDATE users SET name = ?, avatar_url = ?, email = ?, department_id = ?,
-        department_name = ?, title = ?, role = ?, updated_at = CURRENT_TIMESTAMP
+        department_name = ?, title = ?, role = ?, user_key = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `, [
       params.name, params.avatar_url, params.email, params.department_id,
-      params.department_name, params.title, updateRole, params.id
+      params.department_name, params.title, updateRole, userKey, existing.id
     ])
-    return (await db.queryOne<User>('SELECT * FROM users WHERE id = ?', [params.id])) as User
+    return (await db.queryOne<User>('SELECT * FROM users WHERE id = ?', [existing.id])) as User
   } else {
-    // 新用户：根据配置分配角色
-    const role = admins.admins.includes(params.id) ? 'ADMIN' : 'MEMBER'
+    const role = admins.admins.includes(params.open_id) ? 'ADMIN' : 'MEMBER'
     await db.execute(`
-      INSERT INTO users (id, name, avatar_url, email, department_id, department_name, title, role)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (open_id, user_key, name, avatar_url, email, department_id, department_name, title, role)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      params.id, params.name, params.avatar_url, params.email,
+      params.open_id, userKey, params.name, params.avatar_url, params.email,
       params.department_id, params.department_name, params.title, role
     ])
-    return (await db.queryOne<User>('SELECT * FROM users WHERE id = ?', [params.id])) as User
+    const result = await db.queryOne<User>('SELECT * FROM users WHERE open_id = ?', [params.open_id])
+    return result as User
   }
 }
 
@@ -46,12 +52,12 @@ export async function getAllUsers(): Promise<User[]> {
   return db.query<User>('SELECT * FROM users ORDER BY created_at DESC')
 }
 
-export async function getUserById(id: string): Promise<User | undefined> {
+export async function getUserById(id: number): Promise<User | undefined> {
   const db = getDb()
   return db.queryOne<User>('SELECT * FROM users WHERE id = ?', [id])
 }
 
-export async function updateUser(id: string, data: { role?: string; job_role?: string }): Promise<User> {
+export async function updateUser(id: number, data: { role?: string; job_role?: string }): Promise<User> {
   const db = getDb()
   const sets: string[] = []
   const values: unknown[] = []

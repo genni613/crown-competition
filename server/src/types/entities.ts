@@ -1,7 +1,8 @@
 // ============ 数据库实体类型 ============
 
 export interface User {
-  id: string // 飞书 open_id
+  id: number
+  open_id: string
   user_key: string | null
   name: string
   avatar_url: string | null

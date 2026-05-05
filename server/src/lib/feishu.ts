@@ -163,7 +163,7 @@ export class FeishuAuthService {
   }
 
   async loginWithCode(code: string): Promise<{
-    user: { id: string; name: string; avatar_url?: string | null; department_name?: string | null; role: string }
+    user: { id: string; open_id: string; name: string; avatar_url?: string | null; department_name?: string | null; role: string }
     accessToken: string
     refreshToken: string
     tenantKey?: string
@@ -202,6 +202,7 @@ export class FeishuAuthService {
     return {
       user: {
         id: openId,
+        open_id: openId,
         name,
         avatar_url: avatarUrl,
         department_name: departmentName,

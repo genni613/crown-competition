@@ -16,6 +16,16 @@ authRouter.get('/login', async (req: Request, res: Response) => {
   const session = await getIronSession<SessionData>(req, res, sessionOptions)
   const state = crypto.randomBytes(16).toString('hex')
   session.state = state
+
+  // 记住用户从哪个前端地址发起的登录，回调后跳回去
+  const origin = req.query.redirect as string || req.headers.referer || config.clientUrl
+  try {
+    const url = new URL('/', origin)
+    session.redirectTo = url.origin
+  } catch {
+    session.redirectTo = config.clientUrl
+  }
+
   await session.save()
 
   const redirectUri = `${config.siteUrl}/api/auth/callback`
@@ -56,7 +66,7 @@ authRouter.get('/callback', asyncHandler(async (req: Request, res: Response) => 
     // 创建/更新本地用户
     const extra = result as any
     const user = await upsertUser({
-      id: result.user.id,
+      open_id: result.user.open_id,
       name: result.user.name,
       avatar_url: result.user.avatar_url,
       email: extra.email,
@@ -78,7 +88,10 @@ authRouter.get('/callback', asyncHandler(async (req: Request, res: Response) => 
     session.refreshToken = result.refreshToken
     await session.save()
 
-    res.redirect(new URL('/', config.clientUrl).toString())
+    const redirectTo = session.redirectTo || config.clientUrl
+    session.redirectTo = undefined
+    await session.save()
+    res.redirect(new URL('/', redirectTo).toString())
   } catch (err: any) {
     console.error('Auth callback error:', err)
     res.status(500).json({ error: `登录失败: ${err.message}` })
@@ -110,7 +123,7 @@ authRouter.get('/me', authMiddleware, asyncHandler(async (req: Request, res: Res
       }
       const userDetail = await feishuAuth.getUserDetail(tokenUserInfo.open_id)
       const updated = await upsertUser({
-        id: currentUser.id,
+        open_id: currentUser.open_id,
         name: userDetail?.name || tokenUserInfo.name || currentUser.name,
         avatar_url: tokenUserInfo.avatar_middle || tokenUserInfo.avatar_url || currentUser.avatar_url,
         email: userDetail?.email || tokenUserInfo.email || null,

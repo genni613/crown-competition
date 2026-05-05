@@ -5,13 +5,156 @@
   font-weight: 400 !important;
 }
 
-/* CopilotKit 浮动按钮背景透明，显示自定义图片 */
+/* CopilotKit 浮动按钮 */
 .copilotKitButton {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  width: 92px !important;
+  height: 112px !important;
+  min-width: 92px !important;
+  min-height: 112px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  left: auto !important;
+  top: auto !important;
+  transition: right 160ms ease-out, bottom 160ms ease-out;
+}
+
+.copilotKitButton.is-dragging {
+  transition: none !important;
 }
 
 .copilotKitButton:hover {
   background: transparent !important;
 }
+
+.copilotKitButton:focus-visible {
+  outline: none !important;
+}
+
+.copilot-mascot-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 112px;
+  transform-origin: center bottom;
+  transition: transform 180ms ease;
+  cursor: grab;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.copilot-mascot-shell::before {
+  content: '';
+  position: absolute;
+  inset: auto 14px 12px;
+  height: 18px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(223, 171, 114, 0.28), rgba(223, 171, 114, 0));
+  filter: blur(8px);
+  opacity: 0.85;
+  transform: scale(0.92);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.copilot-mascot-frame {
+  position: relative;
+  z-index: 1;
+  width: 72px;
+  height: 96px;
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 8px 12px rgba(185, 137, 93, 0.24));
+}
+
+.copilotKitButton:hover .copilot-mascot-shell,
+.copilotKitButton:focus-visible .copilot-mascot-shell {
+  transform: translateY(-2px) scale(1.03);
+}
+
+.copilotKitButton:hover .copilot-mascot-shell::before,
+.copilotKitButton:focus-visible .copilot-mascot-shell::before {
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+.copilotKitButton:hover .copilot-mascot-frame,
+.copilotKitButton:focus-visible .copilot-mascot-frame {
+  animation: none;
+}
+
+.copilot-mascot-shell.is-pressed {
+  animation: copilot-gibbon-jump 520ms cubic-bezier(0.24, 0.84, 0.29, 1.2);
+  cursor: grabbing;
+}
+
+.copilot-mascot-shell.is-pressed .copilot-mascot-frame {
+  animation: none;
+}
+
+.copilot-mascot-shell.is-pressed::before {
+  opacity: 0.72;
+  transform: scale(0.78);
+}
+
+@keyframes copilot-gibbon-jump {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  24% {
+    transform: translateY(6px) scale(0.94, 1.04);
+  }
+  56% {
+    transform: translateY(-16px) scale(1.02);
+  }
+  82% {
+    transform: translateY(-4px) scale(0.99);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Pet bubble */
+.pet-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: -12px;
+  max-width: 196px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 12px;
+  padding: 7px 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #374151;
+  white-space: nowrap;
+  animation: pet-bubble-in 220ms ease-out;
+  pointer-events: none;
+}
+
+.pet-bubble::after {
+  content: '';
+  position: absolute;
+  right: 26px;
+  bottom: -6px;
+  width: 11px;
+  height: 11px;
+  background: rgba(255, 255, 255, 0.96);
+  border-right: 1px solid rgba(99, 102, 241, 0.18);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.18);
+  transform: rotate(45deg);
+}
+
+@keyframes pet-bubble-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+
+/* Drag cursor — merged above */
