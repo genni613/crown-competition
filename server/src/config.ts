@@ -48,7 +48,13 @@ export const config = {
     workHourViewId: process.env.FEISHU_PROJECT_WORK_HOUR_VIEW_ID || '',
   },
   session: {
-    secret: process.env.SESSION_SECRET || 'change-me-in-production-env-!!!',
+    secret: (() => {
+      const s = process.env.SESSION_SECRET
+      if (!s || s.length < 32) {
+        throw new Error('SESSION_SECRET 环境变量必须设置且至少 32 个字符')
+      }
+      return s
+    })(),
   },
   siteUrl: process.env.SITE_URL || 'http://localhost:3001',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',

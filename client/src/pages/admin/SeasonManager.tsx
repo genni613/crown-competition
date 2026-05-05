@@ -27,7 +27,7 @@ export default function SeasonManager() {
   const [memberOpen, setMemberOpen] = useState(false)
   const [form] = Form.useForm()
 
-  useEffect(() => { loadSeasons(); getLocalFeishuUsers().then(r => setFeishuUsers(r.data)) }, [])
+  useEffect(() => { loadSeasons(); getLocalFeishuUsers().then(r => setFeishuUsers(r.data)).catch(() => message.error('加载飞书用户失败')) }, [])
 
   useCopilotReadable(
     copilotConfig.enabled ? {
@@ -75,22 +75,34 @@ export default function SeasonManager() {
   )
 
   async function loadSeasons() {
-    const res = await getSeasons()
-    setSeasons(res.data)
+    try {
+      const res = await getSeasons()
+      setSeasons(res.data)
+    } catch {
+      message.error('加载赛季失败')
+    }
   }
 
   async function showMembers(seasonId: number) {
-    setSelectedSeason(seasonId)
-    const res = await getMembers(seasonId)
-    setMembers(res.data)
+    try {
+      setSelectedSeason(seasonId)
+      const res = await getMembers(seasonId)
+      setMembers(res.data)
+    } catch {
+      message.error('加载成员失败')
+    }
   }
 
   async function onCreate(values: any) {
-    await createSeason({ ...values, start_date: values.dates[0].format('YYYY-MM-DD'), end_date: values.dates[1].format('YYYY-MM-DD') })
-    message.success('创建成功')
-    setCreateOpen(false)
-    form.resetFields()
-    loadSeasons()
+    try {
+      await createSeason({ ...values, start_date: values.dates[0].format('YYYY-MM-DD'), end_date: values.dates[1].format('YYYY-MM-DD') })
+      message.success('创建成功')
+      setCreateOpen(false)
+      form.resetFields()
+      loadSeasons()
+    } catch {
+      message.error('创建赛季失败')
+    }
   }
 
   const [selectedUserKeys, setSelectedUserKeys] = useState<string[]>([])
@@ -109,7 +121,6 @@ export default function SeasonManager() {
           job_role: roleMap[uk] || undefined,
         })),
       })
-      console.log('[batch] response:', res.data)
       const { added, skipped } = res.data
       if (added > 0) message.success(`成功添加 ${added} 名成员`)
       if (skipped.length > 0) {
@@ -141,15 +152,19 @@ export default function SeasonManager() {
     { title: '操作', render: (_: any, r: Season) => (
       <Space>
         <Button size="small" onClick={() => showMembers(r.id)}>成员</Button>
-        {r.status === 'draft' && <Button size="small" type="primary" onClick={async () => { await activateSeason(r.id); message.success('已激活'); loadSeasons() }}>激活</Button>}
-        {r.status === 'active' && <Button size="small" danger onClick={async () => { await endSeason(r.id); message.success('已结束'); loadSeasons() }}>结束</Button>}
+        {r.status === 'draft' && <Button size="small" type="primary" onClick={async () => { try { await activateSeason(r.id); message.success('已激活'); loadSeasons() } catch { message.error('激活失败') } }}>激活</Button>}
+        {r.status === 'active' && <Button size="small" danger onClick={async () => { try { await endSeason(r.id); message.success('已结束'); loadSeasons() } catch { message.error('结束失败') } }}>结束</Button>}
       </Space>
     )},
   ]
 
   async function onEditMember(member: SeasonMember, field: string, value: string | null) {
-    await updateMember(member.season_id, member.id, { [field]: value })
-    showMembers(member.season_id)
+    try {
+      await updateMember(member.season_id, member.id, { [field]: value })
+      showMembers(member.season_id)
+    } catch {
+      message.error('编辑失败')
+    }
   }
 
   const memberColumns = [
@@ -185,7 +200,7 @@ export default function SeasonManager() {
       ),
     },
     { title: '操作', render: (_: any, r: SeasonMember) => (
-      <Popconfirm title="确认移除？" onConfirm={async () => { await removeMember(r.season_id, r.id); message.success('已移除'); showMembers(r.season_id) }}>
+      <Popconfirm title="确认移除？" onConfirm={async () => { try { await removeMember(r.season_id, r.id); message.success('已移除'); showMembers(r.season_id) } catch { message.error('移除失败') } }}>
         <Button size="small" danger>移除</Button>
       </Popconfirm>
     )},

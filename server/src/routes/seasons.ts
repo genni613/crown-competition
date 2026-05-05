@@ -61,10 +61,11 @@ seasonsRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, res
 
 // POST /api/seasons/:id/activate — 激活赛季
 seasonsRouter.post('/:id/activate', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const db = getDb()
-  await db.execute("UPDATE seasons SET status = 'draft' WHERE status = 'active'")
-  await db.execute("UPDATE seasons SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id])
-  const season = await db.queryOne('SELECT * FROM seasons WHERE id = ?', [req.params.id])
+  await withTransaction(async tx => {
+    await tx.execute("UPDATE seasons SET status = 'draft' WHERE status = 'active'")
+    await tx.execute("UPDATE seasons SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id])
+  })
+  const season = await getDb().queryOne('SELECT * FROM seasons WHERE id = ?', [req.params.id])
   res.json(season)
 }))
 

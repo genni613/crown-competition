@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { AppCopilotProvider } from './components/copilot/AppCopilotProvider'
 import '@copilotkit/react-core/v2/styles.css'
 import './styles.css'
@@ -11,6 +12,7 @@ import './copilot-override.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
+    <ErrorBoundary>
     <AppCopilotProvider>
       <ConfigProvider
         locale={zhCN}
@@ -51,5 +53,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </BrowserRouter>
       </ConfigProvider>
     </AppCopilotProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 )

@@ -49,12 +49,17 @@ export default function ScoreEntry() {
 
   async function loadMeta() {
     if (!seasonId) return
-    const [memRes, dimRes] = await Promise.all([
-      getMembers(Number(seasonId)),
-      getDimensions(jobRole),
-    ])
-    setMembers(memRes.data.filter((m: SeasonMember) => m.job_role === jobRole))
-    setDimensions(dimRes.data)
+    try {
+      const [memRes, dimRes] = await Promise.all([
+        getMembers(Number(seasonId)),
+        getDimensions(jobRole),
+      ])
+      setMembers(memRes.data.filter((m: SeasonMember) => m.job_role === jobRole))
+      setDimensions(dimRes.data)
+    } catch (e) {
+      message.error('加载数据失败')
+      console.error(e)
+    }
   }
 
   async function loadMemberScores(memberId: number) {

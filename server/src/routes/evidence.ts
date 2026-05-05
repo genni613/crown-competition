@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import multer, { MulterError } from 'multer'
-import { getDb } from '../db'
+import { getDb, withTransaction } from '../db'
 import { calculateThresholdScore } from '../utils/scoringFormulas'
 import { calculateSeasonScores } from '../services/scoring.service'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
@@ -305,74 +305,79 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
     return
   }
 
-  const db = getDb()
-  const reviewSnapshot = {
-    reviewed_by: req.currentUser.id,
-    action: status,
-    comment: review_comment ?? null,
-    reviewed_at: new Date().toISOString(),
-  }
-  await db.execute(
-    'UPDATE evidence_submissions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [status, req.params.id]
-  )
-  await db.execute(`
-    INSERT INTO evidence_reviews (evidence_submission_id, reviewer_id, action, comment, snapshot_json)
-    VALUES (?, ?, ?, ?, ?)
-  `, [req.params.id, req.currentUser.id, status, review_comment ?? null, JSON.stringify(reviewSnapshot)])
-
-  if (status === 'approved') {
-    const evidence = await db.queryOne<{
-      target_type: string; target_id: number | null;
+  await withTransaction(async tx => {
+    // 锁定举证记录，防止并发重复审核
+    const evidence = await tx.queryOne<{
+      id: number; status: string; target_type: string; target_id: number | null;
       season_member_id: number; snapshot_json: string | null
-    }>(
-      'SELECT * FROM evidence_submissions WHERE id = ?',
-      [req.params.id]
+    }>('SELECT * FROM evidence_submissions WHERE id = ? FOR UPDATE', [req.params.id])
+
+    if (!evidence) {
+      throw Object.assign(new Error('不存在'), { status: 404 })
+    }
+    if (evidence.status !== 'pending') {
+      throw Object.assign(new Error('该举证已被处理'), { status: 400 })
+    }
+
+    const reviewSnapshot = {
+      reviewed_by: req.currentUser.id,
+      action: status,
+      comment: review_comment ?? null,
+      reviewed_at: new Date().toISOString(),
+    }
+    await tx.execute(
+      'UPDATE evidence_submissions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [status, req.params.id]
     )
-    if (evidence?.target_type === 'indicator' && evidence?.target_id) {
-      const snapshot = typeof evidence.snapshot_json === 'string' ? JSON.parse(evidence.snapshot_json) : (evidence.snapshot_json ?? {})
-      const rawValue = snapshot.raw_value ?? null
-      const dimensionId = evidence.target_id
+    await tx.execute(`
+      INSERT INTO evidence_reviews (evidence_submission_id, reviewer_id, action, comment, snapshot_json)
+      VALUES (?, ?, ?, ?, ?)
+    `, [req.params.id, req.currentUser.id, status, review_comment ?? null, JSON.stringify(reviewSnapshot)])
 
-      // 读取维度规则
-      const dim = await db.queryOne<{
-        threshold_100: number | null; threshold_60: number | null; score_type: string; indicator_weight: number
-      }>('SELECT * FROM scoring_dimensions WHERE id = ?', [dimensionId])
+    if (status === 'approved') {
+      if (evidence.target_type === 'indicator' && evidence.target_id) {
+        const snapshot = typeof evidence.snapshot_json === 'string' ? JSON.parse(evidence.snapshot_json) : (evidence.snapshot_json ?? {})
+        const rawValue = snapshot.raw_value ?? null
+        const dimensionId = evidence.target_id
 
-      let thresholdScore: number | null = null
-      let finalScore: number | null = null
-      if (dim && rawValue != null && dim.threshold_100 != null && dim.threshold_60 != null) {
-        thresholdScore = calculateThresholdScore(rawValue, dim.threshold_100, dim.threshold_60)
-        finalScore = thresholdScore * (dim.indicator_weight ?? 1)
+        const dim = await tx.queryOne<{
+          threshold_100: number | null; threshold_60: number | null; score_type: string; indicator_weight: number
+        }>('SELECT * FROM scoring_dimensions WHERE id = ?', [dimensionId])
+
+        let thresholdScore: number | null = null
+        let finalScore: number | null = null
+        if (dim && rawValue != null && dim.threshold_100 != null && dim.threshold_60 != null) {
+          thresholdScore = calculateThresholdScore(rawValue, dim.threshold_100, dim.threshold_60)
+          finalScore = thresholdScore * (dim.indicator_weight ?? 1)
+        }
+
+        const existing = await tx.queryOne<{ id: number }>(
+          'SELECT id FROM indicator_scores WHERE season_member_id = ? AND dimension_id = ?',
+          [evidence.season_member_id, dimensionId]
+        )
+        if (existing) {
+          await tx.execute(
+            'UPDATE indicator_scores SET raw_value = ?, threshold_score = ?, final_score = ?, source = ?, approved = 1 WHERE id = ?',
+            [rawValue, thresholdScore, finalScore, 'evidence', existing.id]
+          )
+        } else {
+          await tx.execute(
+            'INSERT INTO indicator_scores (season_member_id, dimension_id, raw_value, threshold_score, final_score, source, approved) VALUES (?, ?, ?, ?, ?, ?, 1)',
+            [evidence.season_member_id, dimensionId, rawValue, thresholdScore, finalScore, 'evidence']
+          )
+        }
       }
 
-      // 查找或创建 indicator_scores 行
-      const existing = await db.queryOne<{ id: number }>(
-        'SELECT id FROM indicator_scores WHERE season_member_id = ? AND dimension_id = ?',
-        [evidence.season_member_id, dimensionId]
+      // 在同一事务内触发全量赛季分数重算
+      const sm = await tx.queryOne<{ season_id: number }>(
+        'SELECT season_id FROM season_members WHERE id = ?',
+        [evidence.season_member_id]
       )
-      if (existing) {
-        await db.execute(
-          'UPDATE indicator_scores SET raw_value = ?, threshold_score = ?, final_score = ?, source = ?, approved = 1 WHERE id = ?',
-          [rawValue, thresholdScore, finalScore, 'evidence', existing.id]
-        )
-      } else {
-        await db.execute(
-          'INSERT INTO indicator_scores (season_member_id, dimension_id, raw_value, threshold_score, final_score, source, approved) VALUES (?, ?, ?, ?, ?, ?, 1)',
-          [evidence.season_member_id, dimensionId, rawValue, thresholdScore, finalScore, 'evidence']
-        )
+      if (sm) {
+        await calculateSeasonScores(sm.season_id, tx)
       }
     }
-
-    // 触发全量赛季分数重算
-    const sm = await db.queryOne<{ season_id: number }>(
-      'SELECT season_id FROM season_members WHERE id = ?',
-      [evidence!.season_member_id]
-    )
-    if (sm) {
-      await calculateSeasonScores(sm.season_id)
-    }
-  }
+  })
 
   res.json({ ok: true })
 }))

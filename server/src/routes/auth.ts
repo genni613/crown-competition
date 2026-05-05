@@ -17,14 +17,16 @@ authRouter.get('/login', async (req: Request, res: Response) => {
   const state = crypto.randomBytes(16).toString('hex')
   session.state = state
 
-  // 记住用户从哪个前端地址发起的登录，回调后跳回去
-  const origin = req.query.redirect as string || req.headers.referer || config.clientUrl
+  // 记住用户从哪个前端地址发起的登录，回调后跳回去（只允许白名单域名）
+  const allowedOrigins = [config.clientUrl, config.siteUrl]
+  let origin = config.clientUrl
   try {
-    const url = new URL('/', origin)
-    session.redirectTo = url.origin
-  } catch {
-    session.redirectTo = config.clientUrl
-  }
+    const url = new URL('/', req.query.redirect as string || req.headers.referer || config.clientUrl)
+    if (allowedOrigins.includes(url.origin)) {
+      origin = url.origin
+    }
+  } catch { /* 保持默认 */ }
+  session.redirectTo = origin
 
   await session.save()
 
@@ -94,7 +96,7 @@ authRouter.get('/callback', asyncHandler(async (req: Request, res: Response) => 
     res.redirect(new URL('/', redirectTo).toString())
   } catch (err: any) {
     console.error('Auth callback error:', err)
-    res.status(500).json({ error: `登录失败: ${err.message}` })
+    res.status(500).json({ error: '登录失败，请重试' })
   }
 }))
 

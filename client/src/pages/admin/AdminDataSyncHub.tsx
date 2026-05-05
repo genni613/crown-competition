@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Empty, Select, Space, Tag, Typography } from 'antd'
+import { Button, Card, Empty, Select, Space, Tag, Typography, message } from 'antd'
 import { CloudSyncOutlined } from '@ant-design/icons'
 import { getSeasons } from '../../api/seasons'
 import type { Season } from '../../types/models'
@@ -28,10 +28,15 @@ export default function AdminDataSyncHub() {
   }, [])
 
   async function loadData() {
-    const res = await getSeasons()
-    setSeasons(res.data)
-    const activeSeason = res.data.find(item => item.status === 'active')
-    setSelectedSeasonId(activeSeason?.id ?? res.data[0]?.id)
+    try {
+      const res = await getSeasons()
+      setSeasons(res.data)
+      const activeSeason = res.data.find(item => item.status === 'active')
+      setSelectedSeasonId(activeSeason?.id ?? res.data[0]?.id)
+    } catch (e) {
+      message.error('加载赛季失败')
+      console.error(e)
+    }
   }
 
   const selectedSeason = useMemo(

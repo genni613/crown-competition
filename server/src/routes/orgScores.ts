@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { getDb } from '../db'
+import { getDb, withTransaction } from '../db'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 
@@ -30,8 +30,8 @@ orgScoresRouter.post('/:seasonId/:memberId', adminMiddleware, asyncHandler(async
   const { org_score_type_id, quantity, description } = req.body
   if (!org_score_type_id) { res.status(400).json({ error: '缺少组织分类型' }); return }
 
-  const db = getDb()
-  const type = await db.queryOne<{ points_per_unit: number; max_per_season?: number }>(
+  const memberId = req.params.memberId
+  const type = await getDb().queryOne<{ points_per_unit: number; max_per_season?: number }>(
     'SELECT * FROM org_score_types WHERE id = ?',
     [org_score_type_id]
   )
@@ -40,30 +40,35 @@ orgScoresRouter.post('/:seasonId/:memberId', adminMiddleware, asyncHandler(async
   const qty = quantity || 1
   const points = qty * type.points_per_unit
 
-  if (type.max_per_season) {
-    const currentTotal = (await db.queryOne<{ total: number }>(
-      'SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND org_score_type_id = ?',
-      [req.params.memberId, org_score_type_id]
-    ))?.total ?? 0
-    if (currentTotal + points > type.max_per_season * type.points_per_unit) {
-      const cappedPoints = Math.max(0, type.max_per_season * type.points_per_unit - currentTotal)
-      if (cappedPoints <= 0) {
-        res.status(400).json({ error: `已达封顶值 ${type.max_per_season * type.points_per_unit} 分` })
-        return
+  const result = await withTransaction(async tx => {
+    await tx.queryOne('SELECT id FROM season_members WHERE id = ? FOR UPDATE', [memberId])
+
+    if (type.max_per_season) {
+      const currentTotal = (await tx.queryOne<{ total: number }>(
+        'SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND org_score_type_id = ?',
+        [memberId, org_score_type_id]
+      ))?.total ?? 0
+      if (currentTotal + points > type.max_per_season * type.points_per_unit) {
+        const cappedPoints = Math.max(0, type.max_per_season * type.points_per_unit - currentTotal)
+        if (cappedPoints <= 0) {
+          throw Object.assign(new Error(`已达封顶值 ${type.max_per_season * type.points_per_unit} 分`), { status: 400 })
+        }
       }
     }
-  }
 
-  const result = await db.execute(`
-    INSERT INTO org_scores (season_member_id, org_score_type_id, quantity, points, description, status, submitted_by)
-    VALUES (?, ?, ?, ?, ?, 'approved', ?)
-  `, [req.params.memberId, org_score_type_id, qty, points, description, req.currentUser.id])
+    const insertResult = await tx.execute(`
+      INSERT INTO org_scores (season_member_id, org_score_type_id, quantity, points, description, status, submitted_by)
+      VALUES (?, ?, ?, ?, ?, 'approved', ?)
+    `, [memberId, org_score_type_id, qty, points, description, req.currentUser.id])
 
-  const totalOrg = (await db.queryOne<{ total: number }>(
-    "SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND status = 'approved'",
-    [req.params.memberId]
-  ))?.total ?? 0
-  await db.execute('UPDATE season_members SET total_org_score = ? WHERE id = ?', [Math.min(totalOrg, 25), req.params.memberId])
+    const totalOrg = (await tx.queryOne<{ total: number }>(
+      "SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND status = 'approved'",
+      [memberId]
+    ))?.total ?? 0
+    await tx.execute('UPDATE season_members SET total_org_score = ? WHERE id = ?', [Math.min(totalOrg, 25), memberId])
+
+    return insertResult
+  })
 
   res.status(201).json({ id: result.insertId, points })
 }))
@@ -71,9 +76,8 @@ orgScoresRouter.post('/:seasonId/:memberId', adminMiddleware, asyncHandler(async
 // PUT /api/org-scores/:id — 编辑组织分
 orgScoresRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { quantity, description } = req.body
-  const db = getDb()
 
-  const existing = await db.queryOne<{
+  const existing = await getDb().queryOne<{
     season_member_id: number
     org_score_type_id: number
     quantity: number
@@ -81,40 +85,47 @@ orgScoresRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, r
   }>('SELECT * FROM org_scores WHERE id = ?', [req.params.id])
   if (!existing) { res.status(404).json({ error: '不存在' }); return }
 
-  const type = await db.queryOne<{ points_per_unit: number }>(
+  const type = await getDb().queryOne<{ points_per_unit: number }>(
     'SELECT * FROM org_score_types WHERE id = ?',
     [existing.org_score_type_id]
   )
   const qty = quantity ?? existing.quantity
   const points = qty * (type?.points_per_unit ?? 0)
 
-  await db.execute(
-    'UPDATE org_scores SET quantity = ?, points = ?, description = ? WHERE id = ?',
-    [qty, points, description ?? existing.description, req.params.id]
-  )
+  await withTransaction(async tx => {
+    await tx.queryOne('SELECT id FROM season_members WHERE id = ? FOR UPDATE', [existing.season_member_id])
 
-  const totalOrg = (await db.queryOne<{ total: number }>(
-    "SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND status = 'approved'",
-    [existing.season_member_id]
-  ))?.total ?? 0
-  await db.execute('UPDATE season_members SET total_org_score = LEAST(?, 25) WHERE id = ?', [totalOrg, existing.season_member_id])
+    await tx.execute(
+      'UPDATE org_scores SET quantity = ?, points = ?, description = ? WHERE id = ?',
+      [qty, points, description ?? existing.description, req.params.id]
+    )
+
+    const totalOrg = (await tx.queryOne<{ total: number }>(
+      "SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND status = 'approved'",
+      [existing.season_member_id]
+    ))?.total ?? 0
+    await tx.execute('UPDATE season_members SET total_org_score = LEAST(?, 25) WHERE id = ?', [totalOrg, existing.season_member_id])
+  })
 
   res.json({ ok: true })
 }))
 
 // DELETE /api/org-scores/:id — 删除组织分
 orgScoresRouter.delete('/:id', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const db = getDb()
-  const existing = await db.queryOne<{ season_member_id: number }>('SELECT * FROM org_scores WHERE id = ?', [req.params.id])
+  const existing = await getDb().queryOne<{ season_member_id: number }>('SELECT * FROM org_scores WHERE id = ?', [req.params.id])
   if (!existing) { res.status(404).json({ error: '不存在' }); return }
 
-  await db.execute('DELETE FROM org_scores WHERE id = ?', [req.params.id])
+  await withTransaction(async tx => {
+    await tx.queryOne('SELECT id FROM season_members WHERE id = ? FOR UPDATE', [existing.season_member_id])
 
-  const totalOrg = (await db.queryOne<{ total: number }>(
-    "SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND status = 'approved'",
-    [existing.season_member_id]
-  ))?.total ?? 0
-  await db.execute('UPDATE season_members SET total_org_score = LEAST(?, 25) WHERE id = ?', [totalOrg, existing.season_member_id])
+    await tx.execute('DELETE FROM org_scores WHERE id = ?', [req.params.id])
+
+    const totalOrg = (await tx.queryOne<{ total: number }>(
+      "SELECT COALESCE(SUM(points), 0) as total FROM org_scores WHERE season_member_id = ? AND status = 'approved'",
+      [existing.season_member_id]
+    ))?.total ?? 0
+    await tx.execute('UPDATE season_members SET total_org_score = LEAST(?, 25) WHERE id = ?', [totalOrg, existing.season_member_id])
+  })
 
   res.json({ ok: true })
 }))

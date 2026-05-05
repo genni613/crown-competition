@@ -65,12 +65,17 @@ export default function OrgScoreManager() {
 
   async function loadMeta() {
     if (!seasonId) return
-    const [memRes, typeRes] = await Promise.all([
-      getMembers(Number(seasonId)),
-      getOrgScoreTypes(),
-    ])
-    setMembers(memRes.data)
-    setTypes(typeRes.data)
+    try {
+      const [memRes, typeRes] = await Promise.all([
+        getMembers(Number(seasonId)),
+        getOrgScoreTypes(),
+      ])
+      setMembers(memRes.data)
+      setTypes(typeRes.data)
+    } catch (e) {
+      message.error('加载数据失败')
+      console.error(e)
+    }
   }
 
   async function loadMemberScores(memberId: number) {

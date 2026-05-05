@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Tag, Spin, Empty, Typography, Button, Space, Collapse, Descriptions, Divider, Progress } from 'antd'
+import { Card, Tag, Spin, Empty, Typography, Button, Space, Collapse, Descriptions, Divider, Progress, message } from 'antd'
 import {
   CrownOutlined, FireOutlined,
   RiseOutlined, TeamOutlined, BulbOutlined,
@@ -101,6 +101,7 @@ export default function Dashboard() {
       }
     } catch (e) {
       console.error(e)
+      message.error('加载数据失败，请刷新重试')
     } finally {
       setLoading(false)
     }

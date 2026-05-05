@@ -1,4 +1,5 @@
 import { getDb, withTransaction } from '../db'
+import type { DbExecutor } from '../db'
 import {
   calculateThresholdScore,
   assignLinearScores,
@@ -7,9 +8,18 @@ import {
 } from '../utils/scoringFormulas'
 import type { IndicatorScore, ScoringDimension, SeasonMember } from '../types/entities'
 
-export async function calculateSeasonScores(seasonId: number): Promise<SeasonMember[]> {
-  const db = getDb()
-  const members = await db.query<SeasonMember>(
+export async function calculateSeasonScores(seasonId: number, executor?: DbExecutor): Promise<SeasonMember[]> {
+  if (executor) {
+    // 调用方已开启事务，直接使用传入的 executor
+    return doCalculate(executor, seasonId)
+  }
+
+  // 没有传入 executor，自己开启事务
+  return withTransaction(async tx => doCalculate(tx, seasonId))
+}
+
+async function doCalculate(tx: DbExecutor, seasonId: number): Promise<SeasonMember[]> {
+  const members = await tx.query<SeasonMember>(
     'SELECT * FROM season_members WHERE season_id = ?',
     [seasonId]
   )
@@ -23,110 +33,108 @@ export async function calculateSeasonScores(seasonId: number): Promise<SeasonMem
     jobGroups.get(key)!.push(member)
   }
 
-  await withTransaction(async tx => {
-    for (const [jobRole, group] of jobGroups) {
-      for (const member of group) {
-        const dimensions = await tx.query<ScoringDimension>(
-          'SELECT * FROM scoring_dimensions WHERE job_role = ? ORDER BY sort_order',
-          [jobRole]
-        )
+  for (const [jobRole, group] of jobGroups) {
+    for (const member of group) {
+      const dimensions = await tx.query<ScoringDimension>(
+        'SELECT * FROM scoring_dimensions WHERE job_role = ? ORDER BY sort_order',
+        [jobRole]
+      )
 
-        const dimMap = new Map<string, { indicators: { dim: ScoringDimension; score: IndicatorScore | null }[] }>()
-        for (const dim of dimensions) {
-          const key = dim.dimension_name
-          if (!dimMap.has(key)) dimMap.set(key, { indicators: [] })
-          const score = await tx.queryOne<IndicatorScore>(
-            'SELECT * FROM indicator_scores WHERE season_member_id = ? AND dimension_id = ?',
-            [member.id, dim.id]
+      const dimMap = new Map<string, { indicators: { dim: ScoringDimension; score: IndicatorScore | null }[] }>()
+      for (const dim of dimensions) {
+        const key = dim.dimension_name
+        if (!dimMap.has(key)) dimMap.set(key, { indicators: [] })
+        const score = await tx.queryOne<IndicatorScore>(
+          'SELECT * FROM indicator_scores WHERE season_member_id = ? AND dimension_id = ?',
+          [member.id, dim.id]
+        )
+        dimMap.get(key)!.indicators.push({ dim, score: score ?? null })
+      }
+
+      let totalDeduction = 0
+      let rawPositionScore = 0
+
+      for (const [, group] of dimMap) {
+        const thresholdIndicators = group.indicators.filter(i => i.dim.score_type !== 'deduction' && i.score)
+        const deductionIndicators = group.indicators.filter(i => i.dim.score_type === 'deduction' && i.score)
+
+        for (const { dim, score } of thresholdIndicators) {
+          const rawVal = score!.raw_value || 0
+          const t100 = dim.threshold_100
+          const t60 = dim.threshold_60
+          const thresholdScore = (t100 != null && t60 != null)
+            ? calculateThresholdScore(rawVal, t100, t60)
+            : rawVal
+          const contribution = thresholdScore * dim.indicator_weight
+          await tx.execute(
+            'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
+            [thresholdScore, contribution, score!.id]
           )
-          dimMap.get(key)!.indicators.push({ dim, score: score ?? null })
+          rawPositionScore += contribution
         }
 
-        let totalDeduction = 0
-        let rawPositionScore = 0
+        for (const { dim, score } of deductionIndicators) {
+          const rawVal = score!.raw_value || 0
+          const divisor = dim.deduction_divisor || 1
+          const perUnit = dim.deduction_per_unit || 1
+          const cap = dim.deduction_cap || 0
+          const deduction = Math.min(rawVal * perUnit / divisor, cap)
+          totalDeduction += deduction
 
-        for (const [, group] of dimMap) {
-          const thresholdIndicators = group.indicators.filter(i => i.dim.score_type !== 'deduction' && i.score)
-          const deductionIndicators = group.indicators.filter(i => i.dim.score_type === 'deduction' && i.score)
-
-          for (const { dim, score } of thresholdIndicators) {
-            const rawVal = score!.raw_value || 0
-            const t100 = dim.threshold_100
-            const t60 = dim.threshold_60
-            const thresholdScore = (t100 != null && t60 != null)
-              ? calculateThresholdScore(rawVal, t100, t60)
-              : rawVal
-            const contribution = thresholdScore * dim.indicator_weight
-            await tx.execute(
-              'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
-              [thresholdScore, contribution, score!.id]
-            )
-            rawPositionScore += contribution
-          }
-
-          for (const { dim, score } of deductionIndicators) {
-            const rawVal = score!.raw_value || 0
-            const divisor = dim.deduction_divisor || 1
-            const perUnit = dim.deduction_per_unit || 1
-            const cap = dim.deduction_cap || 0
-            const deduction = Math.min(rawVal * perUnit / divisor, cap)
-            totalDeduction += deduction
-
-            await tx.execute(
-              'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
-              [0, -deduction, score!.id]
-            )
-          }
+          await tx.execute(
+            'UPDATE indicator_scores SET threshold_score = ?, final_score = ? WHERE id = ?',
+            [0, -deduction, score!.id]
+          )
         }
-
-        rawPositionScore -= totalDeduction
-        await tx.execute(
-          'UPDATE season_members SET raw_position_score = ? WHERE id = ?',
-          [rawPositionScore, member.id]
-        )
       }
 
-      const withRaw = await tx.query<SeasonMember>(
-        'SELECT * FROM season_members WHERE season_id = ? AND job_role = ?',
-        [seasonId, jobRole]
+      rawPositionScore -= totalDeduction
+      await tx.execute(
+        'UPDATE season_members SET raw_position_score = ? WHERE id = ?',
+        [rawPositionScore, member.id]
       )
-
-      const growthMembers = withRaw
-        .filter(member => member.raw_position_score != null && member.prev_raw_score != null && member.prev_raw_score > 0)
-        .map(member => ({
-          id: member.id,
-          growth: (member.raw_position_score! - member.prev_raw_score!) / member.prev_raw_score!,
-        }))
-
-      const linearMap = assignLinearScores(growthMembers)
-
-      for (const member of withRaw) {
-        const linearScore = linearMap.get(member.id) ?? member.raw_position_score ?? 0
-        const finalScore = applyProtection(member.raw_position_score ?? 0, linearScore)
-        const growth = growthMembers.find(item => item.id === member.id)?.growth ?? null
-
-        await tx.execute(
-          'UPDATE season_members SET growth = ?, linear_score = ?, final_position_score = ? WHERE id = ?',
-          [growth, linearScore, finalScore, member.id]
-        )
-      }
-
-      const ranked = await tx.query<SeasonMember>(
-        'SELECT * FROM season_members WHERE season_id = ? AND job_role = ? ORDER BY final_position_score + total_org_score DESC',
-        [seasonId, jobRole]
-      )
-
-      const distributions = calculate271(ranked.length)
-      for (let i = 0; i < ranked.length; i++) {
-        await tx.execute(
-          'UPDATE season_members SET total_score = final_position_score + total_org_score, `rank` = ?, distribution = ? WHERE id = ?',
-          [i + 1, distributions[i], ranked[i].id]
-        )
-      }
     }
-  })
 
-  return db.query<SeasonMember>(
+    const withRaw = await tx.query<SeasonMember>(
+      'SELECT * FROM season_members WHERE season_id = ? AND job_role = ?',
+      [seasonId, jobRole]
+    )
+
+    const growthMembers = withRaw
+      .filter(member => member.raw_position_score != null && member.prev_raw_score != null && member.prev_raw_score > 0)
+      .map(member => ({
+        id: member.id,
+        growth: (member.raw_position_score! - member.prev_raw_score!) / member.prev_raw_score!,
+      }))
+
+    const linearMap = assignLinearScores(growthMembers)
+
+    for (const member of withRaw) {
+      const linearScore = linearMap.get(member.id) ?? member.raw_position_score ?? 0
+      const finalScore = applyProtection(member.raw_position_score ?? 0, linearScore)
+      const growth = growthMembers.find(item => item.id === member.id)?.growth ?? null
+
+      await tx.execute(
+        'UPDATE season_members SET growth = ?, linear_score = ?, final_position_score = ? WHERE id = ?',
+        [growth, linearScore, finalScore, member.id]
+      )
+    }
+
+    const ranked = await tx.query<SeasonMember>(
+      'SELECT * FROM season_members WHERE season_id = ? AND job_role = ? ORDER BY final_position_score + total_org_score DESC',
+      [seasonId, jobRole]
+    )
+
+    const distributions = calculate271(ranked.length)
+    for (let i = 0; i < ranked.length; i++) {
+      await tx.execute(
+        'UPDATE season_members SET total_score = final_position_score + total_org_score, `rank` = ?, distribution = ? WHERE id = ?',
+        [i + 1, distributions[i], ranked[i].id]
+      )
+    }
+  }
+
+  return tx.query<SeasonMember>(
     'SELECT * FROM season_members WHERE season_id = ? ORDER BY `rank`',
     [seasonId]
   )

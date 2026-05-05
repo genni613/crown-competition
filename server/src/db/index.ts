@@ -184,6 +184,8 @@ export async function initDb(): Promise<void> {
     database: config.mysql.database,
     waitForConnections: true,
     connectionLimit: config.mysql.connectionLimit,
+    queueLimit: 20,
+    connectTimeout: 10000,
     charset: 'utf8mb4',
     decimalNumbers: true,
   })
