@@ -1,0 +1,13 @@
+exclude:
+  - client/
+  - server/
+  - node_modules/
+  - output/
+  - .claude/
+  - .codex/
+  - .superpowers/
+  - .git/
+  - virtual-pet-implementation-guide.md
+  - split_sprite.py
+  - default.profraw
+  - crown-competition-slides.html
