@@ -10,10 +10,10 @@
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  width: 92px !important;
-  height: 112px !important;
-  min-width: 92px !important;
-  min-height: 112px !important;
+  width: 122px !important;
+  height: 132px !important;
+  min-width: 122px !important;
+  min-height: 132px !important;
   padding: 0 !important;
   overflow: visible !important;
   left: auto !important;
@@ -37,8 +37,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 92px;
-  height: 112px;
+  width: 122px;
+  height: 132px;
   transform-origin: center bottom;
   transition: transform 180ms ease;
   cursor: grab;
@@ -49,8 +49,8 @@
 .copilot-mascot-shell::before {
   content: '';
   position: absolute;
-  inset: auto 14px 12px;
-  height: 18px;
+  inset: auto 18px 14px;
+  height: 20px;
   border-radius: 999px;
   background: radial-gradient(circle, rgba(223, 171, 114, 0.28), rgba(223, 171, 114, 0));
   filter: blur(8px);
@@ -62,8 +62,8 @@
 .copilot-mascot-frame {
   position: relative;
   z-index: 1;
-  width: 72px;
-  height: 96px;
+  width: 102px;
+  height: 110px;
   display: block;
   object-fit: contain;
   user-select: none;

@@ -1,0 +1,67 @@
+{
+  "ok": true,
+  "chroma_key": {
+    "hex": "#0000FF",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "threshold": 96.0
+  },
+  "rows": [
+    {
+      "state": "idle",
+      "frames": [
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/idle/00.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/idle/01.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/idle/02.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/idle/03.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/idle/04.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/idle/05.png"
+      ],
+      "method": "components"
+    },
+    {
+      "state": "waving",
+      "frames": [
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waving/00.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waving/01.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waving/02.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waving/03.png"
+      ],
+      "method": "components"
+    },
+    {
+      "state": "jumping",
+      "frames": [
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/jumping/00.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/jumping/01.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/jumping/02.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/jumping/03.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/jumping/04.png"
+      ],
+      "method": "components"
+    },
+    {
+      "state": "waiting",
+      "frames": [
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waiting/00.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waiting/01.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waiting/02.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/waiting/03.png"
+      ],
+      "method": "components"
+    },
+    {
+      "state": "review",
+      "frames": [
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/review/00.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/review/01.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/review/02.png",
+        "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames/review/03.png"
+      ],
+      "method": "components"
+    }
+  ]
+}

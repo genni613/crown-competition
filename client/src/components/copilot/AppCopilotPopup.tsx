@@ -3,12 +3,29 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
 import { Card, Typography } from 'antd'
 import { CopilotPopup } from '@copilotkit/react-core/v2'
-import gibbonFrame1 from '../../assets/copilot/1.png'
-import gibbonFrame2 from '../../assets/copilot/2.png'
-import gibbonFrame3 from '../../assets/copilot/3.png'
-import gibbonFrame4 from '../../assets/copilot/4.png'
-import gibbonFrame5 from '../../assets/copilot/5.png'
-import gibbonFrame6 from '../../assets/copilot/6.png'
+import idle00 from '../../assets/copilot/hatch-pet-png-run/frames/idle/00.png'
+import idle01 from '../../assets/copilot/hatch-pet-png-run/frames/idle/01.png'
+import idle02 from '../../assets/copilot/hatch-pet-png-run/frames/idle/02.png'
+import idle03 from '../../assets/copilot/hatch-pet-png-run/frames/idle/03.png'
+import idle04 from '../../assets/copilot/hatch-pet-png-run/frames/idle/04.png'
+import idle05 from '../../assets/copilot/hatch-pet-png-run/frames/idle/05.png'
+import jumping00 from '../../assets/copilot/hatch-pet-png-run/frames/jumping/00.png'
+import jumping01 from '../../assets/copilot/hatch-pet-png-run/frames/jumping/01.png'
+import jumping02 from '../../assets/copilot/hatch-pet-png-run/frames/jumping/02.png'
+import jumping03 from '../../assets/copilot/hatch-pet-png-run/frames/jumping/03.png'
+import jumping04 from '../../assets/copilot/hatch-pet-png-run/frames/jumping/04.png'
+import review00 from '../../assets/copilot/hatch-pet-png-run/frames/review/00.png'
+import review01 from '../../assets/copilot/hatch-pet-png-run/frames/review/01.png'
+import review02 from '../../assets/copilot/hatch-pet-png-run/frames/review/02.png'
+import review03 from '../../assets/copilot/hatch-pet-png-run/frames/review/03.png'
+import waiting00 from '../../assets/copilot/hatch-pet-png-run/frames/waiting/00.png'
+import waiting01 from '../../assets/copilot/hatch-pet-png-run/frames/waiting/01.png'
+import waiting02 from '../../assets/copilot/hatch-pet-png-run/frames/waiting/02.png'
+import waiting03 from '../../assets/copilot/hatch-pet-png-run/frames/waiting/03.png'
+import waving00 from '../../assets/copilot/hatch-pet-png-run/frames/waving/00.png'
+import waving01 from '../../assets/copilot/hatch-pet-png-run/frames/waving/01.png'
+import waving02 from '../../assets/copilot/hatch-pet-png-run/frames/waving/02.png'
+import waving03 from '../../assets/copilot/hatch-pet-png-run/frames/waving/03.png'
 import { matchOrgScoreType } from '../../api/orgScores'
 import { getSeasons } from '../../api/seasons'
 import type { Season } from '../../types/models'
@@ -32,27 +49,29 @@ function buildDraftNavigationTarget(path: string) {
   return `${path}?draftTs=${Date.now()}`
 }
 
-const gibbonFrames = [
-  gibbonFrame1,
-  gibbonFrame2,
-  gibbonFrame3,
-  gibbonFrame4,
-  gibbonFrame5,
-  gibbonFrame6,
-] as const
+const gibbonAnimations = {
+  idle: [idle00, idle01, idle02, idle03, idle04, idle05],
+  waving: [waving00, waving01, waving02, waving03],
+  jumping: [jumping00, jumping01, jumping02, jumping03, jumping04],
+  waiting: [waiting00, waiting01, waiting02, waiting03],
+  review: [review00, review01, review02, review03],
+} as const
 
-const idleTimeline = [
-  { frame: 0, duration: 1100 },
-  { frame: 1, duration: 140 },
-  { frame: 2, duration: 1100 },
-] as const
-
-const hoverFrames = [3, 4] as const
+const gibbonAnimationDurations = {
+  idle: [1200, 120, 120, 180, 180, 920],
+  waving: [150, 150, 150, 260],
+  jumping: [90, 100, 100, 100, 130],
+  waiting: [260, 150, 150, 320],
+  review: [180, 180, 180, 280],
+} as const
 
 const DRAG_THRESHOLD = 8
 const WAITING_TIMEOUT = 45000
+const PET_WIDTH = 122
+const PET_HEIGHT = 132
 
 type AmbientState = 'idle' | 'waving' | 'review' | 'waiting'
+type MascotAnimation = keyof typeof gibbonAnimations
 
 function loadPetPos(): { right: number; bottom: number } {
   try {
@@ -80,8 +99,7 @@ function CopilotMascotIcon() {
   const [isFocused, setIsFocused] = useState(false)
   const [isPressed, setIsPressed] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [idleStep, setIdleStep] = useState(0)
-  const [hoverStep, setHoverStep] = useState(0)
+  const [animationStep, setAnimationStep] = useState(0)
   const [ambientState, setAmbientState] = useState<AmbientState>('idle')
   const [bubbleOpen, setBubbleOpen] = useState(true)
 
@@ -107,29 +125,6 @@ function CopilotMascotIcon() {
     return () => window.clearTimeout(t)
   }, [bubbleOpen])
 
-  // Idle animation timeline
-  useEffect(() => {
-    if (ambientState !== 'idle' || isHovered || isFocused || isDragging || isPressed) return
-    const t = window.setTimeout(() => setIdleStep(s => (s + 1) % idleTimeline.length), idleTimeline[idleStep].duration)
-    return () => window.clearTimeout(t)
-  }, [idleStep, ambientState, isHovered, isFocused, isDragging, isPressed])
-
-  // Reset idle step when returning to idle
-  useEffect(() => {
-    if (ambientState === 'idle' && !isHovered && !isFocused && !isDragging && !isPressed) setIdleStep(0)
-  }, [ambientState, isHovered, isFocused, isDragging, isPressed])
-
-  // Hover animation timeline
-  useEffect(() => {
-    if (!isHovered && !isFocused && ambientState !== 'waving') return
-    const t = window.setTimeout(() => setHoverStep(s => (s + 1) % hoverFrames.length), 320)
-    return () => window.clearTimeout(t)
-  }, [hoverStep, isHovered, isFocused, ambientState])
-
-  useEffect(() => {
-    if (!isHovered && !isFocused && ambientState !== 'waving') setHoverStep(0)
-  }, [isHovered, isFocused, ambientState])
-
   // Ambient animation — random state switch when idle
   useEffect(() => {
     if (ambientState !== 'idle' || isHovered || isFocused || isDragging || isPressed) return
@@ -149,6 +144,35 @@ function CopilotMascotIcon() {
     return () => window.clearTimeout(t)
   }, [ambientState])
 
+  const activeAnimation: MascotAnimation = (() => {
+    if (isPressed) return 'jumping'
+    if (isDragging || isHovered || isFocused) return 'waving'
+    if (ambientState === 'waving') return 'waving'
+    if (ambientState === 'review') return 'review'
+    if (ambientState === 'waiting') return 'waiting'
+    return 'idle'
+  })()
+
+  useEffect(() => {
+    setAnimationStep(0)
+  }, [activeAnimation])
+
+  useEffect(() => {
+    const frames = gibbonAnimations[activeAnimation]
+    const durations = gibbonAnimationDurations[activeAnimation]
+    const currentIndex = Math.min(animationStep, frames.length - 1)
+    const isFinalJumpingFrame = activeAnimation === 'jumping' && currentIndex === frames.length - 1
+    const t = window.setTimeout(() => {
+      setAnimationStep((step) => {
+        if (isFinalJumpingFrame) {
+          return step
+        }
+        return (step + 1) % frames.length
+      })
+    }, durations[currentIndex])
+    return () => window.clearTimeout(t)
+  }, [activeAnimation, animationStep])
+
   // Waiting state after inactivity
   const resetWaiting = useCallback(() => {
     if (waitingTimerRef.current != null) window.clearTimeout(waitingTimerRef.current)
@@ -161,14 +185,8 @@ function CopilotMascotIcon() {
   // Cleanup
   useEffect(() => () => { if (releaseTimerRef.current != null) window.clearTimeout(releaseTimerRef.current) }, [])
 
-  // Frame selection — priority: pressed > drag/hover/focus > ambient > idle timeline
-  const currentFrame = (() => {
-    if (isPressed) return gibbonFrames[5]
-    if (isDragging || isHovered || isFocused) return gibbonFrames[hoverFrames[hoverStep]]
-    if (ambientState === 'waving') return gibbonFrames[hoverFrames[hoverStep]]
-    if (ambientState === 'review' || ambientState === 'waiting') return gibbonFrames[2]
-    return gibbonFrames[idleTimeline[idleStep].frame]
-  })()
+  const activeFrames = gibbonAnimations[activeAnimation]
+  const currentFrame = activeFrames[Math.min(animationStep, activeFrames.length - 1)]
 
   // --- Pointer handlers ---
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -195,8 +213,8 @@ function CopilotMascotIcon() {
     }
     if (drag.moved) {
       syncPosition({
-        right: Math.max(8, Math.min(window.innerWidth - 100, drag.startRight - dx)),
-        bottom: Math.max(8, Math.min(window.innerHeight - 120, drag.startBottom - dy)),
+        right: Math.max(8, Math.min(window.innerWidth - PET_WIDTH, drag.startRight - dx)),
+        bottom: Math.max(8, Math.min(window.innerHeight - PET_HEIGHT, drag.startBottom - dy)),
       })
     }
   }, [syncPosition])

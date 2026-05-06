@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "run_dir": "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run",
+  "frames_dir": "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/frames",
+  "states": [
+    "idle",
+    "jumping",
+    "review",
+    "waiting",
+    "waving"
+  ],
+  "total_frames": 23,
+  "atlas_png": "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/final/spritesheet.png",
+  "atlas_webp": "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/final/spritesheet.webp",
+  "contact_sheet": "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/qa/contact-sheet.png"
+}

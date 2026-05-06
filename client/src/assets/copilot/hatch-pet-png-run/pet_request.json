@@ -1,0 +1,145 @@
+{
+  "pet_id": "gibbon",
+  "display_name": "gibbon",
+  "description": "A compact Codex digital pet: Cream plush long-armed gibbon based on the provided reference image. Preserve the round face, cream fur, long arms, gentle smile, and overall silhouette as reference, but follow the hatch-pet-png skill output format.",
+  "created_at": "2026-05-06T03:55:24.162812+00:00",
+  "atlas": {
+    "columns": 6,
+    "rows": 5,
+    "cell_width": 192,
+    "cell_height": 208,
+    "width": 1152,
+    "height": 1040
+  },
+  "rows": [
+    {
+      "state": "idle",
+      "row": 0,
+      "frames": 6,
+      "purpose": "neutral breathing/blinking loop"
+    },
+    {
+      "state": "waving",
+      "row": 1,
+      "frames": 4,
+      "purpose": "greeting gesture with raised wave and return"
+    },
+    {
+      "state": "jumping",
+      "row": 2,
+      "frames": 5,
+      "purpose": "anticipation, lift, peak, descent, settle"
+    },
+    {
+      "state": "waiting",
+      "row": 3,
+      "frames": 4,
+      "purpose": "patient waiting loop with small motion"
+    },
+    {
+      "state": "review",
+      "row": 4,
+      "frames": 4,
+      "purpose": "focused inspecting or review loop"
+    }
+  ],
+  "layout_guides": [
+    {
+      "state": "idle",
+      "path": "references/layout-guides/idle.png",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "cell_width": 192,
+      "cell_height": 208,
+      "safe_margin_x": 18,
+      "safe_margin_y": 16,
+      "usage": "layout guide input only; do not copy visible guide lines into generated sprite strips"
+    },
+    {
+      "state": "waving",
+      "path": "references/layout-guides/waving.png",
+      "width": 768,
+      "height": 208,
+      "frames": 4,
+      "cell_width": 192,
+      "cell_height": 208,
+      "safe_margin_x": 18,
+      "safe_margin_y": 16,
+      "usage": "layout guide input only; do not copy visible guide lines into generated sprite strips"
+    },
+    {
+      "state": "jumping",
+      "path": "references/layout-guides/jumping.png",
+      "width": 960,
+      "height": 208,
+      "frames": 5,
+      "cell_width": 192,
+      "cell_height": 208,
+      "safe_margin_x": 18,
+      "safe_margin_y": 16,
+      "usage": "layout guide input only; do not copy visible guide lines into generated sprite strips"
+    },
+    {
+      "state": "waiting",
+      "path": "references/layout-guides/waiting.png",
+      "width": 768,
+      "height": 208,
+      "frames": 4,
+      "cell_width": 192,
+      "cell_height": 208,
+      "safe_margin_x": 18,
+      "safe_margin_y": 16,
+      "usage": "layout guide input only; do not copy visible guide lines into generated sprite strips"
+    },
+    {
+      "state": "review",
+      "path": "references/layout-guides/review.png",
+      "width": 768,
+      "height": 208,
+      "frames": 4,
+      "cell_width": 192,
+      "cell_height": 208,
+      "safe_margin_x": 18,
+      "safe_margin_y": 16,
+      "usage": "layout guide input only; do not copy visible guide lines into generated sprite strips"
+    }
+  ],
+  "references": [
+    {
+      "path": "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/references/reference-01.png",
+      "width": 1794,
+      "height": 1458,
+      "mode": "RGBA",
+      "format": "PNG",
+      "source_path": "/Users/pengyuang/Desktop/play/crown-competition/client/src/new.png",
+      "copied_path": "/Users/pengyuang/Desktop/play/crown-competition/client/src/assets/copilot/hatch-pet-png-run/references/reference-01.png"
+    }
+  ],
+  "chroma_key": {
+    "hex": "#0000FF",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "name": "blue",
+    "selection": "auto",
+    "score": 257.08
+  },
+  "pet_notes": "Cream plush long-armed gibbon based on the provided reference image. Preserve the round face, cream fur, long arms, gentle smile, and overall silhouette as reference, but follow the hatch-pet-png skill output format.",
+  "style_notes": "",
+  "house_style": "Codex digital pet sprite style: pixel-art-adjacent low-resolution mascot sprite, compact chibi proportions, chunky whole-body silhouette, thick dark 1-2 px outline, visible stepped/pixel edges, limited palette, flat cel shading with at most one small highlight and one shadow step, simple readable face, tiny limbs, and no detail that disappears at 192x208. Avoid polished illustration, painterly rendering, anime key art, 3D render, vector app-icon polish, glossy lighting, soft gradients, realistic fur or material texture, anti-aliased high-detail edges, and complex tiny accessories.",
+  "primary_generation_skill": "$imagegen",
+  "canonical_identity_reference": {
+    "path": "references/canonical-base.png",
+    "source_job": "base",
+    "sha256": "eb19a272b7592225f36a58bd8153ff813021cfb448ed410ea84b63138be42df1",
+    "metadata": {
+      "width": 1204,
+      "height": 1306,
+      "mode": "RGB",
+      "format": "PNG"
+    }
+  }
+}
