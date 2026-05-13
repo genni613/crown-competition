@@ -135,8 +135,8 @@ authRouter.get('/me', authMiddleware, asyncHandler(async (req: Request, res: Res
         role: currentUser.role,
       })
       req.currentUser = updated
-      const fu = await getDb().queryOne<{ job_role: string | null }>('SELECT job_role FROM feishu_user WHERE user_key = ?', [updated.user_key])
-      res.json({ user: { ...updated, feishu_job_role: fu?.job_role ?? null } })
+      const fu = await getDb().queryOne<{ job_role: string | null; sub_role: string | null }>('SELECT job_role, sub_role FROM feishu_user WHERE user_key = ?', [updated.user_key])
+      res.json({ user: { ...updated, feishu_job_role: fu?.job_role ?? null, feishu_sub_role: fu?.sub_role ?? null } })
       return
     } catch (error) {
       console.warn('Failed to refresh current user profile from Feishu:', error)
@@ -144,9 +144,11 @@ authRouter.get('/me', authMiddleware, asyncHandler(async (req: Request, res: Res
   }
   const userKey = (req.currentUser as any)?.user_key
   let feishuJobRole: string | null = null
+  let feishuSubRole: string | null = null
   if (userKey) {
-    const fu = await getDb().queryOne<{ job_role: string | null }>('SELECT job_role FROM feishu_user WHERE user_key = ?', [userKey])
+    const fu = await getDb().queryOne<{ job_role: string | null; sub_role: string | null }>('SELECT job_role, sub_role FROM feishu_user WHERE user_key = ?', [userKey])
     feishuJobRole = fu?.job_role ?? null
+    feishuSubRole = fu?.sub_role ?? null
   }
-  res.json({ user: { ...req.currentUser, feishu_job_role: feishuJobRole } })
+  res.json({ user: { ...req.currentUser, feishu_job_role: feishuJobRole, feishu_sub_role: feishuSubRole } })
 }))

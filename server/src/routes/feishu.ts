@@ -319,9 +319,13 @@ feishuRouter.get('/local-users', adminMiddleware, asyncHandler(async (_req, res)
 
 // PUT /api/feishu/my-job-role — 当前登录用户设置自己的岗位
 feishuRouter.put('/my-job-role', authMiddleware, asyncHandler(async (req, res) => {
-  const { job_role } = req.body
+  const { job_role, sub_role } = req.body
   if (!job_role || !['product', 'design', 'tech'].includes(job_role)) {
     res.status(400).json({ error: '无效的岗位类型' })
+    return
+  }
+  if (sub_role && !['client', 'frontend', 'backend'].includes(sub_role)) {
+    res.status(400).json({ error: '无效的子岗位类型' })
     return
   }
   const userKey = (req.currentUser as any)?.user_key
@@ -329,7 +333,8 @@ feishuRouter.put('/my-job-role', authMiddleware, asyncHandler(async (req, res) =
     res.status(400).json({ error: '当前用户未关联飞书账号' })
     return
   }
-  await getDb().execute('UPDATE feishu_user SET job_role = ? WHERE user_key = ?', [job_role, userKey])
+  const effectiveSubRole = job_role === 'tech' ? (sub_role || null) : null
+  await getDb().execute('UPDATE feishu_user SET job_role = ?, sub_role = ? WHERE user_key = ?', [job_role, effectiveSubRole, userKey])
   res.json({ ok: true })
 }))
 

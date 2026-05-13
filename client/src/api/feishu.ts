@@ -152,6 +152,7 @@ export interface LocalFeishuUser {
   email: string
   avatar_url?: string | null
   job_role?: 'product' | 'design' | 'tech' | null
+  sub_role?: 'client' | 'frontend' | 'backend' | null
 }
 
 export const getFeishuProjectStatus = () =>
@@ -193,8 +194,8 @@ export const getLocalPdSummary = (params: { startDate: string; endDate: string; 
 export const getLocalFeishuUsers = () =>
   api.get<LocalFeishuUser[]>('/feishu/local-users')
 
-export const updateMyJobRole = (job_role: string) =>
-  api.put('/feishu/my-job-role', { job_role })
+export const updateMyJobRole = (job_role: string, sub_role?: string) =>
+  api.put('/feishu/my-job-role', { job_role, sub_role })
 
 export interface WorkHourImportResult {
   total: number
@@ -256,6 +257,9 @@ export interface SeasonSyncResult {
 
 export const syncSeasonScores = (seasonId: number) =>
   api.post<SeasonSyncResult>(`/feishu/${seasonId}/sync`)
+
+export const syncMemberSeasonScore = (seasonId: number, userKey: string) =>
+  api.post<SeasonSyncResult>(`/feishu/${seasonId}/${encodeURIComponent(userKey)}/sync`)
 
 export const calculateSeasonScores = (seasonId: number) =>
   api.post(`/scoring/calculate/${seasonId}`)

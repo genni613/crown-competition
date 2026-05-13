@@ -18,6 +18,12 @@ const jobRoleOptions = [
   { label: '研发', value: 'tech' },
 ]
 
+const subRoleOptions = [
+  { label: '客户端', value: 'client' },
+  { label: '前端', value: 'frontend' },
+  { label: '后端', value: 'backend' },
+]
+
 export default function SeasonManager() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [members, setMembers] = useState<SeasonMember[]>([])
@@ -108,6 +114,7 @@ export default function SeasonManager() {
   const [selectedUserKeys, setSelectedUserKeys] = useState<string[]>([])
   const [gradeMap, setGradeMap] = useState<Record<string, string>>({})
   const [roleMap, setRoleMap] = useState<Record<string, string>>({})
+  const [subRoleMap, setSubRoleMap] = useState<Record<string, string>>({})
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set())
 
   async function onAddMember() {
@@ -119,6 +126,7 @@ export default function SeasonManager() {
           user_key: uk,
           performance_grade: gradeMap[uk] || undefined,
           job_role: roleMap[uk] || undefined,
+          sub_role: roleMap[uk] === 'tech' ? (subRoleMap[uk] || undefined) : undefined,
         })),
       })
       const { added, skipped } = res.data
@@ -138,6 +146,7 @@ export default function SeasonManager() {
       setSelectedUserKeys([])
       setGradeMap({})
       setRoleMap({})
+      setSubRoleMap({})
       showMembers(selectedSeason)
     } catch (err: any) {
       console.error('[batch] error:', err)
@@ -183,6 +192,21 @@ export default function SeasonManager() {
           options={jobRoleOptions}
         />
       ),
+    },
+    {
+      title: '子岗位',
+      dataIndex: 'sub_role',
+      render: (v: string, r: SeasonMember) => r.job_role === 'tech' ? (
+        <Select
+          size="small"
+          style={{ width: 90 }}
+          value={v || undefined}
+          placeholder="未设置"
+          allowClear
+          onChange={val => onEditMember(r, 'sub_role', val ?? null)}
+          options={subRoleOptions}
+        />
+      ) : <span style={{ color: '#d9d9d9' }}>-</span>,
     },
     {
       title: '上期绩效',
@@ -286,6 +310,22 @@ export default function SeasonManager() {
                   </Tag>
                 ))}
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                <span style={{ color: '#94a3b8', fontSize: 12, width: 48 }}>细分：</span>
+                {subRoleOptions.map(o => (
+                  <Tag
+                    key={o.value}
+                    style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
+                    color="purple"
+                    onClick={() => {
+                      if (checkedKeys.size === 0) return
+                      setSubRoleMap(prev => { const next = { ...prev }; for (const k of checkedKeys) next[k] = o.value; return next })
+                    }}
+                  >
+                    {o.label}
+                  </Tag>
+                ))}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                 <span style={{ color: '#94a3b8', fontSize: 12, width: 48 }}>绩效：</span>
                 {gradeOptions.map(o => (
@@ -317,6 +357,10 @@ export default function SeasonManager() {
                 const baseRole = u?.job_role
                 const effectiveRole = overrideRole || baseRole
                 const roleLabel = effectiveRole ? jobRoleOptions.find(j => j.value === effectiveRole)?.label : null
+                const overrideSubRole = subRoleMap[uk]
+                const baseSubRole = u?.sub_role
+                const effectiveSubRole = overrideSubRole || baseSubRole
+                const subRoleLabel = effectiveSubRole ? subRoleOptions.find(s => s.value === effectiveSubRole)?.label : null
                 return (
                   <div key={uk} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
                     <Checkbox
@@ -332,6 +376,11 @@ export default function SeasonManager() {
                     <Tag color={roleLabel ? 'green' : 'warning'}>
                       {u?.name ?? uk} {roleLabel ? `· ${roleLabel}` : '· 岗位未设置'}
                     </Tag>
+                    {effectiveRole === 'tech' && (
+                      <Tag color={subRoleLabel ? 'purple' : undefined}>
+                        {subRoleLabel ?? '细分未设置'}
+                      </Tag>
+                    )}
                     <Tag color={gradeMap[uk] ? 'geekblue' : undefined} style={{ marginRight: 0 }}>
                       {gradeMap[uk] ? `绩效 ${gradeMap[uk]}` : '未设绩效'}
                     </Tag>

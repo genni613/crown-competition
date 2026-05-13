@@ -9,6 +9,7 @@ interface SyncMember {
   season_member_id: number
   user_key: string
   job_role: JobRole | null
+  sub_role: 'client' | 'frontend' | 'backend' | null
   email: string | null
   name: string
 }
@@ -121,12 +122,27 @@ async function queryLocalIssuePriorityCounts(userKey: string, startMs: number, e
 }
 
 async function aggregateProduct(userKey: string, startMs: number, endMs: number, startDate: string, endDate: string): Promise<MetricMap> {
-  const pdResult = await queryPdSummaryByDateRange(startDate, endDate, userKey)
-  const workHours = pdResult.people.find(p => p.project_user_key === userKey)?.total_hours ?? 0
+  const db = getDb()
+  // 按产品负责人汇总该成员负责的需求所消耗的研发工时（客户端 ÷3）
+  const rdHoursRows = await db.query<{ total_rd_hours: number }>(`
+    SELECT ROUND(SUM(
+      CASE WHEN fu.sub_role = 'client'
+           THEN g.actual_work_hours / 3
+           ELSE g.actual_work_hours END
+    ), 2) AS total_rd_hours
+    FROM feishu_workitem_gongshi g
+    JOIN feishu_workitem_story s ON s.work_item_id = g.related_requirement
+    JOIN feishu_user fu ON fu.user_key = g.work_hour_reporter
+    WHERE s.product_owner = ?
+      AND ${GONGSHI_TIME} IS NOT NULL
+      AND ${GONGSHI_TIME} >= ?
+      AND ${GONGSHI_TIME} < ?
+  `, [userKey, new Date(startMs), new Date(endMs)])
+  const rdHours = Number(rdHoursRows[0]?.total_rd_hours || 0)
   const resolvedIssueCount = await queryLocalIssueCount(userKey, startMs, endMs)
 
   return {
-    '产品需求使用研发测试PD数': workHours,
+    '产品需求使用研发测试PD数': rdHours,
     '需求评审通过准时率': 100,
     '核心项目准时上线率': 100,
     '需求变更消耗PD': 0,
@@ -158,9 +174,13 @@ async function aggregateDesign(userKey: string, startMs: number, endMs: number):
   }
 }
 
-async function aggregateTech(userKey: string, startMs: number, endMs: number, startDate: string, endDate: string): Promise<MetricMap> {
+async function aggregateTech(userKey: string, subRole: string | null, startMs: number, endMs: number, startDate: string, endDate: string): Promise<MetricMap> {
   const pdResult = await queryPdSummaryByDateRange(startDate, endDate, userKey)
-  const totalHours = pdResult.people.find(p => p.project_user_key === userKey)?.total_hours ?? 0
+  let totalHours = pdResult.people.find(p => p.project_user_key === userKey)?.total_hours ?? 0
+  // 客户端 3PD 折算 1PD
+  if (subRole === 'client') {
+    totalHours = Math.round((totalHours / 3) * 100) / 100
+  }
   const issuePriorityCounts = await queryLocalIssuePriorityCounts(userKey, startMs, endMs)
 
   // 线上故障(P1/P2)：P1/P2 且来源含"故障"
@@ -204,7 +224,7 @@ async function aggregateMemberMetrics(member: SyncMember, season: Season): Promi
     ? await aggregateProduct(userKey, startMs, endMs, sd, ed)
     : member.job_role === 'design'
       ? await aggregateDesign(userKey, startMs, endMs)
-      : await aggregateTech(userKey, startMs, endMs, sd, ed)
+      : await aggregateTech(userKey, member.sub_role, startMs, endMs, sd, ed)
 
   return {
     member,
@@ -281,7 +301,7 @@ async function getMembers(seasonId: number, userId?: string): Promise<SyncMember
   }
 
   return getDb().query<SyncMember>(`
-    SELECT sm.id AS season_member_id, sm.user_key, sm.job_role, fu.email, fu.name
+    SELECT sm.id AS season_member_id, sm.user_key, sm.job_role, sm.sub_role, fu.email, fu.name
     FROM season_members sm
     JOIN feishu_user fu ON fu.user_key = sm.user_key
     ${where}

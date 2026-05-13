@@ -12,6 +12,7 @@ export interface User {
   title: string | null
   role: 'ADMIN' | 'MEMBER'
   job_role: 'product' | 'design' | 'tech' | null
+  sub_role: 'client' | 'frontend' | 'backend' | null
   created_at: string
   updated_at: string
 }
@@ -31,6 +32,7 @@ export interface SeasonMember {
   season_id: number
   user_key: string
   job_role: 'product' | 'design' | 'tech' | null
+  sub_role: 'client' | 'frontend' | 'backend' | null
   performance_grade: 'A' | 'B+' | 'B' | 'B-' | 'C' | null
   prev_raw_score: number | null
   raw_position_score: number | null
@@ -129,6 +131,7 @@ export interface FeishuDataCache {
 // ============ 聚合类型 ============
 
 export type JobRole = 'product' | 'design' | 'tech'
+export type SubRole = 'client' | 'frontend' | 'backend'
 export type SeasonStatus = 'draft' | 'active' | 'ended'
 export type UserRole = 'ADMIN' | 'MEMBER'
 export type PerformanceGrade = 'A' | 'B+' | 'B' | 'B-' | 'C'

@@ -93,7 +93,7 @@ seasonsRouter.get('/:id/members', authMiddleware, asyncHandler(async (req: Reque
 
 // POST /api/seasons/:id/members/batch — 批量添加成员
 seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { members } = req.body as { members: { user_key: string; performance_grade?: string; job_role?: string }[] }
+  const { members } = req.body as { members: { user_key: string; performance_grade?: string; job_role?: string; sub_role?: string }[] }
   console.log('[batch] received members:', JSON.stringify(members))
   if (!Array.isArray(members) || members.length === 0) {
     res.status(400).json({ error: '缺少成员列表' })
@@ -108,8 +108,8 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
   // 查出所有 user_key 对应的飞书用户信息
   const userKeys = members.map(m => m.user_key)
   const feishuPlaceholders = userKeys.map(() => '?').join(',')
-  const feishuRows = await db.query<{ user_key: string; job_role: string | null; name: string }>(
-    `SELECT user_key, job_role, name FROM feishu_user WHERE user_key IN (${feishuPlaceholders})`,
+  const feishuRows = await db.query<{ user_key: string; job_role: string | null; sub_role: string | null; name: string }>(
+    `SELECT user_key, job_role, sub_role, name FROM feishu_user WHERE user_key IN (${feishuPlaceholders})`,
     userKeys
   )
   const feishuMap = new Map(feishuRows.map(r => [r.user_key, r]))
@@ -136,6 +136,7 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
     }
 
     const jobRole = m.job_role || feishu.job_role || null
+    const subRole = m.sub_role || feishu.sub_role || null
     const prevRawScore = m.performance_grade ? getPerformanceScore(m.performance_grade) : null
 
     try {
@@ -143,9 +144,12 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
         if (m.job_role && m.job_role !== feishu.job_role) {
           await tx.execute('UPDATE feishu_user SET job_role = ? WHERE user_key = ?', [m.job_role, m.user_key])
         }
+        if (m.sub_role && m.sub_role !== feishu.sub_role) {
+          await tx.execute('UPDATE feishu_user SET sub_role = ? WHERE user_key = ?', [m.sub_role, m.user_key])
+        }
         const result = await tx.execute(
-          'INSERT INTO season_members (season_id, user_key, job_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?)',
-          [seasonId, m.user_key, jobRole, m.performance_grade ?? null, prevRawScore]
+          'INSERT INTO season_members (season_id, user_key, job_role, sub_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?, ?)',
+          [seasonId, m.user_key, jobRole, jobRole === 'tech' ? subRole : null, m.performance_grade ?? null, prevRawScore]
         )
         if (jobRole) {
           const dimensions = await tx.query<{ id: number; data_source?: string }>(
@@ -176,17 +180,18 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
 
 // POST /api/seasons/:id/members — 添加成员
 seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { user_key, job_role, performance_grade } = req.body
+  const { user_key, job_role, sub_role, performance_grade } = req.body
   if (!user_key) { res.status(400).json({ error: '缺少 user_key' }); return }
 
   const seasonId = parseInt(req.params.id, 10)
   const prevRawScore = performance_grade ? getPerformanceScore(performance_grade) : null
+  const effectiveSubRole = job_role === 'tech' ? (sub_role || null) : null
 
   try {
     const memberId = await withTransaction(async tx => {
       const result = await tx.execute(
-        'INSERT INTO season_members (season_id, user_key, job_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?)',
-        [seasonId, user_key, job_role, performance_grade, prevRawScore]
+        'INSERT INTO season_members (season_id, user_key, job_role, sub_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?, ?)',
+        [seasonId, user_key, job_role, effectiveSubRole, performance_grade, prevRawScore]
       )
       const dimensions = await tx.query<{ id: number; data_source?: string }>(
         'SELECT id, data_source FROM scoring_dimensions WHERE job_role = ?',
@@ -216,17 +221,18 @@ seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Req
 
 // PUT /api/seasons/:id/members/:mid — 编辑成员
 seasonsRouter.put('/:id/members/:mid', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { job_role, performance_grade } = req.body
+  const { job_role, sub_role, performance_grade } = req.body
   const db = getDb()
   const prevRawScore = performance_grade ? getPerformanceScore(performance_grade) : undefined
 
   await db.execute(`
     UPDATE season_members SET
       job_role = COALESCE(?, job_role),
+      sub_role = COALESCE(?, sub_role),
       performance_grade = COALESCE(?, performance_grade),
       prev_raw_score = COALESCE(?, prev_raw_score)
     WHERE id = ? AND season_id = ?
-  `, [job_role, performance_grade, prevRawScore, req.params.mid, req.params.id])
+  `, [job_role, sub_role, performance_grade, prevRawScore, req.params.mid, req.params.id])
 
   const member = await db.queryOne('SELECT * FROM season_members WHERE id = ?', [req.params.mid])
   res.json(member)

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   title VARCHAR(255) NULL,
   role ENUM('ADMIN', 'MEMBER') NOT NULL DEFAULT 'MEMBER',
   job_role ENUM('product', 'design', 'tech') NULL,
+  sub_role ENUM('client', 'frontend', 'backend') NULL COMMENT '子岗位(仅tech有效)',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_users_user_key (user_key)
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS season_members (
   season_id BIGINT NOT NULL,
   user_key VARCHAR(64) NOT NULL COMMENT '关联 feishu_user.user_key',
   job_role ENUM('product', 'design', 'tech') NULL,
+  sub_role ENUM('client', 'frontend', 'backend') NULL COMMENT '子岗位(仅tech有效)',
   performance_grade ENUM('A', 'B+', 'B', 'B-', 'C') NULL,
   prev_raw_score DOUBLE NULL,
   raw_position_score DOUBLE NULL,
@@ -230,6 +232,7 @@ CREATE TABLE IF NOT EXISTS feishu_workitem_story (
   finish_status TINYINT(1) NULL COMMENT '是否完成',
   related_project VARCHAR(64) NULL COMMENT '关联项目',
   current_status_operator VARCHAR(512) NULL COMMENT '需求负责人',
+  product_owner VARCHAR(64) NULL COMMENT '产品负责人(PM user_key)',
   template_type VARCHAR(128) NULL COMMENT '需求类型',
   sub_stage VARCHAR(64) NULL COMMENT '需求状态(细分)',
   update_time DATETIME NULL COMMENT '更新时间',
@@ -298,6 +301,7 @@ CREATE TABLE IF NOT EXISTS feishu_user (
   avatar_url TEXT NULL COMMENT '头像URL',
   status VARCHAR(32) DEFAULT '' COMMENT '状态',
   job_role ENUM('product', 'design', 'tech') NULL COMMENT '岗位',
+  sub_role ENUM('client', 'frontend', 'backend') NULL COMMENT '子岗位(仅tech有效)',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_user_key (user_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='飞书用户表';

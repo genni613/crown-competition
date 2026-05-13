@@ -103,6 +103,17 @@ function parseWorkItem(item: any): Record<string, any> {
     row[column] = parseFieldValue(raw, mapping.type ?? 'text')
   }
 
+  // 从 role_owners 字段提取产品负责人（PM）
+  const roleOwners = extractFieldValue(fields, 'role_owners')
+  if (Array.isArray(roleOwners)) {
+    const pmEntry = roleOwners.find((r: any) => r.role === 'PM')
+    row.product_owner = Array.isArray(pmEntry?.owners) && pmEntry.owners.length > 0
+      ? String(pmEntry.owners[0])
+      : null
+  } else {
+    row.product_owner = null
+  }
+
   const updatedAt = extractTopLevel(item, 'updated_at')
   row.update_time = typeof updatedAt === 'number' ? new Date(updatedAt) : new Date()
 
@@ -114,11 +125,11 @@ async function upsertRow(db: any, row: Record<string, any>): Promise<'inserted' 
     INSERT INTO feishu_workitem_story (
       work_item_id, name, owner, start_time, finish_time,
       work_item_type_key, work_item_status, finish_status, related_project,
-      current_status_operator, template_type, sub_stage, update_time
+      current_status_operator, product_owner, template_type, sub_stage, update_time
     ) VALUES (
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?
+      ?, ?, ?, ?, ?
     )
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
@@ -130,13 +141,14 @@ async function upsertRow(db: any, row: Record<string, any>): Promise<'inserted' 
       finish_status = VALUES(finish_status),
       related_project = VALUES(related_project),
       current_status_operator = VALUES(current_status_operator),
+      product_owner = VALUES(product_owner),
       template_type = VALUES(template_type),
       sub_stage = VALUES(sub_stage),
       update_time = VALUES(update_time)
   `, [
     row.work_item_id, row.name, row.owner, row.start_time, row.finish_time,
     row.work_item_type_key, row.work_item_status, row.finish_status, row.related_project,
-    row.current_status_operator, row.template_type, row.sub_stage, row.update_time || new Date(),
+    row.current_status_operator, row.product_owner, row.template_type, row.sub_stage, row.update_time || new Date(),
   ])
 
   return result.affectedRows === 1 ? 'inserted' : 'updated'
@@ -182,11 +194,12 @@ function extractItemsFromResponse(raw: any): any[] {
 
 function getUniqueFieldKeys(): string[] {
   const topKeys = new Set(['name', 'created_at', 'updated_at', 'template', 'start_time'])
-  return [...new Set(
-    Object.values(mappings)
-      .filter(m => m.source === 'field' && m.key && !topKeys.has(m.key))
-      .map(m => m.key!)
-  )]
+  const keys = Object.values(mappings)
+    .filter(m => m.source === 'field' && m.key && !topKeys.has(m.key))
+    .map(m => m.key!)
+  // role_owners 不在 storyFields 映射中，但需要请求以解析产品负责人
+  keys.push('role_owners')
+  return [...new Set(keys)]
 }
 
 async function fetchStoryItems(workItemTypeKey?: string, startDate?: string, endDate?: string): Promise<any[]> {

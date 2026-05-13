@@ -17,5 +17,5 @@ export interface BatchAddResult {
   skipped: { user_key: string; name?: string; reason: string }[]
 }
 
-export const addMembersBatch = (seasonId: number, data: { members: { user_key: string; performance_grade?: string }[] }) =>
+export const addMembersBatch = (seasonId: number, data: { members: { user_key: string; performance_grade?: string; job_role?: string; sub_role?: string }[] }) =>
   api.post<BatchAddResult>(`/seasons/${seasonId}/members/batch`, data)

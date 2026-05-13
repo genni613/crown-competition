@@ -18,6 +18,7 @@ import FeishuManager from './pages/admin/FeishuManager'
 import AdminScoringHub from './pages/admin/AdminScoringHub'
 import AdminDataSyncHub from './pages/admin/AdminDataSyncHub'
 import DimensionManager from './pages/admin/DimensionManager'
+import MemberManager from './pages/admin/MemberManager'
 
 const jobRoleOptions = [
   { label: '产品', value: 'product' },
@@ -25,10 +26,17 @@ const jobRoleOptions = [
   { label: '研发', value: 'tech' },
 ]
 
+const subRoleOptions = [
+  { label: '客户端', value: 'client' },
+  { label: '前端', value: 'frontend' },
+  { label: '后端', value: 'backend' },
+]
+
 export default function App() {
   const { user, loading, fetchUser, setUser } = useAuthStore()
   const [jobRoleOpen, setJobRoleOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>()
+  const [selectedSubRole, setSelectedSubRole] = useState<string>()
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -45,8 +53,8 @@ export default function App() {
     if (!selectedRole) return
     setSaving(true)
     try {
-      await updateMyJobRole(selectedRole)
-      setUser({ ...user!, feishu_job_role: selectedRole } as any)
+      await updateMyJobRole(selectedRole, selectedRole === 'tech' ? selectedSubRole : undefined)
+      setUser({ ...user!, feishu_job_role: selectedRole, feishu_sub_role: selectedRole === 'tech' ? (selectedSubRole || null) : null } as any)
       setJobRoleOpen(false)
       message.success('岗位设置成功')
     } catch {
@@ -117,7 +125,7 @@ export default function App() {
         open={jobRoleOpen}
         title={<span style={{ fontWeight: 700, color: '#1e1b4b' }}>选择你的岗位</span>}
         confirmLoading={saving}
-        okButtonProps={{ disabled: !selectedRole }}
+        okButtonProps={{ disabled: !selectedRole || (selectedRole === 'tech' && !selectedSubRole) }}
         onOk={onSaveJobRole}
         onCancel={undefined}
         closable={false}
@@ -133,11 +141,20 @@ export default function App() {
         )}
         <Select
           value={selectedRole}
-          onChange={setSelectedRole}
+          onChange={(v) => { setSelectedRole(v); if (v !== 'tech') setSelectedSubRole(undefined) }}
           placeholder="请选择岗位"
           style={{ width: '100%' }}
           options={jobRoleOptions}
         />
+        {selectedRole === 'tech' && (
+          <Select
+            value={selectedSubRole}
+            onChange={setSelectedSubRole}
+            placeholder="请选择研发细分方向"
+            style={{ width: '100%', marginTop: 12 }}
+            options={subRoleOptions}
+          />
+        )}
       </Modal>
       <Routes>
       <Route element={<AppLayout />}>
@@ -149,6 +166,7 @@ export default function App() {
           <>
             <Route path="/admin/seasons" element={<SeasonManager />} />
             <Route path="/admin/scoring" element={<AdminScoringHub />} />
+            <Route path="/admin/members" element={<MemberManager />} />
             <Route path="/admin/scores/:seasonId" element={<ScoreEntry />} />
             <Route path="/admin/evidence" element={<EvidenceReview />} />
             <Route path="/admin/org-scores/:seasonId" element={<OrgScoreManager />} />
