@@ -98,7 +98,7 @@ const latestReviewJoin = `
     ) latest ON latest.max_id = er1.id
   ) lr ON lr.evidence_submission_id = es.id
   LEFT JOIN users reviewer
-    ON reviewer.id COLLATE utf8mb4_unicode_ci = lr.reviewer_id COLLATE utf8mb4_unicode_ci
+    ON reviewer.id = lr.reviewer_id
 `
 
 function normalizeReviewRecord<T extends Record<string, unknown>>(record: T) {
@@ -409,7 +409,7 @@ evidenceRouter.get('/:id', authMiddleware, asyncHandler(async (req: Request, res
     SELECT er.*, reviewer.name as reviewer_name
     FROM evidence_reviews er
     JOIN users reviewer
-      ON reviewer.id COLLATE utf8mb4_unicode_ci = er.reviewer_id COLLATE utf8mb4_unicode_ci
+      ON reviewer.id = er.reviewer_id
     WHERE er.evidence_submission_id = ?
     ORDER BY er.created_at DESC, er.id DESC
   `, [req.params.id])

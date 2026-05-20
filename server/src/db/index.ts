@@ -51,6 +51,9 @@ async function applySchema(currentPool: Pool): Promise<void> {
   await ensureEvidenceAuditColumns(currentPool)
   await ensureEvidenceReviewTable(currentPool)
   await ensureIssueDataSourceMigration(currentPool)
+  await ensureFkColumnTypes(currentPool)
+  await ensureUsersCollation(currentPool)
+  await checkOrphanedMembers(currentPool)
 }
 
 async function columnExists(currentPool: Pool, tableName: string, columnName: string): Promise<boolean> {
@@ -115,7 +118,6 @@ async function ensureIssueDataSourceMigration(currentPool: Pool): Promise<void> 
 
 async function ensureEvidenceReviewTable(currentPool: Pool): Promise<void> {
   if (await tableExists(currentPool, 'evidence_reviews')) {
-    await ensureEvidenceReviewReviewerCollation(currentPool)
     return
   }
 
@@ -123,7 +125,7 @@ async function ensureEvidenceReviewTable(currentPool: Pool): Promise<void> {
     CREATE TABLE IF NOT EXISTS evidence_reviews (
       id BIGINT PRIMARY KEY AUTO_INCREMENT,
       evidence_submission_id BIGINT NOT NULL,
-      reviewer_id VARCHAR(191) NOT NULL,
+      reviewer_id BIGINT NOT NULL,
       action ENUM('approved', 'rejected') NOT NULL,
       comment TEXT NULL,
       snapshot_json JSON NULL,
@@ -133,17 +135,15 @@ async function ensureEvidenceReviewTable(currentPool: Pool): Promise<void> {
       CONSTRAINT fk_evidence_reviews_submission FOREIGN KEY (evidence_submission_id) REFERENCES evidence_submissions(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
-
-  await ensureEvidenceReviewReviewerCollation(currentPool)
 }
 
-async function getColumnCollation(
+async function getColumnType(
   currentPool: Pool,
   tableName: string,
   columnName: string
 ): Promise<string | null> {
   const [rows] = await currentPool.query<RowDataPacket[]>(
-    `SELECT COLLATION_NAME
+    `SELECT DATA_TYPE
      FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = ?
        AND TABLE_NAME = ?
@@ -151,26 +151,101 @@ async function getColumnCollation(
      LIMIT 1`,
     [config.mysql.database, tableName, columnName]
   )
-
-  const value = rows[0]?.COLLATION_NAME
+  const value = rows[0]?.DATA_TYPE
   return typeof value === 'string' && value ? value : null
 }
 
-async function ensureEvidenceReviewReviewerCollation(currentPool: Pool): Promise<void> {
-  const usersIdCollation = await getColumnCollation(currentPool, 'users', 'id')
-  const reviewerIdCollation = await getColumnCollation(currentPool, 'evidence_reviews', 'reviewer_id')
+async function migrateFkColumn(
+  currentPool: Pool,
+  table: string,
+  column: string,
+  nullable: boolean,
+  fkName: string
+): Promise<void> {
+  const colType = await getColumnType(currentPool, table, column)
+  if (!colType || colType === 'bigint') return
 
-  if (!usersIdCollation || !reviewerIdCollation || usersIdCollation === reviewerIdCollation) {
-    return
+  const tempCol = `new_${column}`
+  const colDef = nullable ? 'BIGINT NULL' : 'BIGINT NOT NULL'
+
+  try {
+    await currentPool.query(`ALTER TABLE ${table} DROP FOREIGN KEY ${fkName}`)
+  } catch {
+    // FK may not exist
   }
 
-  await currentPool.query(`
-    ALTER TABLE evidence_reviews
-    MODIFY reviewer_id VARCHAR(191)
-    CHARACTER SET utf8mb4
-    COLLATE ${usersIdCollation}
-    NOT NULL
-  `)
+  await currentPool.query(`ALTER TABLE ${table} ADD COLUMN ${tempCol} ${colDef} AFTER ${column}`)
+  await currentPool.query(`UPDATE ${table} t JOIN users u ON t.${column} = u.id SET t.${tempCol} = u.id`)
+  await currentPool.query(`ALTER TABLE ${table} DROP COLUMN ${column}`)
+  await currentPool.query(`ALTER TABLE ${table} CHANGE COLUMN ${tempCol} ${column} ${colDef}`)
+
+  try {
+    await currentPool.query(`ALTER TABLE ${table} ADD CONSTRAINT ${fkName} FOREIGN KEY (${column}) REFERENCES users(id)`)
+  } catch {
+    // FK creation may fail if data has orphans, non-blocking
+  }
+
+  console.log(`[DB] Migrated ${table}.${column}: VARCHAR → BIGINT`)
+}
+
+async function ensureFkColumnTypes(currentPool: Pool): Promise<void> {
+  if (!(await tableExists(currentPool, 'org_scores'))) return
+
+  await migrateFkColumn(currentPool, 'org_scores', 'submitted_by', true, 'fk_org_scores_submitted_by')
+  await migrateFkColumn(currentPool, 'org_scores', 'reviewed_by', true, 'fk_org_scores_reviewed_by')
+
+  if (await tableExists(currentPool, 'evidence_reviews')) {
+    await migrateFkColumn(currentPool, 'evidence_reviews', 'reviewer_id', false, 'fk_evidence_reviews_reviewer')
+  }
+}
+
+async function checkOrphanedMembers(currentPool: Pool): Promise<void> {
+  if (!(await tableExists(currentPool, 'season_members'))) return
+
+  const [rows] = await currentPool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt
+     FROM season_members sm
+     LEFT JOIN feishu_user fu ON sm.user_key = fu.user_key
+     WHERE fu.user_key IS NULL`
+  )
+
+  const orphaned = (rows[0] as RowDataPacket)?.cnt ?? 0
+  if (orphaned > 0) {
+    console.warn(`[DB] WARNING: ${orphaned} season_members rows have user_key not found in feishu_user`)
+  }
+}
+
+async function ensureUsersCollation(currentPool: Pool): Promise<void> {
+  const varcharColumns: Array<{ column: string; definition: string }> = [
+    { column: 'open_id', definition: 'VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL' },
+    { column: 'user_key', definition: 'VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL' },
+    { column: 'name', definition: 'VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL' },
+    { column: 'avatar_url', definition: 'TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL' },
+    { column: 'email', definition: 'VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL' },
+    { column: 'department_id', definition: 'VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL' },
+    { column: 'department_name', definition: 'VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL' },
+    { column: 'title', definition: 'VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL' },
+  ]
+
+  let fixed = 0
+  for (const { column, definition } of varcharColumns) {
+    const col = await getColumnType(currentPool, 'users', column)
+    if (col) {
+      const [rows] = await currentPool.query<RowDataPacket[]>(
+        `SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = ? LIMIT 1`,
+        [config.mysql.database, column]
+      )
+      const collation = (rows[0] as RowDataPacket)?.COLLATION_NAME
+      if (collation && collation !== 'utf8mb4_unicode_ci') {
+        await currentPool.query(`ALTER TABLE users MODIFY ${column} ${definition}`)
+        fixed++
+      }
+    }
+  }
+
+  if (fixed > 0) {
+    console.log(`[DB] Fixed collation for ${fixed} columns in users table → utf8mb4_unicode_ci`)
+  }
 }
 
 export async function initDb(): Promise<void> {

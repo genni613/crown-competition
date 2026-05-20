@@ -8,7 +8,8 @@ import {
   Descriptions,
   Drawer,
   Empty,
-  Input,
+  Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
@@ -16,15 +17,20 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ReloadOutlined, SyncOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
-import { getSeasons } from '../../api/seasons'
-import { syncMemberSeasonScore } from '../../api/feishu'
+import { ImportOutlined, PlusOutlined, ReloadOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons'
 import {
-  getMemberDirectory,
-  getMemberSeasonHistory,
-  updateMemberDirectoryJobRole,
-} from '../../api/users'
-import type { MemberDirectoryItem, MemberSeasonHistoryItem, Season } from '../../types/models'
+  getSeasons,
+  getMembers,
+  updateMember,
+  removeMember,
+  addMembersBatch,
+  importPrevMembers,
+  getPrevGrades,
+} from '../../api/seasons'
+import { getLocalFeishuUsers, syncMemberSeasonScore } from '../../api/feishu'
+import { getMemberSeasonHistory, updateMemberDirectoryJobRole } from '../../api/users'
+import type { LocalFeishuUser } from '../../api/feishu'
+import type { MemberSeasonHistoryItem, Season, SeasonMember } from '../../types/models'
 import { formatDate, formatDateTime } from '../../utils/datetime'
 
 const jobRoleOptions = [
@@ -39,25 +45,14 @@ const subRoleOptions = [
   { label: '后端', value: 'backend' },
 ]
 
-const seasonStatusColor: Record<string, string> = {
-  draft: 'default',
-  active: 'green',
-  ended: 'red',
-}
+const gradeOptions = ['A', 'B+', 'B', 'B-', 'C'].map(g => ({ label: g, value: g }))
 
-const seasonStatusLabel: Record<string, string> = {
-  draft: '草稿',
-  active: '进行中',
-  ended: '已结束',
-}
+const seasonStatusColor: Record<string, string> = { draft: 'default', active: 'green', ended: 'red' }
+const seasonStatusLabel: Record<string, string> = { draft: '草稿', active: '进行中', ended: '已结束' }
 
 const roleLabelMap: Record<string, string> = {
-  product: '产品',
-  design: '设计',
-  tech: '研发',
-  client: '客户端',
-  frontend: '前端',
-  backend: '后端',
+  product: '产品', design: '设计', tech: '研发',
+  client: '客户端', frontend: '前端', backend: '后端',
 }
 
 function renderScore(value: number | null | undefined) {
@@ -70,23 +65,27 @@ function renderRole(jobRole: string | null, subRole: string | null) {
   return `${roleLabelMap[jobRole] || jobRole} / ${roleLabelMap[subRole || ''] || '未设置'}`
 }
 
-function getMemberIdentityKey(record: MemberDirectoryItem) {
-  return record.user_key || record.open_id || String(record.user_id || record.name)
-}
-
 export default function MemberManager() {
   const navigate = useNavigate()
   const [seasons, setSeasons] = useState<Season[]>([])
   const [selectedSeasonId, setSelectedSeasonId] = useState<number>()
-  const [members, setMembers] = useState<MemberDirectoryItem[]>([])
-  const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
-  const [jobRole, setJobRole] = useState<string>()
-  const [department, setDepartment] = useState<string>()
-  const [keyword, setKeyword] = useState('')
-  const [anomalyOnly, setAnomalyOnly] = useState(false)
+  const [members, setMembers] = useState<SeasonMember[]>([])
+  const [feishuUsers, setFeishuUsers] = useState<LocalFeishuUser[]>([])
+  const [prevGradeMap, setPrevGradeMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+
+  // 添加成员
+  const [addOpen, setAddOpen] = useState(false)
+  const [selectedUserKeys, setSelectedUserKeys] = useState<string[]>([])
+  const [gradeMap, setGradeMap] = useState<Record<string, string>>({})
+  const [roleMap, setRoleMap] = useState<Record<string, string>>({})
+  const [subRoleMap, setSubRoleMap] = useState<Record<string, string>>({})
+  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set())
+  const [adding, setAdding] = useState(false)
+
+  // 详情抽屉
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [selectedMember, setSelectedMember] = useState<MemberDirectoryItem | null>(null)
+  const [selectedMember, setSelectedMember] = useState<SeasonMember | null>(null)
   const [history, setHistory] = useState<MemberSeasonHistoryItem[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [editingJobRole, setEditingJobRole] = useState<string | null>(null)
@@ -94,20 +93,30 @@ export default function MemberManager() {
   const [syncDraftSeasonMembers, setSyncDraftSeasonMembers] = useState(true)
   const [savingRole, setSavingRole] = useState(false)
   const [syncingMemberKey, setSyncingMemberKey] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     void loadSeasons()
+    getLocalFeishuUsers().then(r => setFeishuUsers(r.data)).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (selectedSeasonId) {
       void loadMembers()
+    } else {
+      setMembers([])
     }
-  }, [selectedSeasonId, jobRole, department, anomalyOnly])
+  }, [selectedSeasonId])
 
   const selectedSeason = useMemo(
     () => seasons.find(item => item.id === selectedSeasonId),
     [seasons, selectedSeasonId],
+  )
+
+  // 已在赛季中的 user_key 集合，用于添加成员时排除
+  const existingUserKeys = useMemo(
+    () => new Set(members.map(m => m.user_key)),
+    [members],
   )
 
   async function loadSeasons() {
@@ -123,42 +132,82 @@ export default function MemberManager() {
     }
   }
 
-  async function loadMembers(nextKeyword?: string) {
-    const seasonId = selectedSeasonId
-    if (!seasonId) return
-
+  async function loadMembers() {
+    if (!selectedSeasonId) return
     setLoading(true)
     try {
-      const searchKeyword = nextKeyword ?? keyword
-      const res = await getMemberDirectory({
-        seasonId,
-        jobRole,
-        department,
-        keyword: searchKeyword || undefined,
-        anomalyOnly,
-      })
+      const res = await getMembers(selectedSeasonId)
       setMembers(res.data)
-      setDepartmentOptions(prev => {
-        const merged = new Set(prev)
-        res.data
-          .map(item => item.department_name)
-          .filter((item): item is string => Boolean(item))
-          .forEach(item => merged.add(item))
-        return Array.from(merged).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-      })
-      if (selectedMember) {
-        const latest = res.data.find(item => getMemberIdentityKey(item) === getMemberIdentityKey(selectedMember)) || null
-        setSelectedMember(latest)
-      }
     } catch (error) {
       console.error(error)
-      message.error('加载成员台账失败')
+      message.error('加载成员失败')
     } finally {
       setLoading(false)
     }
   }
 
-  async function openMemberDetail(record: MemberDirectoryItem) {
+  // ---- 添加成员 ----
+  function openAddMember() {
+    if (!selectedSeasonId) { message.warning('请先选择赛季'); return }
+    setSelectedUserKeys([])
+    setGradeMap({})
+    setRoleMap({})
+    setSubRoleMap({})
+    setCheckedKeys(new Set())
+    getPrevGrades().then(r => setPrevGradeMap(r.data)).catch(() => setPrevGradeMap({}))
+    setAddOpen(true)
+  }
+
+  async function onAddMember() {
+    if (!selectedSeasonId || selectedUserKeys.length === 0) return
+    setAdding(true)
+    try {
+      const res = await addMembersBatch(selectedSeasonId, {
+        members: selectedUserKeys.map(uk => ({
+          user_key: uk,
+          performance_grade: gradeMap[uk] || undefined,
+          job_role: roleMap[uk] || undefined,
+          sub_role: roleMap[uk] === 'tech' ? (subRoleMap[uk] || undefined) : undefined,
+        })),
+      })
+      const { added, skipped } = res.data
+      if (added > 0) message.success(`成功添加 ${added} 名成员`)
+      if (skipped.length > 0) {
+        Modal.info({
+          title: '部分成员已跳过',
+          content: skipped.map((s, i) => <div key={i}>{s.name || s.user_key}：{s.reason}</div>),
+        })
+      }
+      setAddOpen(false)
+      await loadMembers()
+    } catch (err: any) {
+      message.error(`添加失败: ${err.message || '未知错误'}`)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function onRemoveMember(member: SeasonMember) {
+    try {
+      await removeMember(member.season_id, member.id)
+      message.success('已移除')
+      await loadMembers()
+    } catch {
+      message.error('移除失败')
+    }
+  }
+
+  async function onEditMemberField(member: SeasonMember, field: string, value: string | null) {
+    try {
+      await updateMember(member.season_id, member.id, { [field]: value })
+      await loadMembers()
+    } catch {
+      message.error('编辑失败')
+    }
+  }
+
+  // ---- 详情抽屉 ----
+  async function openMemberDetail(record: SeasonMember) {
     setSelectedMember(record)
     setEditingJobRole(record.job_role)
     setEditingSubRole(record.sub_role)
@@ -172,9 +221,7 @@ export default function MemberManager() {
       } else {
         setHistory([])
       }
-    } catch (error) {
-      console.error(error)
-      message.error('加载成员历史失败')
+    } catch {
       setHistory([])
     } finally {
       setHistoryLoading(false)
@@ -182,12 +229,7 @@ export default function MemberManager() {
   }
 
   async function handleSaveJobRole() {
-    if (!selectedMember) return
-    if (!selectedMember.user_key) {
-      message.warning('当前成员缺少 user_key，无法更新岗位')
-      return
-    }
-
+    if (!selectedMember?.user_key) { message.warning('缺少 user_key'); return }
     setSavingRole(true)
     try {
       await updateMemberDirectoryJobRole(selectedMember.user_key, {
@@ -195,163 +237,150 @@ export default function MemberManager() {
         sub_role: editingJobRole === 'tech' ? editingSubRole : null,
         syncDraftSeasonMembers,
       })
-      const nextMember: MemberDirectoryItem = {
-        ...selectedMember,
-        job_role: (editingJobRole as MemberDirectoryItem['job_role']) ?? null,
-        sub_role: editingJobRole === 'tech' ? (editingSubRole as MemberDirectoryItem['sub_role']) ?? null : null,
-        system_job_role: (editingJobRole as MemberDirectoryItem['system_job_role']) ?? null,
-        system_sub_role: editingJobRole === 'tech' ? (editingSubRole as MemberDirectoryItem['system_sub_role']) ?? null : null,
-        anomalies: selectedMember.anomalies.filter(item => item !== '未配置岗位' && item !== '岗位数据不一致'),
-      }
-      setSelectedMember(nextMember)
       message.success('岗位已更新')
+      setDrawerOpen(false)
       await loadMembers()
-    } catch (error) {
-      console.error(error)
+    } catch {
       message.error('更新岗位失败')
     } finally {
       setSavingRole(false)
     }
   }
 
-  async function handleSyncMember(record: MemberDirectoryItem) {
-    if (!selectedSeasonId || !record.user_key) {
-      message.warning('当前成员缺少 user_key，无法同步')
-      return
-    }
-
-    setSyncingMemberKey(getMemberIdentityKey(record))
+  async function handleSyncMember(record: SeasonMember) {
+    if (!selectedSeasonId || !record.user_key) return
+    setSyncingMemberKey(record.user_key)
     try {
       await syncMemberSeasonScore(selectedSeasonId, record.user_key)
-      message.success('单人同步完成')
+      message.success('同步完成')
       await loadMembers()
-      if (selectedMember && getMemberIdentityKey(selectedMember) === getMemberIdentityKey(record)) {
-        const historyRes = await getMemberSeasonHistory(record.user_key)
-        setHistory(historyRes.data)
-      }
-    } catch (error) {
-      console.error(error)
-      message.error('单人同步失败')
+    } catch {
+      message.error('同步失败')
     } finally {
       setSyncingMemberKey(null)
     }
   }
 
+  async function handleImportPrev() {
+    if (!selectedSeasonId) return
+    setImporting(true)
+    try {
+      const res = await importPrevMembers(selectedSeasonId)
+      const { added, skipped, prevSeasonName, prevSeasonMembers } = res.data
+      if (added > 0) {
+        message.success(`从「${prevSeasonName}」导入 ${added} 名成员`)
+      } else {
+        message.info('没有新成员需要导入')
+      }
+      if (skipped.length > 0) {
+        Modal.info({
+          title: `${skipped.length} 人已跳过`,
+          content: skipped.map((s, i) => <div key={i}>{s.user_key}：{s.reason}</div>),
+        })
+      }
+      await loadMembers()
+    } catch (err: any) {
+      message.error(err.response?.data?.error || '导入失败')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  // ---- 表格列 ----
   const columns = [
     {
       title: '成员',
-      dataIndex: 'name',
-      width: 220,
-      render: (_: unknown, record: MemberDirectoryItem) => (
+      dataIndex: 'user_name',
+      width: 200,
+      render: (_: unknown, r: SeasonMember) => (
         <Space size={12}>
-          <Avatar src={record.avatar_url} icon={<UserOutlined />} />
+          <Avatar src={r.user_avatar_url} icon={<UserOutlined />} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, color: '#0f172a' }}>{record.name}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{record.email || '-'}</div>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>{r.user_name}</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>{r.user_key}</div>
           </div>
         </Space>
       ),
     },
     {
-      title: '部门 / 岗位',
-      key: 'org',
-      width: 220,
-      render: (_: unknown, record: MemberDirectoryItem) => (
-        <div>
-          <div style={{ color: '#0f172a' }}>{record.department_name || '-'}</div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>{renderRole(record.job_role, record.sub_role)}</div>
-        </div>
-      ),
-    },
-    {
-      title: '系统角色',
-      dataIndex: 'role',
-      width: 100,
-      render: (value: string | null) => <Tag color={value === 'ADMIN' ? 'gold' : value === 'MEMBER' ? 'default' : 'blue'}>{value || '未登录'}</Tag>,
-    },
-    {
-      title: '当前赛季总分',
-      dataIndex: 'selected_total_score',
-      width: 120,
-      render: (value: number | null) => <span style={{ fontWeight: 600 }}>{renderScore(value)}</span>,
-    },
-    {
-      title: '岗位分',
-      dataIndex: 'selected_final_position_score',
-      width: 100,
-      render: (value: number | null) => renderScore(value),
-    },
-    {
-      title: '组织分',
-      dataIndex: 'selected_total_org_score',
-      width: 100,
-      render: (value: number | null) => renderScore(value),
-    },
-    {
-      title: '历史季度分',
-      dataIndex: 'latest_ended_total_score',
-      width: 110,
-      render: (value: number | null) => renderScore(value),
-    },
-    {
-      title: '赛季数',
-      dataIndex: 'season_count',
-      width: 80,
-    },
-    {
-      title: '最近同步',
-      dataIndex: 'last_sync_at',
-      width: 150,
-      render: (value: string | null) => (
-        <span style={{ color: '#64748b', fontSize: 12 }}>{value ? formatDateTime(value) : '-'}</span>
-      ),
-    },
-    {
-      title: '异常',
-      dataIndex: 'anomalies',
-      width: 220,
-      render: (values: string[]) => values.length > 0 ? (
-        <Space size={[4, 4]} wrap>
-          {values.map(item => <Tag color="orange" key={item}>{item}</Tag>)}
+      title: '岗位',
+      dataIndex: 'job_role',
+      width: 200,
+      render: (_: unknown, r: SeasonMember) => (
+        <Space size={4}>
+          <Select
+            size="small"
+            style={{ width: 90 }}
+            value={r.job_role || undefined}
+            placeholder="未设置"
+            allowClear
+            onChange={val => onEditMemberField(r, 'job_role', val ?? null)}
+            options={jobRoleOptions}
+          />
+          {r.job_role === 'tech' && (
+            <Select
+              size="small"
+              style={{ width: 90 }}
+              value={r.sub_role || undefined}
+              placeholder="细分"
+              allowClear
+              onChange={val => onEditMemberField(r, 'sub_role', val ?? null)}
+              options={subRoleOptions}
+            />
+          )}
         </Space>
-      ) : <Tag color="green">正常</Tag>,
+      ),
     },
+    {
+      title: '上期绩效',
+      dataIndex: 'performance_grade',
+      width: 110,
+      render: (v: string | null, r: SeasonMember) => (
+        <Select
+          size="small"
+          style={{ width: 80 }}
+          value={v || undefined}
+          placeholder="未设置"
+          allowClear
+          onChange={val => onEditMemberField(r, 'performance_grade', val ?? null)}
+          options={gradeOptions}
+        />
+      ),
+    },
+    { title: '总分', dataIndex: 'total_score', width: 90, render: (v: number | null) => <span style={{ fontWeight: 600 }}>{renderScore(v)}</span> },
+    { title: '岗位分', dataIndex: 'final_position_score', width: 90, render: renderScore },
+    { title: '组织分', dataIndex: 'total_org_score', width: 90, render: renderScore },
+    { title: '排名', dataIndex: 'rank', width: 70, render: (v: number | null) => v ?? '-' },
+    { title: '271', dataIndex: 'distribution', width: 60, render: (v: string | null) => v || '-' },
     {
       title: '操作',
       key: 'actions',
       fixed: 'right' as const,
-      width: 210,
-      render: (_: unknown, record: MemberDirectoryItem) => (
+      width: 200,
+      render: (_: unknown, r: SeasonMember) => (
         <Space>
-          <Button size="small" onClick={() => openMemberDetail(record)}>详情</Button>
-          <Button
-            size="small"
-            icon={<SyncOutlined />}
-            loading={syncingMemberKey === getMemberIdentityKey(record)}
-            onClick={() => handleSyncMember(record)}
-          >
-            单人同步
-          </Button>
+          <Button size="small" onClick={() => openMemberDetail(r)}>详情</Button>
+          <Button size="small" icon={<SyncOutlined />} loading={syncingMemberKey === r.user_key} onClick={() => handleSyncMember(r)}>同步</Button>
+          <Popconfirm title="确认移除？" onConfirm={() => onRemoveMember(r)}>
+            <Button size="small" danger>移除</Button>
+          </Popconfirm>
         </Space>
       ),
     },
   ]
 
   const historyColumns = [
-    { title: '赛季', dataIndex: 'season_name', render: (value: string, record: MemberSeasonHistoryItem) => (
-      <Space size={8}>
-        <span>{value}</span>
-        <Tag color={seasonStatusColor[record.season_status]}>{seasonStatusLabel[record.season_status]}</Tag>
-      </Space>
+    { title: '赛季', dataIndex: 'season_name', render: (v: string, r: MemberSeasonHistoryItem) => (
+      <Space size={8}><span>{v}</span><Tag color={seasonStatusColor[r.season_status]}>{seasonStatusLabel[r.season_status]}</Tag></Space>
     ) },
-    { title: '时间', render: (_: unknown, record: MemberSeasonHistoryItem) => `${formatDate(record.start_date)} ~ ${formatDate(record.end_date)}` },
-    { title: '岗位', render: (_: unknown, record: MemberSeasonHistoryItem) => renderRole(record.job_role, record.sub_role) },
-    { title: '绩效等级', dataIndex: 'performance_grade', render: (value: string | null) => value || '-' },
-    { title: '总分', dataIndex: 'total_score', render: (value: number | null) => renderScore(value) },
-    { title: '岗位分', dataIndex: 'final_position_score', render: (value: number | null) => renderScore(value) },
-    { title: '组织分', dataIndex: 'total_org_score', render: (value: number | null) => renderScore(value) },
-    { title: '排名', dataIndex: 'rank', render: (value: number | null) => value ?? '-' },
-    { title: '271', dataIndex: 'distribution', render: (value: string | null) => value || '-' },
+    { title: '时间', render: (_: unknown, r: MemberSeasonHistoryItem) => `${formatDate(r.start_date)} ~ ${formatDate(r.end_date)}` },
+    { title: '岗位', render: (_: unknown, r: MemberSeasonHistoryItem) => renderRole(r.job_role, r.sub_role) },
+    { title: '绩效', dataIndex: 'performance_grade', render: (v: string | null) => v || '-' },
+    { title: '总分', dataIndex: 'total_score', render: renderScore },
+    { title: '岗位分', dataIndex: 'final_position_score', render: renderScore },
+    { title: '组织分', dataIndex: 'total_org_score', render: renderScore },
+    { title: '排名', dataIndex: 'rank', render: (v: number | null) => v ?? '-' },
+    { title: '271', dataIndex: 'distribution', render: (v: string | null) => v || '-' },
   ]
 
   return (
@@ -360,49 +389,24 @@ export default function MemberManager() {
         <div>
           <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>成员管理</Typography.Title>
           <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>
-            查看成员岗位、赛季分数和数据异常
+            管理赛季参赛成员、岗位和分数
           </Typography.Text>
         </div>
         <Space wrap>
           <Select
             value={selectedSeasonId}
-            onChange={setSelectedSeasonId}
+            onChange={val => setSelectedSeasonId(val)}
             style={{ width: 180 }}
             options={seasons.map(item => ({ label: item.name, value: item.id }))}
             placeholder="选择赛季"
           />
-          <Select
-            allowClear
-            value={jobRole}
-            onChange={setJobRole}
-            style={{ width: 120 }}
-            placeholder="岗位"
-            options={jobRoleOptions}
-          />
-          <Select
-            allowClear
-            showSearch
-            value={department}
-            onChange={setDepartment}
-            style={{ width: 180 }}
-            placeholder="部门"
-            options={departmentOptions.map(item => ({ label: item, value: item }))}
-          />
-          <Input.Search
-            allowClear
-            placeholder="姓名或邮箱"
-            value={keyword}
-            onChange={e => setKeyword(e.target.value)}
-            onSearch={value => {
-              setKeyword(value)
-              void loadMembers(value)
-            }}
-            style={{ width: 220 }}
-          />
-          <Checkbox checked={anomalyOnly} onChange={e => setAnomalyOnly(e.target.checked)}>
-            仅看异常
-          </Checkbox>
-          <Button icon={<ReloadOutlined />} onClick={() => loadMembers()}>
+          <Button icon={<ImportOutlined />} onClick={handleImportPrev} loading={importing} disabled={!selectedSeasonId}>
+            导入上赛季成员
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openAddMember} disabled={!selectedSeasonId}>
+            添加成员
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={() => loadMembers()} disabled={!selectedSeasonId}>
             刷新
           </Button>
         </Space>
@@ -414,30 +418,133 @@ export default function MemberManager() {
             <Space wrap>
               <Tag color={seasonStatusColor[selectedSeason.status]}>{seasonStatusLabel[selectedSeason.status]}</Tag>
               <Tag>{formatDate(selectedSeason.start_date)} ~ {formatDate(selectedSeason.end_date)}</Tag>
-              <Tag icon={<TeamOutlined />}>{members.length} 人</Tag>
+              <Tag>{members.length} 人</Tag>
             </Space>
             <Space>
               <Button onClick={() => navigate(`/admin/scores/${selectedSeason.id}`)}>岗位分录入</Button>
               <Button onClick={() => navigate(`/admin/org-scores/${selectedSeason.id}`)}>组织分录入</Button>
             </Space>
           </div>
-        ) : null}
+        ) : (
+          <div style={{ padding: '40px 0', textAlign: 'center' }}>
+            <Empty description="请先选择一个赛季" />
+          </div>
+        )}
 
-        <Table
-          rowKey={getMemberIdentityKey}
-          loading={loading}
-          dataSource={members}
-          columns={columns}
-          scroll={{ x: 1450 }}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
-          locale={{ emptyText: <Empty description="暂无成员数据" /> }}
-        />
+        {selectedSeasonId && (
+          <Table
+            rowKey="id"
+            loading={loading}
+            dataSource={members}
+            columns={columns}
+            scroll={{ x: 1300 }}
+            pagination={{ pageSize: 20, showSizeChanger: true }}
+            locale={{ emptyText: <Empty description="暂无参赛成员，点击「添加成员」配置" /> }}
+          />
+        )}
       </Card>
 
+      {/* 添加成员 Modal */}
+      <Modal
+        title="添加参赛成员"
+        open={addOpen}
+        onCancel={() => setAddOpen(false)}
+        onOk={onAddMember}
+        confirmLoading={adding}
+        okText={`添加 ${selectedUserKeys.length} 人`}
+        okButtonProps={{ disabled: selectedUserKeys.length === 0 }}
+        width={680}
+      >
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+          搜索并选择用户，可批量设置岗位和绩效等级。已在赛季中的用户不会出现。
+        </Typography.Paragraph>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+          <Select
+            mode="multiple"
+            showSearch
+            placeholder="搜索并选择用户"
+            optionFilterProp="label"
+            style={{ minWidth: 320 }}
+            value={selectedUserKeys}
+            onChange={keys => {
+              setSelectedUserKeys(keys)
+              setCheckedKeys(new Set())
+              setGradeMap(prev => {
+                const next = { ...prev }
+                for (const k of keys) { if (!next[k] && prevGradeMap[k]) next[k] = prevGradeMap[k] }
+                return next
+              })
+            }}
+            optionRender={({ data: { label, value } }) => {
+              const u = feishuUsers.find(f => f.user_key === value)
+              return <Space><Avatar src={u?.avatar_url} size="small" />{label}</Space>
+            }}
+          >
+            {feishuUsers.filter(u => !existingUserKeys.has(u.user_key)).map(u => (
+              <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>
+            ))}
+          </Select>
+        </div>
+        {selectedUserKeys.length > 0 && (
+          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+              <Checkbox
+                checked={checkedKeys.size === selectedUserKeys.length && selectedUserKeys.length > 0}
+                indeterminate={checkedKeys.size > 0 && checkedKeys.size < selectedUserKeys.length}
+                onChange={e => setCheckedKeys(e.target.checked ? new Set(selectedUserKeys) : new Set())}
+              >
+                全选
+              </Checkbox>
+              <span style={{ color: '#94a3b8', fontSize: 12 }}>已勾选 {checkedKeys.size} 人</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+              <span style={{ color: '#94a3b8', fontSize: 12, width: 48 }}>岗位：</span>
+              {jobRoleOptions.map(o => (
+                <Tag key={o.value} style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
+                  color="green" onClick={() => { if (checkedKeys.size > 0) setRoleMap(prev => { const next = { ...prev }; for (const k of checkedKeys) next[k] = o.value; return next }) }}>{o.label}</Tag>
+              ))}
+            </div>
+            {selectedUserKeys.some(uk => (roleMap[uk] || feishuUsers.find(f => f.user_key === uk)?.job_role) === 'tech') && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                <span style={{ color: '#94a3b8', fontSize: 12, width: 48 }}>细分：</span>
+                {subRoleOptions.map(o => (
+                  <Tag key={o.value} style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
+                    color="purple" onClick={() => { if (checkedKeys.size > 0) setSubRoleMap(prev => { const next = { ...prev }; for (const k of checkedKeys) next[k] = o.value; return next }) }}>{o.label}</Tag>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: '#94a3b8', fontSize: 12, width: 48 }}>绩效：</span>
+              {gradeOptions.map(o => (
+                <Tag key={o.value} style={{ cursor: checkedKeys.size > 0 ? 'pointer' : 'not-allowed', opacity: checkedKeys.size > 0 ? 1 : 0.4 }}
+                  color="blue" onClick={() => { if (checkedKeys.size > 0) setGradeMap(prev => { const next = { ...prev }; for (const k of checkedKeys) next[k] = o.value; return next }) }}>{o.label}</Tag>
+              ))}
+            </div>
+            {selectedUserKeys.map(uk => {
+              const u = feishuUsers.find(f => f.user_key === uk)
+              const effectiveRole = roleMap[uk] || u?.job_role
+              const roleLabel = effectiveRole ? jobRoleOptions.find(j => j.value === effectiveRole)?.label : null
+              const effectiveSubRole = subRoleMap[uk] || u?.sub_role
+              const subRoleLabel = effectiveSubRole ? subRoleOptions.find(s => s.value === effectiveSubRole)?.label : null
+              const effectiveGrade = gradeMap[uk] || prevGradeMap[uk]
+              return (
+                <div key={uk} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+                  <Checkbox checked={checkedKeys.has(uk)} onChange={e => setCheckedKeys(prev => { const next = new Set(prev); e.target.checked ? next.add(uk) : next.delete(uk); return next })} />
+                  <Tag color={roleLabel ? 'green' : 'warning'}>{u?.name ?? uk} {roleLabel ? `· ${roleLabel}` : '· 岗位未设置'}</Tag>
+                  {effectiveRole === 'tech' && <Tag color={subRoleLabel ? 'purple' : undefined}>{subRoleLabel ?? '细分未设置'}</Tag>}
+                  <Tag color={effectiveGrade ? 'geekblue' : undefined}>{effectiveGrade ? `绩效 ${effectiveGrade}` : '未设绩效'}</Tag>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </Modal>
+
+      {/* 成员详情抽屉 */}
       <Drawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={selectedMember ? `${selectedMember.name} · 成员详情` : '成员详情'}
+        title={selectedMember ? `${selectedMember.user_name} · 成员详情` : '成员详情'}
         width={760}
         destroyOnClose
       >
@@ -445,103 +552,45 @@ export default function MemberManager() {
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
             <Card size="small" style={{ borderRadius: 12 }}>
               <Descriptions column={2} size="small" labelStyle={{ width: 88 }}>
-                <Descriptions.Item label="姓名">{selectedMember.name}</Descriptions.Item>
-                <Descriptions.Item label="系统角色">{selectedMember.role || '未登录'}</Descriptions.Item>
-                <Descriptions.Item label="部门">{selectedMember.department_name || '-'}</Descriptions.Item>
-                <Descriptions.Item label="Title">{selectedMember.title || '-'}</Descriptions.Item>
-                <Descriptions.Item label="邮箱">{selectedMember.email || '-'}</Descriptions.Item>
-                <Descriptions.Item label="user_key">{selectedMember.user_key || '-'}</Descriptions.Item>
-                <Descriptions.Item label="当前岗位">{renderRole(selectedMember.job_role, selectedMember.sub_role)}</Descriptions.Item>
-                <Descriptions.Item label="最近同步">{selectedMember.last_sync_at ? formatDateTime(selectedMember.last_sync_at) : '-'}</Descriptions.Item>
+                <Descriptions.Item label="姓名">{selectedMember.user_name}</Descriptions.Item>
+                <Descriptions.Item label="岗位">{renderRole(selectedMember.job_role, selectedMember.sub_role)}</Descriptions.Item>
+                <Descriptions.Item label="绩效等级">{selectedMember.performance_grade || '-'}</Descriptions.Item>
+                <Descriptions.Item label="总分">{renderScore(selectedMember.total_score)}</Descriptions.Item>
+                <Descriptions.Item label="岗位分">{renderScore(selectedMember.final_position_score)}</Descriptions.Item>
+                <Descriptions.Item label="组织分">{renderScore(selectedMember.total_org_score)}</Descriptions.Item>
+                <Descriptions.Item label="排名">{selectedMember.rank ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="271">{selectedMember.distribution || '-'}</Descriptions.Item>
               </Descriptions>
-              <div style={{ marginTop: 12 }}>
-                <Space size={[6, 6]} wrap>
-                  {selectedMember.anomalies.length > 0
-                    ? selectedMember.anomalies.map(item => <Tag color="orange" key={item}>{item}</Tag>)
-                    : <Tag color="green">当前无异常</Tag>}
-                </Space>
-              </div>
             </Card>
 
-            <Card
-              size="small"
-              title="岗位维护"
-              extra={selectedMember.selected_season_member_id ? (
-                <Button
-                  size="small"
-                  icon={<SyncOutlined />}
-                  loading={syncingMemberKey === getMemberIdentityKey(selectedMember)}
-                  onClick={() => handleSyncMember(selectedMember)}
-                >
-                  同步当前赛季
-                </Button>
-              ) : null}
-              style={{ borderRadius: 12 }}
+            <Card size="small" title="岗位维护" style={{ borderRadius: 12 }}
+              extra={<Button size="small" icon={<SyncOutlined />} loading={syncingMemberKey === selectedMember.user_key} onClick={() => handleSyncMember(selectedMember)}>同步</Button>}
             >
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
                 <Space wrap>
-                  <Select
-                    allowClear
-                    style={{ width: 140 }}
-                    placeholder="选择岗位"
-                    value={editingJobRole || undefined}
-                    options={jobRoleOptions}
-                    onChange={value => {
-                      setEditingJobRole(value ?? null)
-                      if (value !== 'tech') {
-                        setEditingSubRole(null)
-                      }
-                    }}
-                  />
-                  <Select
-                    allowClear
-                    disabled={editingJobRole !== 'tech'}
-                    style={{ width: 140 }}
-                    placeholder="选择子岗位"
-                    value={editingSubRole || undefined}
-                    options={subRoleOptions}
-                    onChange={value => setEditingSubRole(value ?? null)}
-                  />
+                  <Select allowClear style={{ width: 140 }} placeholder="选择岗位" value={editingJobRole || undefined} options={jobRoleOptions}
+                    onChange={value => { setEditingJobRole(value ?? null); if (value !== 'tech') setEditingSubRole(null) }} />
+                  {editingJobRole === 'tech' && (
+                    <Select allowClear style={{ width: 140 }} placeholder="选择子岗位" value={editingSubRole || undefined} options={subRoleOptions}
+                      onChange={value => setEditingSubRole(value ?? null)} />
+                  )}
                 </Space>
-                <Checkbox
-                  checked={syncDraftSeasonMembers}
-                  onChange={e => setSyncDraftSeasonMembers(e.target.checked)}
-                >
+                <Checkbox checked={syncDraftSeasonMembers} onChange={e => setSyncDraftSeasonMembers(e.target.checked)}>
                   同步更新草稿赛季中的岗位快照
                 </Checkbox>
                 <Space>
-                  <Button
-                    type="primary"
-                    loading={savingRole}
-                    disabled={!selectedMember.user_key || (editingJobRole === 'tech' && !editingSubRole)}
-                    onClick={handleSaveJobRole}
-                  >
+                  <Button type="primary" loading={savingRole} disabled={!selectedMember.user_key || (editingJobRole === 'tech' && !editingSubRole)} onClick={handleSaveJobRole}>
                     保存岗位
                   </Button>
-                  {selectedMember.selected_season_id && (
-                    <Button onClick={() => navigate(`/admin/scores/${selectedMember.selected_season_id}`)}>
-                      去岗位分录入
-                    </Button>
-                  )}
-                  {selectedMember.selected_season_id && (
-                    <Button onClick={() => navigate(`/admin/org-scores/${selectedMember.selected_season_id}`)}>
-                      去组织分录入
-                    </Button>
-                  )}
+                  {selectedMember.season_id && <Button onClick={() => navigate(`/admin/scores/${selectedMember.season_id}`)}>岗位分录入</Button>}
+                  {selectedMember.season_id && <Button onClick={() => navigate(`/admin/org-scores/${selectedMember.season_id}`)}>组织分录入</Button>}
                 </Space>
               </Space>
             </Card>
 
             <Card size="small" title="赛季成绩历史" style={{ borderRadius: 12 }}>
-              <Table
-                rowKey="season_member_id"
-                loading={historyLoading}
-                dataSource={history}
-                columns={historyColumns}
-                pagination={false}
-                locale={{ emptyText: <Empty description="暂无历史成绩" /> }}
-                scroll={{ x: 980 }}
-              />
+              <Table rowKey="season_member_id" loading={historyLoading} dataSource={history} columns={historyColumns}
+                pagination={false} locale={{ emptyText: <Empty description="暂无历史成绩" /> }} scroll={{ x: 900 }} />
             </Card>
           </Space>
         ) : null}

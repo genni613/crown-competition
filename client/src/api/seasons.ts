@@ -19,3 +19,15 @@ export interface BatchAddResult {
 
 export const addMembersBatch = (seasonId: number, data: { members: { user_key: string; performance_grade?: string; job_role?: string; sub_role?: string }[] }) =>
   api.post<BatchAddResult>(`/seasons/${seasonId}/members/batch`, data)
+
+export interface ImportPrevResult {
+  added: number
+  skipped: { user_key: string; reason: string }[]
+  prevSeasonName: string
+  prevSeasonMembers: number
+}
+
+export const importPrevMembers = (seasonId: number) =>
+  api.post<ImportPrevResult>(`/seasons/${seasonId}/members/import-prev`)
+
+export const getPrevGrades = () => api.get<Record<string, string>>('/seasons/prev-grades')

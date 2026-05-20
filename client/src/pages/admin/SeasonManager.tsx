@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Table, Button, Modal, Form, Input, DatePicker, Tag, Space, Select, Popconfirm, message, Typography, Card, Avatar, Checkbox } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
-import { getSeasons, createSeason, activateSeason, endSeason, getMembers, updateMember, removeMember, addMembersBatch } from '../../api/seasons'
+import { getSeasons, createSeason, activateSeason, endSeason, getMembers, updateMember, removeMember, addMembersBatch, getPrevGrades } from '../../api/seasons'
 import { getLocalFeishuUsers } from '../../api/feishu'
 import { copilotConfig } from '../../components/copilot/config'
 import type { LocalFeishuUser } from '../../api/feishu'
@@ -94,6 +94,7 @@ export default function SeasonManager() {
       setSelectedSeason(seasonId)
       const res = await getMembers(seasonId)
       setMembers(res.data)
+      getPrevGrades().then(r => setPrevGradeMap(r.data)).catch(() => setPrevGradeMap({}))
     } catch {
       message.error('加载成员失败')
     }
@@ -116,6 +117,7 @@ export default function SeasonManager() {
   const [roleMap, setRoleMap] = useState<Record<string, string>>({})
   const [subRoleMap, setSubRoleMap] = useState<Record<string, string>>({})
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set())
+  const [prevGradeMap, setPrevGradeMap] = useState<Record<string, string>>({})
 
   async function onAddMember() {
     if (!selectedSeason || selectedUserKeys.length === 0) return
@@ -270,7 +272,17 @@ export default function SeasonManager() {
               optionFilterProp="label"
               style={{ minWidth: 320 }}
               value={selectedUserKeys}
-              onChange={keys => { setSelectedUserKeys(keys); setCheckedKeys(new Set()) }}
+              onChange={keys => {
+                setSelectedUserKeys(keys)
+                setCheckedKeys(new Set())
+                setGradeMap(prev => {
+                  const next = { ...prev }
+                  for (const k of keys) {
+                    if (!next[k] && prevGradeMap[k]) next[k] = prevGradeMap[k]
+                  }
+                  return next
+                })
+              }}
               optionRender={({ data: { label, value } }) => {
                 const u = feishuUsers.find(f => f.user_key === value)
                 return <Space><Avatar src={u?.avatar_url} size="small" />{label}</Space>
@@ -361,6 +373,9 @@ export default function SeasonManager() {
                 const baseSubRole = u?.sub_role
                 const effectiveSubRole = overrideSubRole || baseSubRole
                 const subRoleLabel = effectiveSubRole ? subRoleOptions.find(s => s.value === effectiveSubRole)?.label : null
+                const prevGrade = prevGradeMap[uk]
+                const currentGrade = gradeMap[uk]
+                const effectiveGrade = currentGrade || prevGrade
                 return (
                   <div key={uk} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
                     <Checkbox
@@ -381,8 +396,12 @@ export default function SeasonManager() {
                         {subRoleLabel ?? '细分未设置'}
                       </Tag>
                     )}
-                    <Tag color={gradeMap[uk] ? 'geekblue' : undefined} style={{ marginRight: 0 }}>
-                      {gradeMap[uk] ? `绩效 ${gradeMap[uk]}` : '未设绩效'}
+                    <Tag color={effectiveGrade ? 'geekblue' : undefined} style={{ marginRight: 0 }}>
+                      {effectiveGrade
+                        ? (currentGrade && prevGrade && currentGrade !== prevGrade
+                            ? `绩效 ${currentGrade}（上季 ${prevGrade}）`
+                            : `绩效 ${effectiveGrade}`)
+                        : '未设绩效'}
                     </Tag>
                   </div>
                 )

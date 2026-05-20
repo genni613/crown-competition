@@ -70,6 +70,7 @@ export async function upsertUser(params: {
   const existing = await db.queryOne<User>('SELECT * FROM users WHERE open_id = ?', [params.open_id])
 
   // 通过姓名从 feishu_user 匹配 user_key
+  // 注：open_id 和 user_key 来自飞书两套 API，无法自动关联，只能靠姓名匹配
   const feishuRow = await db.queryOne<{ user_key: string }>(
     'SELECT user_key FROM feishu_user WHERE name = ? LIMIT 1',
     [params.name]
@@ -154,7 +155,7 @@ export async function getMemberDirectory(filters: MemberDirectoryFilters = {}): 
   const selectedSeasonJoin = selectedSeasonId
     ? `
       LEFT JOIN season_members sm_selected
-        ON sm_selected.user_key = dbase.user_key AND sm_selected.season_id = ${Number(selectedSeasonId)}
+        ON sm_selected.user_key COLLATE utf8mb4_unicode_ci = dbase.user_key COLLATE utf8mb4_unicode_ci AND sm_selected.season_id = ${Number(selectedSeasonId)}
       LEFT JOIN seasons s_selected
         ON s_selected.id = sm_selected.season_id
     `
@@ -195,31 +196,31 @@ export async function getMemberDirectory(filters: MemberDirectoryFilters = {}): 
         fu.updated_at AS last_sync_at
       FROM (
         SELECT
-          fu.user_key,
-          fu.name,
+          fu.user_key COLLATE utf8mb4_unicode_ci AS user_key,
+          fu.name COLLATE utf8mb4_unicode_ci AS name,
           fu.avatar_url,
-          fu.email
+          fu.email COLLATE utf8mb4_unicode_ci AS email
         FROM feishu_user fu
 
         UNION
 
         SELECT
           NULL AS user_key,
-          u.name,
+          u.name COLLATE utf8mb4_unicode_ci AS name,
           u.avatar_url,
-          u.email
+          u.email COLLATE utf8mb4_unicode_ci AS email
         FROM users u
         WHERE u.user_key IS NULL
            OR NOT EXISTS (
              SELECT 1
              FROM feishu_user mapped
-             WHERE mapped.user_key = u.user_key
+             WHERE mapped.user_key = u.user_key COLLATE utf8mb4_unicode_ci
            )
       ) dbase
       LEFT JOIN feishu_user fu
-        ON fu.user_key = dbase.user_key
+        ON fu.user_key = dbase.user_key COLLATE utf8mb4_unicode_ci
       LEFT JOIN users u
-        ON (dbase.user_key IS NOT NULL AND u.user_key = dbase.user_key)
+        ON (dbase.user_key IS NOT NULL AND u.user_key = dbase.user_key COLLATE utf8mb4_unicode_ci)
         OR (
           dbase.user_key IS NULL
           AND u.user_key IS NULL
@@ -232,7 +233,7 @@ export async function getMemberDirectory(filters: MemberDirectoryFilters = {}): 
         FROM season_members
         GROUP BY user_key
       ) member_stats
-        ON member_stats.user_key = dbase.user_key
+        ON member_stats.user_key COLLATE utf8mb4_unicode_ci = dbase.user_key COLLATE utf8mb4_unicode_ci
       LEFT JOIN (
         SELECT ended.user_key, ended.total_score
         FROM season_members ended
@@ -246,10 +247,10 @@ export async function getMemberDirectory(filters: MemberDirectoryFilters = {}): 
           WHERE s.status = 'ended'
           GROUP BY sm.user_key
         ) latest
-          ON latest.user_key = ended.user_key
+          ON latest.user_key COLLATE utf8mb4_unicode_ci = ended.user_key COLLATE utf8mb4_unicode_ci
          AND ended_season.end_date = latest.latest_end_date
       ) latest_ended
-        ON latest_ended.user_key = dbase.user_key
+        ON latest_ended.user_key COLLATE utf8mb4_unicode_ci = dbase.user_key COLLATE utf8mb4_unicode_ci
       ${whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''}
       ORDER BY
         sm_selected.total_score IS NULL,

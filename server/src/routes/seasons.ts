@@ -4,6 +4,25 @@ import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 import { getPerformanceScore } from '../utils/constants'
 
+async function lookupPrevGrades(db: any, userKeys: string[]): Promise<Record<string, string>> {
+  if (userKeys.length === 0) return {}
+  const lastEndedSeason = await db.queryOne<{ id: number }>(
+    'SELECT id FROM seasons WHERE status = ? ORDER BY end_date DESC LIMIT 1',
+    ['ended']
+  )
+  if (!lastEndedSeason) return {}
+  const placeholders = userKeys.map(() => '?').join(',')
+  const rows = await db.query<{ user_key: string; performance_grade: string }>(
+    `SELECT user_key, performance_grade FROM season_members WHERE season_id = ? AND performance_grade IS NOT NULL AND user_key IN (${placeholders})`,
+    [lastEndedSeason.id, ...userKeys]
+  )
+  const map: Record<string, string> = {}
+  for (const row of rows) {
+    map[row.user_key] = row.performance_grade
+  }
+  return map
+}
+
 export const seasonsRouter = Router()
 
 // GET /api/seasons — 赛季列表
@@ -11,6 +30,28 @@ seasonsRouter.get('/', authMiddleware, asyncHandler(async (_req: Request, res: R
   const db = getDb()
   const seasons = await db.query('SELECT * FROM seasons ORDER BY created_at DESC')
   res.json(seasons)
+}))
+
+// GET /api/seasons/prev-grades — 最近已结束赛季的绩效等级
+seasonsRouter.get('/prev-grades', authMiddleware, asyncHandler(async (_req: Request, res: Response) => {
+  const db = getDb()
+  const lastEndedSeason = await db.queryOne<{ id: number }>(
+    'SELECT id FROM seasons WHERE status = ? ORDER BY end_date DESC LIMIT 1',
+    ['ended']
+  )
+  if (!lastEndedSeason) {
+    res.json({})
+    return
+  }
+  const rows = await db.query<{ user_key: string; performance_grade: string }>(
+    'SELECT user_key, performance_grade FROM season_members WHERE season_id = ? AND performance_grade IS NOT NULL',
+    [lastEndedSeason.id]
+  )
+  const gradeMap: Record<string, string> = {}
+  for (const row of rows) {
+    gradeMap[row.user_key] = row.performance_grade
+  }
+  res.json(gradeMap)
 }))
 
 // GET /api/seasons/:id — 赛季详情
@@ -122,6 +163,9 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
   )
   const existingSet = new Set(existing.map(r => r.user_key))
 
+  // 自动查询上一赛季绩效等级
+  const prevGrades = await lookupPrevGrades(db, userKeys)
+
   for (const m of members) {
     const feishu = feishuMap.get(m.user_key)
 
@@ -137,7 +181,8 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
 
     const jobRole = m.job_role || feishu.job_role || null
     const subRole = m.sub_role || feishu.sub_role || null
-    const prevRawScore = m.performance_grade ? getPerformanceScore(m.performance_grade) : null
+    const grade = m.performance_grade || prevGrades[m.user_key] || null
+    const prevRawScore = grade ? getPerformanceScore(grade) : null
 
     try {
       await withTransaction(async tx => {
@@ -149,7 +194,7 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
         }
         const result = await tx.execute(
           'INSERT INTO season_members (season_id, user_key, job_role, sub_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?, ?)',
-          [seasonId, m.user_key, jobRole, jobRole === 'tech' ? subRole : null, m.performance_grade ?? null, prevRawScore]
+          [seasonId, m.user_key, jobRole, jobRole === 'tech' ? subRole : null, grade, prevRawScore]
         )
         if (jobRole) {
           const dimensions = await tx.query<{ id: number; data_source?: string }>(
@@ -178,20 +223,108 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
   res.status(201).json({ added, skipped })
 }))
 
+// POST /api/seasons/:id/members/import-prev — 一键导入上赛季成员
+seasonsRouter.post('/:id/members/import-prev', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const seasonId = parseInt(req.params.id, 10)
+  const db = getDb()
+
+  // 查找上一个已结束的赛季
+  const prevSeason = await db.queryOne<{ id: number; name: string }>(
+    `SELECT id, name FROM seasons WHERE status = 'ended' ORDER BY end_date DESC LIMIT 1`
+  )
+  if (!prevSeason) {
+    res.status(400).json({ error: '没有已结束的赛季可导入' })
+    return
+  }
+
+  // 查找上赛季成员（按 end_date 最近的取，可能同一赛季多人）
+  const prevMembers = await db.query<{
+    user_key: string; job_role: string | null; sub_role: string | null
+    performance_grade: string | null; prev_raw_score: number | null
+  }>(
+    'SELECT user_key, job_role, sub_role, performance_grade, prev_raw_score FROM season_members WHERE season_id = ?',
+    [prevSeason.id]
+  )
+  if (prevMembers.length === 0) {
+    res.status(400).json({ error: `上赛季「${prevSeason.name}」没有成员` })
+    return
+  }
+
+  // 当前赛季已有的成员
+  const existing = await db.query<{ user_key: string }>(
+    'SELECT user_key FROM season_members WHERE season_id = ?',
+    [seasonId]
+  )
+  const existingSet = new Set(existing.map(r => r.user_key))
+
+  let added = 0
+  const skipped: { user_key: string; reason: string }[] = []
+
+  for (const pm of prevMembers) {
+    if (existingSet.has(pm.user_key)) {
+      skipped.push({ user_key: pm.user_key, reason: '已在此赛季中' })
+      continue
+    }
+
+    // 确认 user_key 在 feishu_user 中仍存在
+    const feishu = await db.queryOne<{ user_key: string }>(
+      'SELECT user_key FROM feishu_user WHERE user_key = ?',
+      [pm.user_key]
+    )
+    if (!feishu) {
+      skipped.push({ user_key: pm.user_key, reason: '飞书用户已不存在' })
+      continue
+    }
+
+    try {
+      await withTransaction(async tx => {
+        const result = await tx.execute(
+          'INSERT INTO season_members (season_id, user_key, job_role, sub_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?, ?)',
+          [seasonId, pm.user_key, pm.job_role, pm.job_role === 'tech' ? pm.sub_role : null, pm.performance_grade, pm.prev_raw_score]
+        )
+        if (pm.job_role) {
+          const dimensions = await tx.query<{ id: number; data_source?: string }>(
+            'SELECT id, data_source FROM scoring_dimensions WHERE job_role = ?',
+            [pm.job_role]
+          )
+          for (const dim of dimensions) {
+            await tx.execute(
+              'INSERT IGNORE INTO indicator_scores (season_member_id, dimension_id, source) VALUES (?, ?, ?)',
+              [result.insertId, dim.id, dim.data_source || 'admin']
+            )
+          }
+        }
+      })
+      added++
+    } catch (err: any) {
+      if (err.code === 'ER_DUP_ENTRY' || err.message?.includes('Duplicate')) {
+        skipped.push({ user_key: pm.user_key, reason: '已在此赛季中' })
+      } else {
+        throw err
+      }
+    }
+  }
+
+  res.status(201).json({ added, skipped, prevSeasonName: prevSeason.name, prevSeasonMembers: prevMembers.length })
+}))
+
 // POST /api/seasons/:id/members — 添加成员
 seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { user_key, job_role, sub_role, performance_grade } = req.body
   if (!user_key) { res.status(400).json({ error: '缺少 user_key' }); return }
 
   const seasonId = parseInt(req.params.id, 10)
-  const prevRawScore = performance_grade ? getPerformanceScore(performance_grade) : null
+  const db = getDb()
+  const prevGrades = await lookupPrevGrades(db, [user_key])
+  const grade = performance_grade || prevGrades[user_key] || null
+  const prevRawScore = grade ? getPerformanceScore(grade) : null
   const effectiveSubRole = job_role === 'tech' ? (sub_role || null) : null
 
   try {
     const memberId = await withTransaction(async tx => {
       const result = await tx.execute(
         'INSERT INTO season_members (season_id, user_key, job_role, sub_role, performance_grade, prev_raw_score) VALUES (?, ?, ?, ?, ?, ?)',
-        [seasonId, user_key, job_role, effectiveSubRole, performance_grade, prevRawScore]
+        [seasonId, user_key, job_role, effectiveSubRole, grade, prevRawScore]
       )
       const dimensions = await tx.query<{ id: number; data_source?: string }>(
         'SELECT id, data_source FROM scoring_dimensions WHERE job_role = ?',
@@ -223,7 +356,10 @@ seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Req
 seasonsRouter.put('/:id/members/:mid', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { job_role, sub_role, performance_grade } = req.body
   const db = getDb()
-  const prevRawScore = performance_grade ? getPerformanceScore(performance_grade) : undefined
+  const existing = await db.queryOne<{ user_key: string }>('SELECT user_key FROM season_members WHERE id = ? AND season_id = ?', [req.params.mid, req.params.id])
+  const prevGrades = existing ? await lookupPrevGrades(db, [existing.user_key]) : {}
+  const grade = performance_grade || prevGrades[existing?.user_key ?? ''] || undefined
+  const prevRawScore = grade ? getPerformanceScore(grade) : undefined
 
   await db.execute(`
     UPDATE season_members SET

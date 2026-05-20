@@ -91,8 +91,8 @@ export interface OrgScore {
   points: number
   description: string | null
   status: 'pending' | 'approved' | 'rejected'
-  submitted_by: string | null
-  reviewed_by: string | null
+  submitted_by: number | null
+  reviewed_by: number | null
 }
 
 export interface EvidenceSubmission {
@@ -112,7 +112,7 @@ export interface EvidenceSubmission {
 export interface EvidenceReview {
   id: number
   evidence_submission_id: number
-  reviewer_id: string
+  reviewer_id: number
   action: 'approved' | 'rejected'
   comment: string | null
   snapshot_json: string | null
