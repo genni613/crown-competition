@@ -126,18 +126,20 @@ async function doCalculate(tx: DbExecutor, seasonId: number): Promise<SeasonMemb
       )
     }
 
-    const ranked = await tx.query<SeasonMember>(
-      'SELECT sm.*, fu.name as user_name FROM season_members sm JOIN feishu_user fu ON sm.user_key = fu.user_key WHERE sm.season_id = ? AND sm.job_role = ? ORDER BY (sm.final_position_score + sm.total_org_score) DESC, sm.raw_position_score DESC, fu.name ASC',
-      [seasonId, jobRole]
-    )
+  }
 
-    const distributions = calculate271(ranked.length)
-    for (let i = 0; i < ranked.length; i++) {
-      await tx.execute(
-        'UPDATE season_members SET total_score = final_position_score + total_org_score, `rank` = ?, distribution = ? WHERE id = ?',
-        [i + 1, distributions[i], ranked[i].id]
-      )
-    }
+  // 全局排名 & 271（不区分岗位）
+  const allRanked = await tx.query<SeasonMember>(
+    'SELECT sm.*, fu.name as user_name FROM season_members sm JOIN feishu_user fu ON sm.user_key = fu.user_key WHERE sm.season_id = ? ORDER BY (sm.final_position_score + sm.total_org_score) DESC, sm.raw_position_score DESC, fu.name ASC',
+    [seasonId]
+  )
+
+  const distributions = calculate271(allRanked.length)
+  for (let i = 0; i < allRanked.length; i++) {
+    await tx.execute(
+      'UPDATE season_members SET total_score = final_position_score + total_org_score, `rank` = ?, distribution = ? WHERE id = ?',
+      [i + 1, distributions[i], allRanked[i].id]
+    )
   }
 
   return tx.query<SeasonMember>(

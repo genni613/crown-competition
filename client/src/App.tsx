@@ -21,6 +21,7 @@ import DimensionManager from './pages/admin/DimensionManager'
 import MemberManager from './pages/admin/MemberManager'
 import MemberScoreDetail from './pages/admin/MemberScoreDetail'
 import MemberDirectory from './pages/admin/MemberDirectory'
+import RankingDetail from './pages/admin/RankingDetail'
 
 const jobRoleOptions = [
   { label: '产品', value: 'product' },
@@ -178,6 +179,7 @@ export default function App() {
             <Route path="/admin/dimensions" element={<DimensionManager />} />
             <Route path="/admin/feishu/:seasonId" element={<FeishuManager />} />
             <Route path="/admin/member-score/:seasonId/:memberId" element={<MemberScoreDetail />} />
+            <Route path="/admin/ranking-detail/:seasonId" element={<RankingDetail />} />
           </>
         )}
         <Route path="*" element={<Navigate to="/" replace />} />

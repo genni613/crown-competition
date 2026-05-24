@@ -84,8 +84,8 @@ const GONGSHI_TIME = 'COALESCE(g.work_date, g.work_start_time, g.create_time, g.
 async function queryLocalPdCount(userKey: string, startMs: number, endMs: number): Promise<number> {
   const rows = await getDb().query<{ total_pd: number }>(`
     SELECT ROUND(SUM(COALESCE(pd_count, 0)), 2) AS total_pd
-    FROM feishu_workitem_gongshi
-    WHERE work_hour_reporter = ?
+    FROM feishu_workitem_gongshi g
+    WHERE g.work_hour_reporter = ?
       AND ${GONGSHI_TIME} IS NOT NULL
       AND ${GONGSHI_TIME} >= ?
       AND ${GONGSHI_TIME} < ?
@@ -175,12 +175,12 @@ async function aggregateDesign(userKey: string, startMs: number, endMs: number):
   // 设计需求完成数：从工时表统计关联的不同需求数
   const storyRows = await db.query<{ count: number }>(`
     SELECT COUNT(DISTINCT related_requirement) as count
-    FROM feishu_workitem_gongshi
-    WHERE work_hour_reporter = ?
+    FROM feishu_workitem_gongshi g
+    WHERE g.work_hour_reporter = ?
       AND ${GONGSHI_TIME} IS NOT NULL
       AND ${GONGSHI_TIME} >= ?
       AND ${GONGSHI_TIME} < ?
-      AND related_requirement IS NOT NULL AND related_requirement != ''
+      AND g.related_requirement IS NOT NULL AND g.related_requirement != ''
   `, [userKey, new Date(startMs), new Date(endMs)])
 
   const resolvedIssueCount = await queryLocalIssueCount(userKey, startMs, endMs)

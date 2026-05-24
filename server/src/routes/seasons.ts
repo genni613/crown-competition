@@ -4,20 +4,57 @@ import type { DbExecutor } from '../db'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 import { getPerformanceScore } from '../utils/constants'
+import { assertSeasonEditable } from '../utils/seasonLock'
 
 const PARTICIPANT_JOB_ROLES = ['product', 'design', 'tech'] as const
 
-async function lookupPrevGrades(db: DbExecutor, userKeys: string[]): Promise<Record<string, string>> {
-  if (userKeys.length === 0) return {}
-  const lastEndedSeason = await db.queryOne<{ id: number }>(
-    'SELECT id FROM seasons WHERE status = ? ORDER BY end_date DESC LIMIT 1',
-    ['ended']
+async function findPreviousSeason(
+  db: DbExecutor,
+  currentSeasonId: number,
+): Promise<{ id: number; name: string } | undefined> {
+  const currentSeason = await db.queryOne<{ id: number; name: string; start_date: string; end_date: string }>(
+    'SELECT id, name, start_date, end_date FROM seasons WHERE id = ?',
+    [currentSeasonId],
   )
-  if (!lastEndedSeason) return {}
+  if (!currentSeason) return undefined
+
+  const previousByStart = await db.queryOne<{ id: number; name: string }>(
+    `SELECT id, name
+     FROM seasons
+     WHERE status = 'ended'
+       AND id <> ?
+       AND end_date < ?
+     ORDER BY end_date DESC, id DESC
+     LIMIT 1`,
+    [currentSeasonId, currentSeason.start_date]
+  )
+  if (previousByStart) return previousByStart
+
+  return db.queryOne<{ id: number; name: string }>(
+    `SELECT id, name
+     FROM seasons
+     WHERE status = 'ended'
+       AND id <> ?
+       AND end_date < ?
+     ORDER BY end_date DESC, id DESC
+     LIMIT 1`,
+    [currentSeasonId, currentSeason.end_date]
+  )
+}
+
+async function lookupPrevGrades(db: DbExecutor, userKeys: string[], seasonId?: number): Promise<Record<string, string>> {
+  if (userKeys.length === 0) return {}
+  const previousSeason = seasonId
+    ? await findPreviousSeason(db, seasonId)
+    : await db.queryOne<{ id: number; name: string }>(
+      'SELECT id, name FROM seasons WHERE status = ? ORDER BY end_date DESC, id DESC LIMIT 1',
+      ['ended']
+    )
+  if (!previousSeason) return {}
   const placeholders = userKeys.map(() => '?').join(',')
   const rows = await db.query<{ user_key: string; performance_grade: string }>(
     `SELECT user_key, performance_grade FROM season_members WHERE season_id = ? AND performance_grade IS NOT NULL AND user_key IN (${placeholders})`,
-    [lastEndedSeason.id, ...userKeys]
+    [previousSeason.id, ...userKeys]
   )
   const map: Record<string, string> = {}
   for (const row of rows) {
@@ -35,20 +72,23 @@ seasonsRouter.get('/', authMiddleware, asyncHandler(async (_req: Request, res: R
   res.json(seasons)
 }))
 
-// GET /api/seasons/prev-grades — 最近已结束赛季的绩效等级
-seasonsRouter.get('/prev-grades', authMiddleware, asyncHandler(async (_req: Request, res: Response) => {
+// GET /api/seasons/prev-grades — 相对当前赛季的上赛季绩效等级
+seasonsRouter.get('/prev-grades', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
-  const lastEndedSeason = await db.queryOne<{ id: number }>(
-    'SELECT id FROM seasons WHERE status = ? ORDER BY end_date DESC LIMIT 1',
-    ['ended']
-  )
-  if (!lastEndedSeason) {
+  const seasonId = req.query.seasonId ? Number(req.query.seasonId) : undefined
+  const previousSeason = seasonId
+    ? await findPreviousSeason(db, seasonId)
+    : await db.queryOne<{ id: number; name: string }>(
+      'SELECT id, name FROM seasons WHERE status = ? ORDER BY end_date DESC, id DESC LIMIT 1',
+      ['ended']
+    )
+  if (!previousSeason) {
     res.json({})
     return
   }
   const rows = await db.query<{ user_key: string; performance_grade: string }>(
     'SELECT user_key, performance_grade FROM season_members WHERE season_id = ? AND performance_grade IS NOT NULL',
-    [lastEndedSeason.id]
+    [previousSeason.id]
   )
   const gradeMap: Record<string, string> = {}
   for (const row of rows) {
@@ -146,6 +186,7 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
 
   const seasonId = parseInt(req.params.id, 10)
   const db = getDb()
+  await assertSeasonEditable(db, seasonId)
   const skipped: { user_key: string; name?: string; reason: string }[] = []
   let added = 0
 
@@ -235,17 +276,14 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
 seasonsRouter.post('/:id/members/import-prev', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const seasonId = parseInt(req.params.id, 10)
   const db = getDb()
+  await assertSeasonEditable(db, seasonId)
 
-  // 查找上一个已结束的赛季
-  const prevSeason = await db.queryOne<{ id: number; name: string }>(
-    `SELECT id, name FROM seasons WHERE status = 'ended' ORDER BY end_date DESC LIMIT 1`
-  )
+  const prevSeason = await findPreviousSeason(db, seasonId)
   if (!prevSeason) {
-    res.status(400).json({ error: '没有已结束的赛季可导入' })
+    res.status(400).json({ error: '当前赛季之前没有可导入的已结束赛季' })
     return
   }
 
-  // 查找上赛季成员（按 end_date 最近的取，可能同一赛季多人）
   const prevMembers = await db.query<{
     user_key: string; job_role: string | null; sub_role: string | null
     performance_grade: string | null; prev_raw_score: number | null
@@ -331,7 +369,8 @@ seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Req
 
   const seasonId = parseInt(req.params.id, 10)
   const db = getDb()
-  const prevGrades = await lookupPrevGrades(db, [user_key])
+  await assertSeasonEditable(db, seasonId)
+  const prevGrades = await lookupPrevGrades(db, [user_key], seasonId)
   const grade = performance_grade || prevGrades[user_key] || null
   const prevRawScore = grade ? getPerformanceScore(grade) : null
   const effectiveSubRole = job_role === 'tech' ? (sub_role || null) : null
@@ -376,8 +415,9 @@ seasonsRouter.put('/:id/members/:mid', adminMiddleware, asyncHandler(async (req:
     return
   }
   const db = getDb()
+  await assertSeasonEditable(db, Number(req.params.id))
   const existing = await db.queryOne<{ user_key: string }>('SELECT user_key FROM season_members WHERE id = ? AND season_id = ?', [req.params.mid, req.params.id])
-  const prevGrades = existing ? await lookupPrevGrades(db, [existing.user_key]) : {}
+  const prevGrades = existing ? await lookupPrevGrades(db, [existing.user_key], Number(req.params.id)) : {}
   const grade = performance_grade || prevGrades[existing?.user_key ?? ''] || undefined
   const prevRawScore = grade ? getPerformanceScore(grade) : undefined
 
@@ -397,6 +437,7 @@ seasonsRouter.put('/:id/members/:mid', adminMiddleware, asyncHandler(async (req:
 // DELETE /api/seasons/:id/members/:mid — 移除成员
 seasonsRouter.delete('/:id/members/:mid', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const db = getDb()
+  await assertSeasonEditable(db, Number(req.params.id))
   await db.execute('DELETE FROM season_members WHERE id = ? AND season_id = ?', [req.params.mid, req.params.id])
   res.json({ ok: true })
 }))

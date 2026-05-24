@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { getDb, withTransaction } from '../db'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
+import { assertSeasonEditable } from '../utils/seasonLock'
 
 export const orgScoresRouter = Router()
 
@@ -29,6 +30,7 @@ orgScoresRouter.get('/:seasonId/:memberId', adminMiddleware, asyncHandler(async 
 orgScoresRouter.post('/:seasonId/:memberId', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { org_score_type_id, quantity, description } = req.body
   if (!org_score_type_id) { res.status(400).json({ error: '缺少组织分类型' }); return }
+  await assertSeasonEditable(getDb(), Number(req.params.seasonId))
 
   const memberId = req.params.memberId
   const type = await getDb().queryOne<{ points_per_unit: number; max_per_season?: number }>(
@@ -79,11 +81,18 @@ orgScoresRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, r
 
   const existing = await getDb().queryOne<{
     season_member_id: number
+    season_id: number
     org_score_type_id: number
     quantity: number
     description?: string
-  }>('SELECT * FROM org_scores WHERE id = ?', [req.params.id])
+  }>(`
+    SELECT os.*, sm.season_id
+    FROM org_scores os
+    JOIN season_members sm ON sm.id = os.season_member_id
+    WHERE os.id = ?
+  `, [req.params.id])
   if (!existing) { res.status(404).json({ error: '不存在' }); return }
+  await assertSeasonEditable(getDb(), existing.season_id)
 
   const type = await getDb().queryOne<{ points_per_unit: number }>(
     'SELECT * FROM org_score_types WHERE id = ?',
@@ -112,8 +121,14 @@ orgScoresRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, r
 
 // DELETE /api/org-scores/:id — 删除组织分
 orgScoresRouter.delete('/:id', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const existing = await getDb().queryOne<{ season_member_id: number }>('SELECT * FROM org_scores WHERE id = ?', [req.params.id])
+  const existing = await getDb().queryOne<{ season_member_id: number; season_id: number }>(`
+    SELECT os.season_member_id, sm.season_id
+    FROM org_scores os
+    JOIN season_members sm ON sm.id = os.season_member_id
+    WHERE os.id = ?
+  `, [req.params.id])
   if (!existing) { res.status(404).json({ error: '不存在' }); return }
+  await assertSeasonEditable(getDb(), existing.season_id)
 
   await withTransaction(async tx => {
     await tx.queryOne('SELECT id FROM season_members WHERE id = ? FOR UPDATE', [existing.season_member_id])

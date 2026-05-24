@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Progress, Select, Space, Tag, Typography, message } from 'antd'
-import { ArrowRightOutlined, CalculatorOutlined, EditOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
+import { ArrowRightOutlined, CalculatorOutlined, EditOutlined, SafetyCertificateOutlined, TeamOutlined, BarChartOutlined } from '@ant-design/icons'
 import { getMembers, getSeasons } from '../../api/seasons'
 import type { Season, SeasonMember } from '../../types/models'
 import { formatDate } from '../../utils/datetime'
@@ -148,6 +148,9 @@ export default function AdminScoringHub() {
               进入组织分录入
             </Button>
             <Button onClick={() => navigate('/admin/members')}>成员管理</Button>
+            <Button icon={<BarChartOutlined />} onClick={() => selectedSeasonId && navigate(`/admin/ranking-detail/${selectedSeasonId}`)} disabled={!selectedSeasonId}>
+              排名计算详情
+            </Button>
           </Space>
         </div>
         <div className="admin-hub-hero-side">

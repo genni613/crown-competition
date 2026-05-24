@@ -49,7 +49,7 @@ export default function Sidebar() {
   }
 
   function getSelectedKey(pathname: string) {
-    if (pathname.startsWith('/admin/scores/') || pathname.startsWith('/admin/org-scores/') || pathname === '/admin/scoring') return '/admin/scoring'
+    if (pathname.startsWith('/admin/scores/') || pathname.startsWith('/admin/org-scores/') || pathname.startsWith('/admin/ranking-detail/') || pathname === '/admin/scoring') return '/admin/scoring'
     if (pathname.startsWith('/admin/members')) return '/admin/members'
     if (pathname.startsWith('/admin/member-directory')) return '/admin/member-directory'
     if (pathname.startsWith('/admin/feishu/') || pathname === '/admin/data-sync') return '/admin/data-sync'

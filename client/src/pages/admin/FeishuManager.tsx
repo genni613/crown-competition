@@ -55,6 +55,7 @@ import {
   type LocalPdSummaryPerson,
   type WorkHourImportResult,
 } from '../../api/feishu'
+import { activateSeason, getSeason } from '../../api/seasons'
 import { getUsers } from '../../api/users'
 import type { User } from '../../types/models'
 
@@ -428,6 +429,7 @@ export default function FeishuManager() {
   const [userLoading, setUserLoading] = useState(false)
   const [userResult, setUserResult] = useState<WorkHourImportResult>()
   const [scoreSyncLoading, setScoreSyncLoading] = useState(false)
+  const [seasonStatus, setSeasonStatus] = useState<'draft' | 'active' | 'ended' | null>(null)
   const [pdSummaryLoading, setPdSummaryLoading] = useState(false)
   const [pdSummaryRange, setPdSummaryRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [pdSummaryProjectUserKey, setPdSummaryProjectUserKey] = useState<string>()
@@ -443,6 +445,13 @@ export default function FeishuManager() {
   useEffect(() => {
     void loadBootstrap()
   }, [])
+
+  useEffect(() => {
+    if (!seasonId) return
+    getSeason(Number(seasonId))
+      .then(res => setSeasonStatus(res.data.status))
+      .catch(() => setSeasonStatus(null))
+  }, [seasonId])
 
   useEffect(() => {
     if (!selectedType) return
@@ -1705,8 +1714,36 @@ export default function FeishuManager() {
                     <Typography.Text type="secondary">
                       从本地飞书数据表聚合指标，写入 indicator_scores 并触发整赛季评分重算。
                     </Typography.Text>
+                    {seasonStatus === 'ended' && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message="当前赛季已结束，评分同步已锁定"
+                        description={(
+                          <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+                            <span>如需继续同步指标或重算评分，请先重新激活赛季。</span>
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={async () => {
+                                if (!seasonId) return
+                                try {
+                                  await activateSeason(Number(seasonId))
+                                  setSeasonStatus('active')
+                                  message.success('赛季已重新激活')
+                                } catch (err: any) {
+                                  message.error(err?.response?.data?.error || '重新激活失败')
+                                }
+                              }}
+                            >
+                              重新激活赛季
+                            </Button>
+                          </Space>
+                        )}
+                      />
+                    )}
                     <Space>
-                      <Button type="primary" loading={scoreSyncLoading} onClick={async () => {
+                      <Button type="primary" loading={scoreSyncLoading} disabled={seasonStatus === 'ended'} onClick={async () => {
                         setScoreSyncLoading(true)
                         try {
                           const res = await syncSeasonScores(Number(seasonId))
@@ -1719,7 +1756,7 @@ export default function FeishuManager() {
                       }}>
                         全量同步指标并重算
                       </Button>
-                      <Button loading={scoreSyncLoading} onClick={async () => {
+                      <Button loading={scoreSyncLoading} disabled={seasonStatus === 'ended'} onClick={async () => {
                         setScoreSyncLoading(true)
                         try {
                           await calculateSeasonScores(Number(seasonId))

@@ -22,6 +22,7 @@ import {
   getWorkflowReport,
   isWorkflowRunning,
 } from '../services/syncWorkflow.service'
+import { assertSeasonEditable } from '../utils/seasonLock'
 
 export const feishuRouter = Router()
 
@@ -834,12 +835,16 @@ feishuRouter.get('/:seasonId/:userId/preview', adminMiddleware, asyncHandler(asy
 
 // POST /api/feishu/:seasonId/:userId/sync — 同步单人并触发整赛季重算
 feishuRouter.post('/:seasonId/:userId/sync', adminMiddleware, asyncHandler(async (req, res) => {
-  const result = await syncMemberFeishuData(Number(req.params.seasonId), req.params.userId)
+  const seasonId = Number(req.params.seasonId)
+  await assertSeasonEditable(getDb(), seasonId)
+  const result = await syncMemberFeishuData(seasonId, req.params.userId)
   res.json(result)
 }))
 
 // POST /api/feishu/:seasonId/sync — 同步全赛季并触发整赛季重算
 feishuRouter.post('/:seasonId/sync', adminMiddleware, asyncHandler(async (req, res) => {
-  const result = await syncSeasonFeishuData(Number(req.params.seasonId))
+  const seasonId = Number(req.params.seasonId)
+  await assertSeasonEditable(getDb(), seasonId)
+  const result = await syncSeasonFeishuData(seasonId)
   res.json(result)
 }))

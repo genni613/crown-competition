@@ -6,6 +6,7 @@ import multer, { MulterError } from 'multer'
 import { getDb, withTransaction } from '../db'
 import { calculateThresholdScore } from '../utils/scoringFormulas'
 import { calculateSeasonScores } from '../services/scoring.service'
+import { assertSeasonEditable } from '../utils/seasonLock'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 
@@ -318,6 +319,13 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
     if (evidence.status !== 'pending') {
       throw Object.assign(new Error('该举证已被处理'), { status: 400 })
     }
+    const sm = await tx.queryOne<{ season_id: number }>(
+      'SELECT season_id FROM season_members WHERE id = ?',
+      [evidence.season_member_id]
+    )
+    if (sm) {
+      await assertSeasonEditable(tx, sm.season_id)
+    }
 
     const reviewSnapshot = {
       reviewed_by: req.currentUser.id,
@@ -369,10 +377,6 @@ evidenceRouter.put('/:id/status', adminMiddleware, asyncHandler(async (req: Requ
       }
 
       // 在同一事务内触发全量赛季分数重算
-      const sm = await tx.queryOne<{ season_id: number }>(
-        'SELECT season_id FROM season_members WHERE id = ?',
-        [evidence.season_member_id]
-      )
       if (sm) {
         await calculateSeasonScores(sm.season_id, tx)
       }
@@ -440,6 +444,13 @@ evidenceRouter.delete('/:id', authMiddleware, asyncHandler(async (req: Request, 
   if (evidence.status !== 'pending') {
     res.status(400).json({ error: '只能撤回待审核的举证' })
     return
+  }
+  const season = await db.queryOne<{ season_id: number }>(
+    'SELECT season_id FROM season_members WHERE id = ?',
+    [evidence.season_member_id]
+  )
+  if (season) {
+    await assertSeasonEditable(db, season.season_id)
   }
 
   await db.execute('DELETE FROM evidence_submissions WHERE id = ?', [req.params.id])

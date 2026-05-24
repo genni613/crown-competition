@@ -19,7 +19,7 @@ import {
   Typography,
 } from 'antd'
 import { clearOrgScoreDraft, loadOrgScoreDraft, type OrgScoreDraft } from '../../components/copilot/orgScoreDraft'
-import { getMembers } from '../../api/seasons'
+import { activateSeason, getMembers, getSeason } from '../../api/seasons'
 import { addOrgScore, deleteOrgScore, getOrgScoreTypes, getOrgScores } from '../../api/orgScores'
 import type { SeasonMember, OrgScore, OrgScoreType } from '../../types/models'
 
@@ -41,6 +41,7 @@ export default function OrgScoreManager() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedTypeId, setSelectedTypeId] = useState<number>()
   const [copilotDraft, setCopilotDraft] = useState<OrgScoreDraft | null>(null)
+  const [seasonStatus, setSeasonStatus] = useState<'draft' | 'active' | 'ended' | null>(null)
   const [form] = Form.useForm()
 
   useEffect(() => {
@@ -66,12 +67,14 @@ export default function OrgScoreManager() {
   async function loadMeta() {
     if (!seasonId) return
     try {
-      const [memRes, typeRes] = await Promise.all([
+      const [memRes, typeRes, seasonRes] = await Promise.all([
         getMembers(Number(seasonId)),
         getOrgScoreTypes(),
+        getSeason(Number(seasonId)),
       ])
       setMembers(memRes.data)
       setTypes(typeRes.data)
+      setSeasonStatus(seasonRes.data.status)
     } catch (e) {
       message.error('加载数据失败')
       console.error(e)
@@ -107,6 +110,7 @@ export default function OrgScoreManager() {
   const memberTotal = selectedMember?.total_org_score ?? 0
   const recordTotal = records.reduce((sum, item) => sum + (item.points || 0), 0)
   const capRemain = Math.max(0, 25 - memberTotal)
+  const seasonLocked = seasonStatus === 'ended'
 
   function openRecord(type: OrgScoreType) {
     setSelectedTypeId(type.id)
@@ -246,6 +250,36 @@ export default function OrgScoreManager() {
         </div>
       </div>
 
+      {seasonLocked && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="当前赛季已结束，组织分录入已锁定"
+          description={(
+            <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+              <span>如需继续补录组织分，请先重新激活赛季。</span>
+              <Button
+                type="primary"
+                size="small"
+                onClick={async () => {
+                  if (!seasonId) return
+                  try {
+                    await activateSeason(Number(seasonId))
+                    message.success('赛季已重新激活')
+                    await loadMeta()
+                  } catch (err: any) {
+                    message.error(err?.response?.data?.error || '重新激活失败')
+                  }
+                }}
+              >
+                重新激活赛季
+              </Button>
+            </Space>
+          )}
+        />
+      )}
+
       {copilotDraft && copilotDraft.seasonId === Number(seasonId) && (
         <Alert
           type="info"
@@ -326,8 +360,8 @@ export default function OrgScoreManager() {
                 placeholder="选择要录分的成员"
                 optionFilterProp="label"
                 value={selectedMemberId}
-                onChange={value => setSelectedMemberId(value)}
-                options={members.map(m => ({
+              onChange={value => setSelectedMemberId(value)}
+              options={members.map(m => ({
                   value: m.id,
                   label: `${m.user_name} · 当前组织分 ${m.total_org_score?.toFixed(1) ?? '0'} / 25`,
                 }))}
@@ -364,10 +398,10 @@ export default function OrgScoreManager() {
             return (
               <Col key={type.id} xs={24} sm={12} xl={8}>
                 <Card
-                  hoverable
+                  hoverable={!seasonLocked}
                   size="small"
-                  onClick={() => openRecord(type)}
-                  style={{ height: '100%', cursor: 'pointer', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+                  onClick={() => { if (!seasonLocked) openRecord(type) }}
+                  style={{ height: '100%', cursor: seasonLocked ? 'not-allowed' : 'pointer', opacity: seasonLocked ? 0.65 : 1, borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
                 >
                   <Space direction="vertical" style={{ width: '100%' }} size={8}>
                     <Space align="start" style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -415,7 +449,7 @@ export default function OrgScoreManager() {
                       {record.description || '无说明'}
                     </Typography.Text>
                   </Space>
-                  <Button size="small" danger onClick={() => onDelete(record.id)}>删除</Button>
+                  <Button size="small" danger onClick={() => onDelete(record.id)} disabled={seasonLocked}>删除</Button>
                 </Space>
               </Card>
             ))}
@@ -441,7 +475,7 @@ export default function OrgScoreManager() {
             >
               取消
             </Button>
-            <Button type="primary" onClick={() => form.submit()}>提交</Button>
+            <Button type="primary" onClick={() => form.submit()} disabled={seasonLocked}>提交</Button>
           </Space>
         }
       >

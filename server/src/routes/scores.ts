@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { getDb } from '../db'
 import { adminMiddleware, authMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
+import { assertSeasonEditable } from '../utils/seasonLock'
 
 export const scoresRouter = Router()
 
@@ -51,6 +52,7 @@ scoresRouter.get('/:seasonId/:memberId', adminMiddleware, asyncHandler(async (re
 scoresRouter.put('/:seasonId/:memberId/:dimensionId', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { raw_value, notes } = req.body
   const db = getDb()
+  await assertSeasonEditable(db, Number(req.params.seasonId))
 
   await db.execute(`
     INSERT INTO indicator_scores (season_member_id, dimension_id, raw_value, source, notes)
@@ -71,6 +73,7 @@ scoresRouter.put('/:seasonId/:memberId/:dimensionId', adminMiddleware, asyncHand
 scoresRouter.put('/:seasonId/:memberId/batch', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { scores } = req.body as { scores: { dimension_id: number; raw_value: number; notes?: string }[] }
   const db = getDb()
+  await assertSeasonEditable(db, Number(req.params.seasonId))
 
   for (const s of scores) {
     await db.execute(`

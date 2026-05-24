@@ -4,7 +4,7 @@ import { Alert, Avatar, Button, Card, Col, Divider, Empty, InputNumber, Modal, R
 import { InfoCircleOutlined, UserOutlined } from '@ant-design/icons'
 import { useCopilotAction } from '@copilotkit/react-core'
 import { calculateSeason, getDimensions } from '../../api/scoring'
-import { getMembers } from '../../api/seasons'
+import { activateSeason, getMembers, getSeason } from '../../api/seasons'
 import { batchUpdateScores, getScores } from '../../api/scores'
 import { copilotConfig } from '../../components/copilot/config'
 import type { IndicatorScore, ScoringDimension, SeasonMember } from '../../types/models'
@@ -37,6 +37,7 @@ export default function ScoreEntry() {
   const [saving, setSaving] = useState(false)
   const [recalculating, setRecalculating] = useState(false)
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
+  const [seasonStatus, setSeasonStatus] = useState<'draft' | 'active' | 'ended' | null>(null)
 
   useEffect(() => {
     void loadMeta()
@@ -63,12 +64,14 @@ export default function ScoreEntry() {
   async function loadMeta() {
     if (!seasonId) return
     try {
-      const [memRes, dimRes] = await Promise.all([
+      const [memRes, dimRes, seasonRes] = await Promise.all([
         getMembers(Number(seasonId)),
         getDimensions(jobRole),
+        getSeason(Number(seasonId)),
       ])
       setMembers(memRes.data.filter((m: SeasonMember) => m.job_role === jobRole))
       setDimensions(dimRes.data)
+      setSeasonStatus(seasonRes.data.status)
     } catch (e) {
       message.error('加载数据失败')
       console.error(e)
@@ -214,6 +217,7 @@ export default function ScoreEntry() {
     () => members.find(item => item.id === selectedMemberId),
     [members, selectedMemberId],
   )
+  const seasonLocked = seasonStatus === 'ended'
 
   if (members.length === 0) {
     return (
@@ -267,10 +271,40 @@ export default function ScoreEntry() {
             )}
             style={{ width: 220 }}
           />
-          <Button onClick={saveCurrentMember} loading={saving}>保存当前成员</Button>
-          <Button type="primary" onClick={recalculate} loading={recalculating}>重新计算</Button>
+          <Button onClick={saveCurrentMember} loading={saving} disabled={seasonLocked}>保存当前成员</Button>
+          <Button type="primary" onClick={recalculate} loading={recalculating} disabled={seasonLocked}>重新计算</Button>
         </Space>
       </div>
+
+      {seasonLocked && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="当前赛季已结束，岗位分录入已锁定"
+          description={(
+            <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+              <span>如需继续录分或重算，请先重新激活赛季。</span>
+              <Button
+                type="primary"
+                size="small"
+                onClick={async () => {
+                  if (!seasonId) return
+                  try {
+                    await activateSeason(Number(seasonId))
+                    message.success('赛季已重新激活')
+                    await loadMeta()
+                  } catch (err: any) {
+                    message.error(err?.response?.data?.error || '重新激活失败')
+                  }
+                }}
+              >
+                重新激活赛季
+              </Button>
+            </Space>
+          )}
+        />
+      )}
 
       {selectedMember && (
         <Space wrap style={{ marginBottom: 16 }}>
@@ -306,6 +340,7 @@ export default function ScoreEntry() {
                 <InputNumber
                   value={scores[dim.id]}
                   onChange={value => updateScore(dim.id, value)}
+                  disabled={seasonLocked}
                   style={{ width: '100%' }}
                   placeholder="输入分值"
                 />

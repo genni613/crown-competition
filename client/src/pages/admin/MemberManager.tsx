@@ -20,6 +20,7 @@ import {
 } from 'antd'
 import { ImportOutlined, PlusOutlined, ReloadOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons'
 import {
+  activateSeason,
   getSeasons,
   getMembers,
   updateMember,
@@ -128,6 +129,23 @@ export default function MemberManager() {
     () => seasons.find(item => item.id === selectedSeasonId),
     [seasons, selectedSeasonId],
   )
+  const selectedSeasonLocked = selectedSeason?.status === 'ended'
+
+  const previousSeasonCandidate = useMemo(() => {
+    if (!selectedSeason) return undefined
+
+    const endedSeasons = seasons
+      .filter(item => item.status === 'ended' && item.id !== selectedSeason.id)
+      .sort((a, b) => {
+        const endDiff = new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
+        return endDiff !== 0 ? endDiff : b.id - a.id
+      })
+
+    const beforeStart = endedSeasons.find(item => new Date(item.end_date).getTime() < new Date(selectedSeason.start_date).getTime())
+    if (beforeStart) return beforeStart
+
+    return endedSeasons.find(item => new Date(item.end_date).getTime() < new Date(selectedSeason.end_date).getTime())
+  }, [seasons, selectedSeason])
 
   // 已在赛季中的 user_key 集合，用于添加成员时排除
   const existingUserKeys = useMemo(
@@ -175,7 +193,7 @@ export default function MemberManager() {
     setRoleMap({})
     setSubRoleMap({})
     setCheckedKeys(new Set())
-    getPrevGrades().then(r => setPrevGradeMap(r.data)).catch(() => setPrevGradeMap({}))
+    getPrevGrades(selectedSeasonId).then(r => setPrevGradeMap(r.data)).catch(() => setPrevGradeMap({}))
     setAddOpen(true)
   }
 
@@ -308,14 +326,10 @@ export default function MemberManager() {
     try {
       const res = await importPrevMembers(selectedSeasonId)
       const { added, skipped, prevSeasonName, prevSeasonMembers } = res.data
-      if (added > 0) {
-        message.success(`从「${prevSeasonName}」导入 ${added} 名成员`)
-      } else {
-        message.info('没有新成员需要导入')
-      }
+      message.success(`已从「${prevSeasonName}」处理 ${prevSeasonMembers} 名成员：新增 ${added}，跳过 ${skipped.length}`)
       if (skipped.length > 0) {
         Modal.info({
-          title: `${skipped.length} 人已跳过`,
+          title: `从「${prevSeasonName}」导入完成`,
           content: skipped.map((s, i) => <div key={i}>{s.user_key}：{s.reason}</div>),
         })
       }
@@ -352,6 +366,7 @@ export default function MemberManager() {
             size="small"
             style={{ width: 90 }}
             value={r.job_role || undefined}
+            disabled={selectedSeasonLocked}
             placeholder="未设置"
             allowClear
             onChange={val => onEditMemberField(r, 'job_role', val ?? null)}
@@ -362,6 +377,7 @@ export default function MemberManager() {
               size="small"
               style={{ width: 90 }}
               value={r.sub_role || undefined}
+              disabled={selectedSeasonLocked}
               placeholder="细分"
               allowClear
               onChange={val => onEditMemberField(r, 'sub_role', val ?? null)}
@@ -380,6 +396,7 @@ export default function MemberManager() {
           size="small"
           style={{ width: 80 }}
           value={v || undefined}
+          disabled={selectedSeasonLocked}
           placeholder="未设置"
           allowClear
           onChange={val => onEditMemberField(r, 'performance_grade', val ?? null)}
@@ -400,9 +417,9 @@ export default function MemberManager() {
       render: (_: unknown, r: SeasonMember) => (
         <Space>
           <Button size="small" onClick={() => openMemberDetail(r)}>详情</Button>
-          <Button size="small" icon={<SyncOutlined />} loading={syncingMemberKey === r.user_key} onClick={() => handleSyncMember(r)}>同步</Button>
+          <Button size="small" icon={<SyncOutlined />} loading={syncingMemberKey === r.user_key} onClick={() => handleSyncMember(r)} disabled={selectedSeasonLocked}>同步</Button>
           <Popconfirm title="确认移除？" onConfirm={() => onRemoveMember(r)}>
-            <Button size="small" danger>移除</Button>
+            <Button size="small" danger disabled={selectedSeasonLocked}>移除</Button>
           </Popconfirm>
         </Space>
       ),
@@ -428,9 +445,18 @@ export default function MemberManager() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 16, flexWrap: 'wrap' }}>
         <div>
           <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>成员管理</Typography.Title>
-          <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>
-            管理赛季参赛成员、岗位和分数
-          </Typography.Text>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
+            <Typography.Text style={{ fontSize: 13, color: '#94a3b8' }}>
+              管理赛季参赛成员、岗位和分数
+            </Typography.Text>
+            {selectedSeasonId ? (
+              <Typography.Text style={{ fontSize: 12, color: previousSeasonCandidate ? '#64748b' : '#f59e0b' }}>
+                {previousSeasonCandidate
+                  ? `导入上赛季成员将使用「${previousSeasonCandidate.name}」`
+                  : '当前赛季之前没有可导入的已结束赛季'}
+              </Typography.Text>
+            ) : null}
+          </div>
         </div>
         <Space wrap>
           <Select
@@ -448,10 +474,10 @@ export default function MemberManager() {
             options={jobRoleOptions}
             placeholder="按岗位筛选"
           />
-          <Button icon={<ImportOutlined />} onClick={handleImportPrev} loading={importing} disabled={!selectedSeasonId}>
+          <Button icon={<ImportOutlined />} onClick={handleImportPrev} loading={importing} disabled={!selectedSeasonId || !previousSeasonCandidate || selectedSeasonLocked}>
             导入上赛季成员
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openAddMember} disabled={!selectedSeasonId}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openAddMember} disabled={!selectedSeasonId || selectedSeasonLocked}>
             添加成员
           </Button>
           <Button icon={<ReloadOutlined />} onClick={() => loadMembers()} disabled={!selectedSeasonId}>
@@ -459,6 +485,33 @@ export default function MemberManager() {
           </Button>
         </Space>
       </div>
+
+      {selectedSeasonLocked && (
+        <Card size="small" style={{ marginBottom: 16, borderRadius: 12, background: '#fff7ed' }}>
+          <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+            <Typography.Text style={{ color: '#9a3412' }}>
+              当前赛季已结束，成员维护默认锁定。请先重新激活赛季，再继续导入、添加或修改成员。
+            </Typography.Text>
+            <Button
+              type="primary"
+              size="small"
+              onClick={async () => {
+                if (!selectedSeasonId) return
+                try {
+                  await activateSeason(selectedSeasonId)
+                  message.success('赛季已重新激活')
+                  await loadSeasons()
+                  await loadMembers()
+                } catch (err: any) {
+                  message.error(err?.response?.data?.error || '重新激活失败')
+                }
+              }}
+            >
+              重新激活赛季
+            </Button>
+          </Space>
+        </Card>
+      )}
 
       <Card size="small" style={{ borderRadius: 12 }}>
         {selectedSeason ? (

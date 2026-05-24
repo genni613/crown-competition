@@ -30,4 +30,5 @@ export interface ImportPrevResult {
 export const importPrevMembers = (seasonId: number) =>
   api.post<ImportPrevResult>(`/seasons/${seasonId}/members/import-prev`)
 
-export const getPrevGrades = () => api.get<Record<string, string>>('/seasons/prev-grades')
+export const getPrevGrades = (seasonId?: number) =>
+  api.get<Record<string, string>>('/seasons/prev-grades', { params: seasonId ? { seasonId } : undefined })

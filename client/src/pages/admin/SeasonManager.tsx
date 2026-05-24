@@ -96,7 +96,7 @@ export default function SeasonManager() {
       setSelectedSeason(seasonId)
       const res = await getMembers(seasonId)
       setMembers(res.data)
-      getPrevGrades().then(r => setPrevGradeMap(r.data)).catch(() => setPrevGradeMap({}))
+      getPrevGrades(seasonId).then(r => setPrevGradeMap(r.data)).catch(() => setPrevGradeMap({}))
     } catch {
       message.error('加载成员失败')
     }
@@ -120,6 +120,8 @@ export default function SeasonManager() {
   const [subRoleMap, setSubRoleMap] = useState<Record<string, string>>({})
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set())
   const [prevGradeMap, setPrevGradeMap] = useState<Record<string, string>>({})
+  const selectedSeasonRecord = seasons.find(item => item.id === selectedSeason)
+  const selectedSeasonLocked = selectedSeasonRecord?.status === 'ended'
 
   async function onAddMember() {
     if (!selectedSeason || selectedUserKeys.length === 0) return
@@ -167,6 +169,7 @@ export default function SeasonManager() {
         <Button size="small" onClick={() => showMembers(r.id)}>成员</Button>
         {r.status === 'draft' && <Button size="small" type="primary" onClick={async () => { try { await activateSeason(r.id); message.success('已激活'); loadSeasons() } catch { message.error('激活失败') } }}>激活</Button>}
         {r.status === 'active' && <Button size="small" danger onClick={async () => { try { await endSeason(r.id); message.success('已结束'); loadSeasons() } catch { message.error('结束失败') } }}>结束</Button>}
+        {r.status === 'ended' && <Button size="small" type="primary" onClick={async () => { try { await activateSeason(r.id); message.success('已重新激活'); loadSeasons() } catch { message.error('重新激活失败') } }}>重新激活</Button>}
       </Space>
     )},
   ]
@@ -190,6 +193,7 @@ export default function SeasonManager() {
           size="small"
           style={{ width: 90 }}
           value={v || undefined}
+          disabled={selectedSeasonLocked}
           placeholder="未设置"
           allowClear
           onChange={val => onEditMember(r, 'job_role', val ?? null)}
@@ -205,6 +209,7 @@ export default function SeasonManager() {
           size="small"
           style={{ width: 90 }}
           value={v || undefined}
+          disabled={selectedSeasonLocked}
           placeholder="未设置"
           allowClear
           onChange={val => onEditMember(r, 'sub_role', val ?? null)}
@@ -220,6 +225,7 @@ export default function SeasonManager() {
           size="small"
           style={{ width: 90 }}
           value={v || undefined}
+          disabled={selectedSeasonLocked}
           placeholder="未设置"
           allowClear
           onChange={val => onEditMember(r, 'performance_grade', val ?? null)}
@@ -229,7 +235,7 @@ export default function SeasonManager() {
     },
     { title: '操作', render: (_: any, r: SeasonMember) => (
       <Popconfirm title="确认移除？" onConfirm={async () => { try { await removeMember(r.season_id, r.id); message.success('已移除'); showMembers(r.season_id) } catch { message.error('移除失败') } }}>
-        <Button size="small" danger>移除</Button>
+        <Button size="small" danger disabled={selectedSeasonLocked}>移除</Button>
       </Popconfirm>
     )},
   ]
@@ -261,6 +267,13 @@ export default function SeasonManager() {
       </Modal>
 
       <Modal title="成员管理" open={!!selectedSeason} onCancel={() => setSelectedSeason(undefined)} footer={null} width={700}>
+        {selectedSeasonLocked && (
+          <Card size="small" style={{ marginBottom: 12, borderRadius: 12, background: '#fff7ed' }}>
+            <Typography.Text style={{ color: '#9a3412' }}>
+              当前赛季已结束，成员信息默认锁定。请先回到赛季列表重新激活，再继续增删改成员。
+            </Typography.Text>
+          </Card>
+        )}
         <Table dataSource={members} columns={memberColumns} rowKey="id" size="small" pagination={false} />
         <Card title="添加成员" size="small" style={{ marginTop: 16, borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
@@ -292,7 +305,7 @@ export default function SeasonManager() {
             >
               {participantFeishuUsers(feishuUsers).map(u => <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>)}
             </Select>
-            <Button type="primary" onClick={onAddMember} disabled={selectedUserKeys.length === 0}>
+            <Button type="primary" onClick={onAddMember} disabled={selectedUserKeys.length === 0 || selectedSeasonLocked}>
               批量添加
             </Button>
           </div>

@@ -4,6 +4,7 @@ import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 import { calculateSeasonScores } from '../services/scoring.service'
 import type { SeasonMember } from '../types/entities'
+import { assertSeasonEditable } from '../utils/seasonLock'
 
 export const scoringRouter = Router()
 
@@ -20,6 +21,7 @@ scoringRouter.get('/dimensions/:jobRole', authMiddleware, asyncHandler(async (re
 // POST /api/scoring/calculate/:seasonId — 触发全赛季计算
 scoringRouter.post('/calculate/:seasonId', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const seasonId = parseInt(req.params.seasonId, 10)
+  await assertSeasonEditable(getDb(), seasonId)
   const result = await calculateSeasonScores(seasonId)
   if (result.length === 0) {
     res.json({ message: '无成员需要计算' })
