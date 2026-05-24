@@ -455,6 +455,31 @@ feishuRouter.post('/user-data/sync', adminMiddleware, asyncHandler(async (_req, 
   res.json(result)
 }))
 
+// POST /api/feishu/raw-data-sync-all — 一键并行同步 4 类原始数据（工时/需求/缺陷/项目）
+feishuRouter.post('/raw-data-sync-all', adminMiddleware, asyncHandler(async (req, res) => {
+  const workItemTypeKey = req.body?.workItemTypeKey || undefined
+  const [workHours, stories, issues, projects] = await Promise.allSettled([
+    syncAllWorkHours(workItemTypeKey),
+    syncAllStories(workItemTypeKey),
+    syncAllIssues(workItemTypeKey),
+    syncAllProjects(workItemTypeKey),
+  ])
+  res.json({
+    workHours: workHours.status === 'fulfilled'
+      ? { status: 'fulfilled' as const, result: workHours.value }
+      : { status: 'rejected' as const, error: workHours.reason instanceof Error ? workHours.reason.message : String(workHours.reason) },
+    stories: stories.status === 'fulfilled'
+      ? { status: 'fulfilled' as const, result: stories.value }
+      : { status: 'rejected' as const, error: stories.reason instanceof Error ? stories.reason.message : String(stories.reason) },
+    issues: issues.status === 'fulfilled'
+      ? { status: 'fulfilled' as const, result: issues.value }
+      : { status: 'rejected' as const, error: issues.reason instanceof Error ? issues.reason.message : String(issues.reason) },
+    projects: projects.status === 'fulfilled'
+      ? { status: 'fulfilled' as const, result: projects.value }
+      : { status: 'rejected' as const, error: projects.reason instanceof Error ? projects.reason.message : String(projects.reason) },
+  })
+}))
+
 // GET /api/feishu/project/status — 检查飞书项目 OpenAPI 配置
 feishuRouter.get('/project/status', adminMiddleware, (req: Request, res: Response) => {
   res.json({

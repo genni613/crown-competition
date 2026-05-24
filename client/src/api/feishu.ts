@@ -238,6 +238,20 @@ export const syncIssuesByDateRange = (startDate: string, endDate: string, workIt
 export const syncAllProjects = (workItemTypeKey?: string) =>
   api.post<WorkHourImportResult>('/feishu/project-data/sync', { workItemTypeKey })
 
+export type SingleSyncOutcome =
+  | { status: 'fulfilled'; result: WorkHourImportResult }
+  | { status: 'rejected'; error: string }
+
+export interface BatchSyncResult {
+  workHours: SingleSyncOutcome
+  stories: SingleSyncOutcome
+  issues: SingleSyncOutcome
+  projects: SingleSyncOutcome
+}
+
+export const syncAllRawData = (workItemTypeKey?: string) =>
+  api.post<BatchSyncResult>('/feishu/raw-data-sync-all', { workItemTypeKey })
+
 export const syncIncrementalProjects = (workItemTypeKey?: string) =>
   api.post<WorkHourImportResult>('/feishu/project-data/sync-incremental', { workItemTypeKey })
 

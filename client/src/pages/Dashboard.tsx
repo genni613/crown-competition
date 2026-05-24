@@ -1,58 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Tag, Spin, Empty, Typography, Button, Space, Collapse, Descriptions, Divider, Progress, message } from 'antd'
-import {
-  CrownOutlined, FireOutlined,
-  RiseOutlined, TeamOutlined, BulbOutlined,
-  CheckCircleOutlined, WarningOutlined,
-  TrophyOutlined, ArrowRightOutlined,
-} from '@ant-design/icons'
+import { Card, Spin, Empty, Typography, Button, Space, Collapse, Descriptions, Divider, Progress, message } from 'antd'
+import { FireOutlined, TrophyOutlined, ArrowRightOutlined } from '@ant-design/icons'
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
 import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core'
 import { useAuthStore } from '../store/authStore'
 import { getSeasons, getMembers } from '../api/seasons'
 import { getBreakdown } from '../api/scoring'
 import { getMyWorkSummary, type MyWorkSummaryResponse } from '../api/feishu'
+import { getScoreHistory } from '../api/scores'
+import GrowthCurveChart from '../components/GrowthCurveChart'
+import type { ScoreHistoryRow } from '../components/GrowthCurveChart'
 import { copilotConfig } from '../components/copilot/config'
 import type { Season, SeasonMember } from '../types/models'
+import {
+  distConfig, dimIcons, dimIconBg, scoreColor, dimGradient,
+  groupByDimension, resolveEffectiveValue, resolveEffectiveScore,
+  calcDimensionScore, ScoreStatus, sourceTag, ruleText, WorkSummaryCard,
+} from './dashboardHelpers'
 
-const { Title, Text } = Typography
-
-const distConfig: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  '2': { label: '优秀', color: '#10b981', bg: '#ecfdf5', icon: <CrownOutlined /> },
-  '7': { label: '达标', color: '#6366f1', bg: '#eef2ff', icon: <CheckCircleOutlined /> },
-  '1': { label: '待改进', color: '#f59e0b', bg: '#fffbeb', icon: <WarningOutlined /> },
-}
-
-const dimIcons: Record<string, React.ReactNode> = {
-  交付效率: <FireOutlined />,
-  需求价值: <BulbOutlined />,
-  创新突破: <RiseOutlined />,
-  交付质量: <CheckCircleOutlined />,
-  协作贡献: <TeamOutlined />,
-}
-
-const dimIconBg: Record<string, string> = {
-  交付效率: 'linear-gradient(135deg, #f97316, #fb923c)',
-  需求价值: 'linear-gradient(135deg, #8b5cf6, #a78bfa)',
-  创新突破: 'linear-gradient(135deg, #06b6d4, #22d3ee)',
-  交付质量: 'linear-gradient(135deg, #10b981, #34d399)',
-  协作贡献: 'linear-gradient(135deg, #f43f5e, #fb7185)',
-}
-
-const scoreColor = (v: number) => {
-  if (v >= 85) return '#6366f1'
-  if (v >= 70) return '#8b5cf6'
-  if (v >= 60) return '#f59e0b'
-  return '#f43f5e'
-}
-
-const dimGradient = (v: number) => {
-  if (v >= 85) return 'linear-gradient(90deg, #6366f1, #818cf8)'
-  if (v >= 70) return 'linear-gradient(90deg, #8b5cf6, #a78bfa)'
-  if (v >= 60) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-  return 'linear-gradient(90deg, #f43f5e, #fb7185)'
-}
+const { Text } = Typography
 
 export default function Dashboard() {
   const { user } = useAuthStore()
@@ -62,6 +29,8 @@ export default function Dashboard() {
   const [breakdown, setBreakdown] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [workSummary, setWorkSummary] = useState<MyWorkSummaryResponse | null>(null)
+  const [growthData, setGrowthData] = useState<ScoreHistoryRow[] | null>(null)
+  const [growthLoading, setGrowthLoading] = useState(true)
 
   useEffect(() => { loadData() }, [])
 
@@ -98,6 +67,15 @@ export default function Dashboard() {
         ])
         setBreakdown(bdRes.data)
         setWorkSummary(wsRes.data)
+      }
+
+      if (user?.user_key) {
+        getScoreHistory(user.user_key)
+          .then(r => setGrowthData(r.data))
+          .catch(() => setGrowthData(null))
+          .finally(() => setGrowthLoading(false))
+      } else {
+        setGrowthLoading(false)
       }
     } catch (e) {
       console.error(e)
@@ -152,7 +130,7 @@ export default function Dashboard() {
             <Descriptions size="small" column={3}>
               <Descriptions.Item label="总分"><Typography.Text strong style={{ color: scoreColor(total), fontSize: 16 }}>{total.toFixed(1)}</Typography.Text></Descriptions.Item>
               <Descriptions.Item label="排名">#{member.rank || '-'}</Descriptions.Item>
-              <Descriptions.Item label="271">{distInfo ? <Tag color={distInfo.color} style={{ color: '#fff', border: 'none', margin: 0 }}>{distInfo.label}</Tag> : '-'}</Descriptions.Item>
+              <Descriptions.Item label="271">{distInfo ? <span style={{ color: distInfo.color, fontWeight: 600 }}>{distInfo.label}</span> : '-'}</Descriptions.Item>
             </Descriptions>
             <Divider style={{ margin: '8px 0' }} />
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
@@ -211,7 +189,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      {/* Score Hero — animated gradient */}
+      {/* Score Hero */}
       <div
         className="hero-bg anim-fade-in-up"
         style={{
@@ -415,6 +393,18 @@ export default function Dashboard() {
         />
       </Card>
 
+      {/* Growth Curve */}
+      {growthData && growthData.length >= 2 && (
+        <Card
+          className="anim-fade-in-up"
+          title={<Text strong style={{ fontSize: 16, color: '#1e1b4b' }}>成长曲线</Text>}
+          style={{ marginBottom: 24, borderRadius: 14, border: 'none' }}
+          styles={{ body: { padding: '16px 20px' } }}
+        >
+          <GrowthCurveChart data={growthData} loading={growthLoading} />
+        </Card>
+      )}
+
       <div className="anim-fade-in-up anim-delay-4">
         <Button
           type="primary"
@@ -430,126 +420,5 @@ export default function Dashboard() {
         </Button>
       </div>
     </div>
-  )
-}
-
-/* ── helpers ───────────────────────────────────── */
-
-function groupByDimension(scores: any[]) {
-  const map = new Map<string, any>()
-  for (const s of scores) {
-    const key = s.dimension_name
-    if (!map.has(key)) map.set(key, { name: key, weight: s.dimension_weight, items: [] })
-    map.get(key)!.items.push(s)
-  }
-  return Array.from(map.values())
-}
-
-function resolveEffectiveValue(dimName: string, item: any, workSummary: MyWorkSummaryResponse | null): number | null {
-  if (dimName === '交付效率' && workSummary?.found && workSummary.people?.[0]) {
-    return workSummary.people[0].total_hours
-  }
-  return item.raw_value ?? null
-}
-
-function calcThresholdScore(value: number | null, t100: number | null, t60: number | null): number | null {
-  if (value == null || t100 == null || t60 == null) return null
-  if (value >= t100) return 100
-  if (value >= t60) return 60 + ((value - t60) / (t100 - t60)) * 40
-  return 0
-}
-
-function resolveEffectiveScore(item: any, effectiveValue: number | null): number | null {
-  if (effectiveValue == null) return null
-  if (item.score_type === 'threshold' && item.threshold_100 != null && item.threshold_60 != null) {
-    return calcThresholdScore(effectiveValue, item.threshold_100, item.threshold_60)
-  }
-  if (item.score_type === 'threshold' && item.threshold_100 == null && item.threshold_60 == null) {
-    return effectiveValue
-  }
-  return item.final_score ?? null
-}
-
-function calcDimensionScore(items: any[], workSummary: MyWorkSummaryResponse | null, dimName: string): number | null {
-  let dimScore = 0
-  let totalDeduction = 0
-  let hasAny = false
-  for (const item of items) {
-    const val = resolveEffectiveValue(dimName, item, workSummary)
-    if (item.score_type === 'deduction') {
-      if (val != null && val > 0) {
-        const perUnit = item.deduction_per_unit || 1
-        const divisor = item.deduction_divisor || 1
-        const cap = item.deduction_cap || 0
-        totalDeduction += Math.min(val * perUnit / divisor, cap)
-      }
-      continue
-    }
-    const score = resolveEffectiveScore(item, val)
-    if (score != null) {
-      dimScore += score * item.indicator_weight
-      hasAny = true
-    }
-  }
-  return hasAny ? dimScore - totalDeduction : null
-}
-
-function ScoreStatus({ score }: { score: number }) {
-  const label = score >= 100 ? '满分' : score >= 60 ? '及格' : '不及格'
-  const color = score >= 100 ? '#10b981' : score >= 60 ? '#6366f1' : '#f43f5e'
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontWeight: 600 }}>{score.toFixed(1)}</span>
-      <span style={{
-        fontSize: 11, color, fontWeight: 600,
-        background: `${color}14`, padding: '2px 8px', borderRadius: 6,
-        border: `1px solid ${color}30`,
-      }}>{label}</span>
-    </span>
-  )
-}
-
-function sourceTag(source?: string) {
-  const map: Record<string, { color: string; label: string }> = {
-    feishu: { color: '#10b981', label: '飞书' },
-    admin: { color: '#f59e0b', label: '录入' },
-    evidence: { color: '#6366f1', label: '举证' },
-  }
-  const s = map[source || 'admin']
-  return <Tag color={s.color} style={{ margin: 0, color: '#fff', border: 'none' }}>{s.label}</Tag>
-}
-
-function ruleText(item: any) {
-  if (item.score_type === 'deduction') {
-    const parts = []
-    if (item.deduction_per_unit) parts.push(`扣${item.deduction_per_unit}/单位`)
-    if (item.deduction_cap) parts.push(`上限${item.deduction_cap}`)
-    return parts.length > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>{parts.join('，')}</Text> : '-'
-  }
-  if (item.threshold_100 != null && item.threshold_60 != null) {
-    return (
-      <Space size={4} wrap>
-        <Tag style={{ margin: 0, fontSize: 11, background: '#eef2ff', color: '#4f46e5', border: 'none' }}>≥{item.threshold_100}=100</Tag>
-        <Tag style={{ margin: 0, fontSize: 11, background: '#fefce8', color: '#a16207', border: 'none' }}>≥{item.threshold_60}=60</Tag>
-      </Space>
-    )
-  }
-  return <Text type="secondary" style={{ fontSize: 12 }}>直接计分</Text>
-}
-
-function WorkSummaryCard({ summary }: { summary: MyWorkSummaryResponse }) {
-  const person = summary.people![0]
-  const dateLabel = `${summary.startDate!.slice(0, 7).replace('-', '.')} ~ ${summary.endDate!.slice(0, 7).replace('-', '.')}`
-  return (
-    <Card size="small" title="工时明细" extra={<Text type="secondary" style={{ fontSize: 12 }}>{dateLabel}</Text>} style={{ marginTop: 8, borderRadius: 10 }}>
-      <Space size={24} style={{ marginBottom: 8 }}>
-        <div><Text type="secondary" style={{ fontSize: 12 }}>总 PD</Text><div style={{ fontWeight: 700, color: '#4f46e5' }}>{person.total_pd?.toFixed(2)}</div></div>
-        <div><Text type="secondary" style={{ fontSize: 12 }}>总工时</Text><div style={{ fontWeight: 700, color: '#4f46e5' }}>{person.total_hours?.toFixed(2)}h</div></div>
-      </Space>
-      <div style={{ marginBottom: 4 }}>
-        <Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}>关联项目（{person.project_names.length}）</Text>
-        <Space size={[4, 4]} wrap>{person.project_names.slice(0, 6).map((n, i) => <Tag key={i} style={{ margin: 0, background: '#eef2ff', color: '#4f46e5', border: 'none' }}>{n}</Tag>)}</Space>
-      </div>
-    </Card>
   )
 }

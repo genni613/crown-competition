@@ -49,14 +49,18 @@ scoringRouter.get('/breakdown/:seasonId/:memberId', authMiddleware, asyncHandler
   }
 
   const scores = await db.query(`
-    SELECT isc.*, sd.dimension_name, sd.indicator_name, sd.dimension_weight,
+    SELECT sd.dimension_name, sd.indicator_name, sd.dimension_weight,
            sd.indicator_weight, sd.data_source, sd.score_type, sd.threshold_100, sd.threshold_60,
-           sd.deduction_per_unit, sd.deduction_cap, sd.deduction_divisor
-    FROM indicator_scores isc
-    JOIN scoring_dimensions sd ON isc.dimension_id = sd.id
-    WHERE isc.season_member_id = ?
+           sd.deduction_per_unit, sd.deduction_cap, sd.deduction_divisor,
+           COALESCE(isc.id, 0) AS id,
+           isc.season_member_id, isc.dimension_id,
+           isc.raw_value, isc.threshold_score, isc.final_score,
+           isc.source, isc.approved, isc.notes
+    FROM scoring_dimensions sd
+    LEFT JOIN indicator_scores isc ON isc.dimension_id = sd.id AND isc.season_member_id = ?
+    WHERE sd.job_role = ?
     ORDER BY sd.sort_order
-  `, [req.params.memberId])
+  `, [req.params.memberId, member.job_role])
 
   const user = await db.queryOne(
     'SELECT name, avatar_url FROM feishu_user WHERE user_key = ?',

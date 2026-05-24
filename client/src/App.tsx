@@ -19,6 +19,7 @@ import AdminScoringHub from './pages/admin/AdminScoringHub'
 import AdminDataSyncHub from './pages/admin/AdminDataSyncHub'
 import DimensionManager from './pages/admin/DimensionManager'
 import MemberManager from './pages/admin/MemberManager'
+import MemberScoreDetail from './pages/admin/MemberScoreDetail'
 
 const jobRoleOptions = [
   { label: '产品', value: 'product' },
@@ -173,6 +174,7 @@ export default function App() {
             <Route path="/admin/data-sync" element={<AdminDataSyncHub />} />
             <Route path="/admin/dimensions" element={<DimensionManager />} />
             <Route path="/admin/feishu/:seasonId" element={<FeishuManager />} />
+            <Route path="/admin/member-score/:seasonId/:memberId" element={<MemberScoreDetail />} />
           </>
         )}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -118,7 +118,7 @@ export default function ScoreEntry() {
   }
 
   const adminDims = useMemo(
-    () => dimensions.filter(d => d.data_source === 'admin' && d.score_type === 'threshold'),
+    () => dimensions.filter(d => d.data_source === 'admin'),
     [dimensions],
   )
 

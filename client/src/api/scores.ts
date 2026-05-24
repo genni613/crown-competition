@@ -8,3 +8,5 @@ export const batchUpdateScores = (seasonId: number, memberId: number, scores: an
   api.put(`/scores/${seasonId}/${memberId}/batch`, { scores })
 export const getScoreSummary = (seasonId: number) =>
   api.get(`/scores/${seasonId}/summary`)
+export const getScoreHistory = (userKey: string) =>
+  api.get(`/scores/history/${encodeURIComponent(userKey)}`)

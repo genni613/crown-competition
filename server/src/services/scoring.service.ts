@@ -59,6 +59,12 @@ async function doCalculate(tx: DbExecutor, seasonId: number): Promise<SeasonMemb
         const deductionIndicators = group.indicators.filter(i => i.dim.score_type === 'deduction' && i.score)
 
         for (const { dim, score } of thresholdIndicators) {
+          // 如果已有动态阈值分数（如产品需求使用研发测试PD数），跳过重算
+          if (score!.threshold_score != null && dim.indicator_name === '产品需求使用研发测试PD数') {
+            rawPositionScore += score!.final_score || 0
+            continue
+          }
+
           const rawVal = score!.raw_value || 0
           const t100 = dim.threshold_100
           const t60 = dim.threshold_60
@@ -121,7 +127,7 @@ async function doCalculate(tx: DbExecutor, seasonId: number): Promise<SeasonMemb
     }
 
     const ranked = await tx.query<SeasonMember>(
-      'SELECT * FROM season_members WHERE season_id = ? AND job_role = ? ORDER BY final_position_score + total_org_score DESC',
+      'SELECT sm.*, fu.name as user_name FROM season_members sm JOIN feishu_user fu ON sm.user_key = fu.user_key WHERE sm.season_id = ? AND sm.job_role = ? ORDER BY (sm.final_position_score + sm.total_org_score) DESC, sm.raw_position_score DESC, fu.name ASC',
       [seasonId, jobRole]
     )
 

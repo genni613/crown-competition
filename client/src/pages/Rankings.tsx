@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Tabs, Table, Tag, Avatar, Typography, Card } from 'antd'
 import { UserOutlined, TrophyOutlined, CrownOutlined } from '@ant-design/icons'
 import { useCopilotAction } from '@copilotkit/react-core'
@@ -19,7 +19,9 @@ const distLabels: Record<string, string> = { '2': '优秀', '7': '达标', '1': 
 
 export default function Rankings() {
   const { seasonId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuthStore()
+  const isAdmin = user?.role === 'ADMIN'
   const [role, setRole] = useState('product')
   const [data, setData] = useState<SeasonMember[]>([])
   const [loading, setLoading] = useState(false)
@@ -165,7 +167,17 @@ export default function Rankings() {
           pagination={false}
           size="middle"
           rowClassName={(record: any) => record.user_key === user?.user_key ? 'ant-table-row-selected' : ''}
-          onRow={(record: any) => ({ style: record.user_key === user?.user_key ? { background: '#eef2ff' } : {} })}
+          onRow={(record: any) => ({
+            style: {
+              ...(record.user_key === user?.user_key ? { background: '#eef2ff' } : {}),
+              ...(isAdmin ? { cursor: 'pointer' } : {}),
+            },
+            onClick: () => {
+              if (isAdmin && seasonId) {
+                navigate(`/admin/member-score/${seasonId}/${record.id}`)
+              }
+            },
+          })}
         />
       </Card>
     </div>

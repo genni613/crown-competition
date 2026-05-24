@@ -1,9 +1,38 @@
 import { Router, Request, Response } from 'express'
 import { getDb } from '../db'
-import { adminMiddleware } from '../middleware/auth'
+import { adminMiddleware, authMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 
 export const scoresRouter = Router()
+
+// GET /api/scores/history/:userKey — 跨赛季指标分数（成长曲线）
+scoresRouter.get('/history/:userKey', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const userKey = req.params.userKey
+  const currentUser = req.currentUser!
+
+  if (currentUser.role !== 'ADMIN' && currentUser.user_key !== userKey) {
+    res.status(403).json({ error: '只能查看自己的历史分数' })
+    return
+  }
+
+  const db = getDb()
+  const rows = await db.query(`
+    SELECT s.id AS season_id, s.name AS season_name, s.status AS season_status,
+           sm.job_role, sm.raw_position_score, sm.final_position_score,
+           sm.total_score, sm.rank, sm.distribution, sm.growth,
+           isc.raw_value, isc.threshold_score, isc.final_score,
+           sd.dimension_name, sd.indicator_name, sd.dimension_weight,
+           sd.indicator_weight, sd.score_type, sd.sort_order
+    FROM season_members sm
+    JOIN seasons s ON sm.season_id = s.id
+    JOIN indicator_scores isc ON isc.season_member_id = sm.id
+    JOIN scoring_dimensions sd ON isc.dimension_id = sd.id
+    WHERE sm.user_key = ?
+    ORDER BY s.start_date ASC, sd.sort_order ASC
+  `, [userKey])
+
+  res.json(rows)
+}))
 
 // GET /api/scores/:seasonId/:memberId — 某人所有指标分数
 scoresRouter.get('/:seasonId/:memberId', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {

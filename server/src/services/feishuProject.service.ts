@@ -87,6 +87,27 @@ export interface FeishuProjectSummary {
 export class FeishuProjectService {
   private pluginToken?: CachedToken
   private projectsCache?: CachedProjects
+  private _concurrencyQueue: Array<() => void> = []
+  private _activeCount = 0
+  private static readonly MAX_CONCURRENT = 5
+  private static readonly MAX_RETRIES = 3
+
+  private async acquire(): Promise<void> {
+    if (this._activeCount < FeishuProjectService.MAX_CONCURRENT) {
+      this._activeCount++
+      return
+    }
+    return new Promise<void>(resolve => this._concurrencyQueue.push(resolve))
+  }
+
+  private release(): void {
+    const next = this._concurrencyQueue.shift()
+    if (next) {
+      next()
+    } else {
+      this._activeCount--
+    }
+  }
 
   constructor(private options: ProjectApiOptions = config.feishuProject) {}
 
@@ -139,66 +160,88 @@ export class FeishuProjectService {
   }
 
   async request(path: string, init: RequestOptions = {}): Promise<any> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (init.auth !== false) {
-      headers['X-PLUGIN-TOKEN'] = await this.getPluginToken()
-      headers['X-USER-KEY'] = this.options.userKey
-    }
-
-    const startedAt = Date.now()
-    console.log('[feishu-project] request start', {
-      method: init.method || 'GET',
-      path,
-      query: init.query || null,
-      body: summarizeValue(init.body),
-    })
-
-    const url = new URL(path, this.options.baseUrl)
-    if (init.query) {
-      for (const [key, value] of Object.entries(init.query)) {
-        if (value != null && value !== '') url.searchParams.set(key, String(value))
-      }
-    }
-
-    const response = await fetch(url.toString(), {
-      method: init.method || 'GET',
-      headers,
-      body: init.body == null ? undefined : JSON.stringify(init.body),
-    })
-
-    const text = await response.text()
-    let json: any
+    await this.acquire()
     try {
-      json = text ? JSON.parse(text) : {}
-    } catch {
-      throw new Error(`飞书项目 API 返回非 JSON：${response.status} ${text.slice(0, 300)}`)
+      return await this._requestWithRetry(path, init)
+    } finally {
+      this.release()
     }
+  }
 
-    const code = json.err_code ?? json.error?.code
-    if (!response.ok || (code != null && code !== 0)) {
-      const message = json.err_msg || json.error?.msg || json.message || text
-      console.warn('[feishu-project] request failed', {
+  private async _requestWithRetry(path: string, init: RequestOptions): Promise<any> {
+    const maxRetries = FeishuProjectService.MAX_RETRIES
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (init.auth !== false) {
+        headers['X-PLUGIN-TOKEN'] = await this.getPluginToken()
+        headers['X-USER-KEY'] = this.options.userKey
+      }
+
+      const startedAt = Date.now()
+      console.log('[feishu-project] request start', {
+        method: init.method || 'GET',
+        path,
+        query: init.query || null,
+        attempt,
+      })
+
+      const url = new URL(path, this.options.baseUrl)
+      if (init.query) {
+        for (const [key, value] of Object.entries(init.query)) {
+          if (value != null && value !== '') url.searchParams.set(key, String(value))
+        }
+      }
+
+      const response = await fetch(url.toString(), {
+        method: init.method || 'GET',
+        headers,
+        body: init.body == null ? undefined : JSON.stringify(init.body),
+      })
+
+      if (response.status === 429 && attempt < maxRetries) {
+        const retryAfterMs = Number(response.headers.get('Retry-After') || 0) * 1000
+          || Math.min(1000 * Math.pow(2, attempt), 10000)
+        console.warn('[feishu-project] rate limited (429), retrying', {
+          path,
+          attempt: attempt + 1,
+          retryAfterMs,
+          retryAfterSec: response.headers.get('Retry-After'),
+        })
+        await new Promise(r => setTimeout(r, retryAfterMs))
+        continue
+      }
+
+      const text = await response.text()
+      let json: any
+      try {
+        json = text ? JSON.parse(text) : {}
+      } catch {
+        throw new Error(`飞书项目 API 返回非 JSON：${response.status} ${text.slice(0, 300)}`)
+      }
+
+      const code = json.err_code ?? json.error?.code
+      if (!response.ok || (code != null && code !== 0)) {
+        const message = json.err_msg || json.error?.msg || json.message || text
+        console.warn('[feishu-project] request failed', {
+          method: init.method || 'GET',
+          path,
+          status: response.status,
+          ms: Date.now() - startedAt,
+          code,
+          message,
+        })
+        throw new Error(`飞书项目 API 调用失败：${response.status} ${message}`)
+      }
+      console.log('[feishu-project] request done', {
         method: init.method || 'GET',
         path,
         status: response.status,
         ms: Date.now() - startedAt,
-        code,
-        message,
-        responseKeys: json && typeof json === 'object' ? Object.keys(json).slice(0, 20) : [],
-        response: summarizeValue(json),
+        code: code ?? 0,
       })
-      throw new Error(`飞书项目 API 调用失败：${response.status} ${message}`)
+      return json
     }
-    console.log('[feishu-project] request done', {
-      method: init.method || 'GET',
-      path,
-      status: response.status,
-      ms: Date.now() - startedAt,
-      code: code ?? 0,
-      responseKeys: json && typeof json === 'object' ? Object.keys(json).slice(0, 20) : [],
-      response: summarizeValue(json),
-    })
-    return json
+    throw new Error('unreachable')
   }
 
   async queryUserByEmail(email: string): Promise<any> {

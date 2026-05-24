@@ -104,6 +104,7 @@ export default function DimensionManager() {
     form.setFieldsValue({
       dimension_weight: item.dimension_weight,
       indicator_weight: item.indicator_weight,
+      data_source: item.data_source,
       threshold_100: item.threshold_100,
       threshold_60: item.threshold_60,
       deduction_per_unit: item.deduction_per_unit,
@@ -286,6 +287,13 @@ export default function DimensionManager() {
           </Space>
           <Form.Item name="sort_order" label="排序">
             <InputNumber min={0} style={{ width: 200 }} />
+          </Form.Item>
+          <Form.Item name="data_source" label="来源">
+            <Select style={{ width: 200 }} options={[
+              { label: '飞书', value: 'feishu' },
+              { label: '录入', value: 'admin' },
+              { label: '举证', value: 'evidence' },
+            ]} />
           </Form.Item>
 
           {(editItem?.score_type === 'threshold' || (!editItem?.deduction_per_unit && editItem?.threshold_100 != null) || (!editItem?.threshold_100 && !editItem?.deduction_per_unit)) && (

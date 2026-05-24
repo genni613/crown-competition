@@ -1,6 +1,7 @@
 import { getDb, withTransaction } from '../db'
 import { calculateSeasonScores } from './scoring.service'
 import { queryPdSummaryByDateRange } from './pdAggregation.service'
+import { calculateThresholdScore } from '../utils/scoringFormulas'
 import type { JobRole, ScoringDimension, Season } from '../types/entities'
 
 type MetricMap = Record<string, number>
@@ -24,6 +25,7 @@ interface MemberPreview {
   member: SyncMember
   projectUserKey: string
   metrics: MetricMap
+  totalRdPd?: number
   warnings: SyncWarning[]
   rawCounts: Record<string, number>
 }
@@ -40,9 +42,7 @@ interface SyncResult {
 const metricNamesByRole: Record<JobRole, string[]> = {
   product: [
     '产品需求使用研发测试PD数',
-    '需求评审通过准时率',
     '核心项目准时上线率',
-    '需求变更消耗PD',
     '线上问题系统解决数',
   ],
   design: [
@@ -79,7 +79,7 @@ function computeDeliveryQuality(p0: number, p1: number, p2: number): number {
   return 60
 }
 
-const GONGSHI_TIME = 'COALESCE(work_date, work_start_time, create_time, update_time)'
+const GONGSHI_TIME = 'COALESCE(g.work_date, g.work_start_time, g.create_time, g.update_time)'
 
 async function queryLocalPdCount(userKey: string, startMs: number, endMs: number): Promise<number> {
   const rows = await getDb().query<{ total_pd: number }>(`
@@ -121,15 +121,32 @@ async function queryLocalIssuePriorityCounts(userKey: string, startMs: number, e
   )
 }
 
-async function aggregateProduct(userKey: string, startMs: number, endMs: number, startDate: string, endDate: string): Promise<MetricMap> {
+async function aggregateProduct(userKey: string, startMs: number, endMs: number, startDate: string, endDate: string): Promise<{ metrics: MetricMap; totalRdPd: number }> {
   const db = getDb()
-  // 按产品负责人汇总该成员负责的需求所消耗的研发工时（客户端 ÷3）
-  const rdHoursRows = await db.query<{ total_rd_hours: number }>(`
+
+  // 赛季内所有研发成员的总PD（客户端 ÷3）
+  const totalRdRows = await db.query<{ total_rd_pd: number }>(`
     SELECT ROUND(SUM(
       CASE WHEN fu.sub_role = 'client'
-           THEN g.actual_work_hours / 3
-           ELSE g.actual_work_hours END
-    ), 2) AS total_rd_hours
+           THEN g.pd_count / 3
+           ELSE g.pd_count END
+    ), 2) AS total_rd_pd
+    FROM feishu_workitem_gongshi g
+    JOIN feishu_user fu ON fu.user_key = g.work_hour_reporter
+    WHERE fu.job_role = 'tech'
+      AND ${GONGSHI_TIME} IS NOT NULL
+      AND ${GONGSHI_TIME} >= ?
+      AND ${GONGSHI_TIME} < ?
+  `, [new Date(startMs), new Date(endMs)])
+  const totalRdPd = Number(totalRdRows[0]?.total_rd_pd || 0)
+
+  // 该产品经理负责的需求所消耗的研发PD（客户端 ÷3）
+  const rdPdRows = await db.query<{ total_rd_pd: number }>(`
+    SELECT ROUND(SUM(
+      CASE WHEN fu.sub_role = 'client'
+           THEN g.pd_count / 3
+           ELSE g.pd_count END
+    ), 2) AS total_rd_pd
     FROM feishu_workitem_gongshi g
     JOIN feishu_workitem_story s ON s.work_item_id = g.related_requirement
     JOIN feishu_user fu ON fu.user_key = g.work_hour_reporter
@@ -138,15 +155,16 @@ async function aggregateProduct(userKey: string, startMs: number, endMs: number,
       AND ${GONGSHI_TIME} >= ?
       AND ${GONGSHI_TIME} < ?
   `, [userKey, new Date(startMs), new Date(endMs)])
-  const rdHours = Number(rdHoursRows[0]?.total_rd_hours || 0)
+  const rdPd = Number(rdPdRows[0]?.total_rd_pd || 0)
   const resolvedIssueCount = await queryLocalIssueCount(userKey, startMs, endMs)
 
   return {
-    '产品需求使用研发测试PD数': rdHours,
-    '需求评审通过准时率': 100,
-    '核心项目准时上线率': 100,
-    '需求变更消耗PD': 0,
-    '线上问题系统解决数': resolvedIssueCount,
+    metrics: {
+      '产品需求使用研发测试PD数': rdPd,
+      '核心项目准时上线率': 100,
+      '线上问题系统解决数': resolvedIssueCount,
+    },
+    totalRdPd,
   }
 }
 
@@ -220,8 +238,12 @@ async function aggregateMemberMetrics(member: SyncMember, season: Season): Promi
   const sd = `${sdDate.getFullYear()}-${pad(sdDate.getMonth() + 1)}-${pad(sdDate.getDate())}`
   const ed = `${edDate.getFullYear()}-${pad(edDate.getMonth() + 1)}-${pad(edDate.getDate())}`
 
-  const metrics = member.job_role === 'product'
+  const productResult = member.job_role === 'product'
     ? await aggregateProduct(userKey, startMs, endMs, sd, ed)
+    : null
+
+  const metrics = productResult
+    ? productResult.metrics
     : member.job_role === 'design'
       ? await aggregateDesign(userKey, startMs, endMs)
       : await aggregateTech(userKey, member.sub_role, startMs, endMs, sd, ed)
@@ -230,12 +252,13 @@ async function aggregateMemberMetrics(member: SyncMember, season: Season): Promi
     member,
     projectUserKey: userKey,
     metrics,
+    totalRdPd: productResult?.totalRdPd,
     warnings: [],
     rawCounts: { local: 1 },
   }
 }
 
-async function writeIndicatorScores(member: SyncMember, metrics: MetricMap): Promise<number> {
+async function writeIndicatorScores(member: SyncMember, metrics: MetricMap, totalRdPd?: number): Promise<number> {
   if (!member.job_role) return 0
   const db = getDb()
   const dimensions = await db.query<ScoringDimension>(`
@@ -251,6 +274,18 @@ async function writeIndicatorScores(member: SyncMember, metrics: MetricMap): Pro
       const dimension = dimensionByName.get(metricName)
       if (!dimension) continue
 
+      // 产品需求使用研发测试PD数：动态阈值（基于总研发PD的1/3和1/4）
+      let dynamicThreshold: { threshold_score: number; final_score: number } | undefined
+      if (metricName === '产品需求使用研发测试PD数' && totalRdPd != null && totalRdPd > 0) {
+        const t100 = totalRdPd / 3
+        const t60 = totalRdPd / 4
+        const ts = calculateThresholdScore(rawValue, t100, t60)
+        dynamicThreshold = {
+          threshold_score: ts,
+          final_score: ts * dimension.indicator_weight,
+        }
+      }
+
       if (dimension.data_source === 'evidence') {
         // 仅在用户没有已审批的举证记录时，写入飞书数据作为默认值
         const existingApproved = await tx.queryOne<{ id: number }>(
@@ -261,24 +296,34 @@ async function writeIndicatorScores(member: SyncMember, metrics: MetricMap): Pro
 
         await tx.execute(`
           INSERT INTO indicator_scores (
-            season_member_id, dimension_id, raw_value, source, approved, notes
-          ) VALUES (?, ?, ?, 'evidence', 1, ?)
+            season_member_id, dimension_id, raw_value, threshold_score, final_score, source, approved, notes
+          ) VALUES (?, ?, ?, ?, ?, 'evidence', 1, ?)
           ON DUPLICATE KEY UPDATE
             raw_value = VALUES(raw_value),
+            threshold_score = COALESCE(VALUES(threshold_score), threshold_score),
+            final_score = COALESCE(VALUES(final_score), final_score),
             notes = VALUES(notes)
-        `, [member.season_member_id, dimension.id, rawValue, '飞书同步默认值，用户举证后覆盖'])
+        `, [member.season_member_id, dimension.id, rawValue,
+            dynamicThreshold?.threshold_score ?? null,
+            dynamicThreshold?.final_score ?? null,
+            totalRdPd != null ? `总研发PD: ${totalRdPd}, 阈值100: ≥${(totalRdPd / 3).toFixed(1)}, 阈值60: ≥${(totalRdPd / 4).toFixed(1)}` : '飞书同步默认值，用户举证后覆盖'])
         written += 1
       } else {
         await tx.execute(`
           INSERT INTO indicator_scores (
-            season_member_id, dimension_id, raw_value, source, approved, notes
-          ) VALUES (?, ?, ?, 'feishu', 1, ?)
+            season_member_id, dimension_id, raw_value, threshold_score, final_score, source, approved, notes
+          ) VALUES (?, ?, ?, ?, ?, 'feishu', 1, ?)
           ON DUPLICATE KEY UPDATE
             raw_value = VALUES(raw_value),
+            threshold_score = COALESCE(VALUES(threshold_score), threshold_score),
+            final_score = COALESCE(VALUES(final_score), final_score),
             source = 'feishu',
             approved = 1,
             notes = VALUES(notes)
-        `, [member.season_member_id, dimension.id, rawValue, 'synced from local db'])
+        `, [member.season_member_id, dimension.id, rawValue,
+            dynamicThreshold?.threshold_score ?? null,
+            dynamicThreshold?.final_score ?? null,
+            totalRdPd != null ? `总研发PD: ${totalRdPd}, 阈值100: ≥${(totalRdPd / 3).toFixed(1)}, 阈值60: ≥${(totalRdPd / 4).toFixed(1)}` : 'synced from local db'])
         written += 1
       }
     }
@@ -323,7 +368,7 @@ export async function syncMemberFeishuData(seasonId: number, userId: string): Pr
 
   const preview = await aggregateMemberMetrics(member, season)
   console.log('[sync-member] metrics', { userId, metrics: preview.metrics })
-  const writtenScoreCount = await writeIndicatorScores(member, preview.metrics)
+  const writtenScoreCount = await writeIndicatorScores(member, preview.metrics, preview.totalRdPd)
   console.log('[sync-member] writtenScoreCount', writtenScoreCount)
   await calculateSeasonScores(seasonId)
   console.log('[sync-member] done')
@@ -357,7 +402,7 @@ export async function syncSeasonFeishuData(seasonId: number): Promise<SyncResult
       const preview = await aggregateMemberMetrics(member, season)
       console.log('[sync-season] member metrics', { userKey: member.user_key, jobRole: member.job_role, metrics: preview.metrics })
       result.warnings.push(...preview.warnings)
-      result.writtenScoreCount += await writeIndicatorScores(member, preview.metrics)
+      result.writtenScoreCount += await writeIndicatorScores(member, preview.metrics, preview.totalRdPd)
       result.syncedCount += 1
     } catch (error) {
       console.error('[sync-season] member error', { userKey: member.user_key, error: error instanceof Error ? error.message : error })

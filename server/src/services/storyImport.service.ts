@@ -227,7 +227,7 @@ async function fetchStoryItems(workItemTypeKey?: string, startDate?: string, end
   console.log('[story-import] first page done', { total, totalPages, pageSize })
 
   if (totalPages > 1) {
-    const concurrency = 5
+    const concurrency = 3
     for (let batchStart = 2; batchStart <= totalPages; batchStart += concurrency) {
       const batchEnd = Math.min(batchStart + concurrency - 1, totalPages)
       const pages = []

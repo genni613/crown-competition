@@ -29,6 +29,9 @@ import {
 } from '../../api/seasons'
 import { getLocalFeishuUsers, syncMemberSeasonScore } from '../../api/feishu'
 import { getMemberSeasonHistory, updateMemberDirectoryJobRole } from '../../api/users'
+import { getScoreHistory } from '../../api/scores'
+import GrowthCurveChart from '../../components/GrowthCurveChart'
+import type { ScoreHistoryRow } from '../../components/GrowthCurveChart'
 import type { LocalFeishuUser } from '../../api/feishu'
 import type { MemberSeasonHistoryItem, Season, SeasonMember } from '../../types/models'
 import { formatDate, formatDateTime } from '../../utils/datetime'
@@ -94,6 +97,8 @@ export default function MemberManager() {
   const [savingRole, setSavingRole] = useState(false)
   const [syncingMemberKey, setSyncingMemberKey] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [growthData, setGrowthData] = useState<ScoreHistoryRow[] | null>(null)
+  const [growthLoading, setGrowthLoading] = useState(false)
 
   useEffect(() => {
     void loadSeasons()
@@ -214,17 +219,25 @@ export default function MemberManager() {
     setSyncDraftSeasonMembers(true)
     setDrawerOpen(true)
     setHistoryLoading(true)
+    setGrowthLoading(true)
     try {
       if (record.user_key) {
-        const res = await getMemberSeasonHistory(record.user_key)
-        setHistory(res.data)
+        const [historyRes, growthRes] = await Promise.all([
+          getMemberSeasonHistory(record.user_key),
+          getScoreHistory(record.user_key).catch(() => ({ data: null })),
+        ])
+        setHistory(historyRes.data)
+        setGrowthData(growthRes.data)
       } else {
         setHistory([])
+        setGrowthData(null)
       }
     } catch {
       setHistory([])
+      setGrowthData(null)
     } finally {
       setHistoryLoading(false)
+      setGrowthLoading(false)
     }
   }
 
@@ -591,6 +604,10 @@ export default function MemberManager() {
             <Card size="small" title="赛季成绩历史" style={{ borderRadius: 12 }}>
               <Table rowKey="season_member_id" loading={historyLoading} dataSource={history} columns={historyColumns}
                 pagination={false} locale={{ emptyText: <Empty description="暂无历史成绩" /> }} scroll={{ x: 900 }} />
+            </Card>
+
+            <Card size="small" title={<span style={{ fontSize: 14, fontWeight: 600, color: '#1e1b4b' }}>成长曲线</span>} style={{ borderRadius: 12 }}>
+              <GrowthCurveChart data={growthData} loading={growthLoading} />
             </Card>
           </Space>
         ) : null}

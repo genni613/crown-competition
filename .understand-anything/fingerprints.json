@@ -1,0 +1,622 @@
+{
+  "_config.yml": {
+    "hash": "8aab32e0172821c69508d509d5310dcab3cc1f9e39f80466c28853eed6c10a06",
+    "sizeLines": 14,
+    "lastModified": "2026-05-06T02:32:33.267Z"
+  },
+  "client/.env.example": {
+    "hash": "e0d1a2673fd5ff20f623ebb0b0c3ab3ed4f76f295c097b226e1ee3a672d7a0bd",
+    "sizeLines": 4,
+    "lastModified": "2026-05-02T10:23:53.734Z"
+  },
+  "client/index.html": {
+    "hash": "8cd959f4a5851bb5799a7921b291c2bc1435b7cd492437257bdf357cc92774d7",
+    "sizeLines": 21,
+    "lastModified": "2026-05-04T10:24:54.726Z"
+  },
+  "client/package.json": {
+    "hash": "705ef39a53f27e9da25b7bab0e6eb7e901b0b4071ce136295157c984af32e547",
+    "sizeLines": 30,
+    "lastModified": "2026-05-02T10:23:53.735Z"
+  },
+  "client/src/api/auth.ts": {
+    "hash": "453ab9f2aba3e35cc535f581bb2ee5c1cee8f229ab09ecd40963117f35246058",
+    "sizeLines": 6,
+    "lastModified": "2026-05-02T10:23:53.736Z"
+  },
+  "client/src/api/client.ts": {
+    "hash": "5b751f5f4cdb2f14e1889d800e175d76f3cdf00d883264b3f9745c3bfbbe1c4a",
+    "sizeLines": 22,
+    "lastModified": "2026-05-05T09:18:21.894Z"
+  },
+  "client/src/api/dimensions.ts": {
+    "hash": "15c53fafb5e469fb98478999440a735cb4b214d553321c3d9b3dfd432810792e",
+    "sizeLines": 9,
+    "lastModified": "2026-05-02T10:23:53.737Z"
+  },
+  "client/src/api/evidence.ts": {
+    "hash": "e60bcb747a2130fac3e62a6448d96205bd9541a2d86b28bd41ae995726f9d901",
+    "sizeLines": 39,
+    "lastModified": "2026-05-05T07:10:19.317Z"
+  },
+  "client/src/api/feishu.ts": {
+    "hash": "5e812939d8dc923d182750785e9bb861653f1bf645022a041853c6c3780a1b57",
+    "sizeLines": 279,
+    "lastModified": "2026-05-13T05:45:09.744Z"
+  },
+  "client/src/api/orgScores.ts": {
+    "hash": "ce84ab9aad79c5f2ac57a7b1530b6fcc2ab2490bb12b2bc9f45c3bc6b71b19ac",
+    "sizeLines": 21,
+    "lastModified": "2026-05-02T10:23:53.739Z"
+  },
+  "client/src/api/scores.ts": {
+    "hash": "f2710b8708a199c2f4dafcf4f87d85b0c282a01a3e1541b297605925a608638a",
+    "sizeLines": 13,
+    "lastModified": "2026-05-20T09:28:01.080Z"
+  },
+  "client/src/api/scoring.ts": {
+    "hash": "497e89d0750ae6d9a30cf8a2ef1568576e3afd90509ff04f8129da55cc1cd64d",
+    "sizeLines": 9,
+    "lastModified": "2026-05-02T10:23:53.740Z"
+  },
+  "client/src/api/seasons.ts": {
+    "hash": "6f3439685d5b9b19504020df1179f31d446a0440c7f39a1520e03420752b4192",
+    "sizeLines": 34,
+    "lastModified": "2026-05-20T07:03:51.875Z"
+  },
+  "client/src/api/users.ts": {
+    "hash": "c3959ada5f57b07ad3dc6f66d19a77f9dadd18b91f766dee661cb695f11b5124",
+    "sizeLines": 27,
+    "lastModified": "2026-05-13T05:48:42.979Z"
+  },
+  "client/src/App.tsx": {
+    "hash": "07b5b9073c6211ddaa2bddcb9bfbfa3b6be2d6ab8fd1b80111d44992498b4d3f",
+    "sizeLines": 184,
+    "lastModified": "2026-05-13T05:46:54.616Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/final/spritesheet.webp": {
+    "hash": "7c2f340599777dd2241193df154f0c9746e96c95adeecf2df440f57a47a985e9",
+    "sizeLines": 2963,
+    "lastModified": "2026-05-06T04:34:24.352Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/frames/frames-manifest.json": {
+    "hash": "789ac5a9d63c0a8b71bef40d42d5f083b8520bc1954265f31f96d39683437d9e",
+    "sizeLines": 68,
+    "lastModified": "2026-05-06T04:34:19.972Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/imagegen-jobs.json": {
+    "hash": "e4e6a65b55920192f6c4dc4c342d60d95cb5d6cdf8e63d1235ec1ee0988d9319",
+    "sizeLines": 295,
+    "lastModified": "2026-05-06T04:33:12.117Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/pet_request.json": {
+    "hash": "c2eb25cf840222eea6afa8978142346d41392cd8f6677a659bd46756f9413fdc",
+    "sizeLines": 146,
+    "lastModified": "2026-05-06T04:14:24.202Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/prompts/base-pet.md": {
+    "hash": "ca866a0643126f3828b1f97e58cb0909ac5c6c7d70d40b8864706ab3ea119c56",
+    "sizeLines": 9,
+    "lastModified": "2026-05-06T03:55:24.164Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/prompts/rows/idle.md": {
+    "hash": "edb6b49cb477fe56476b7dde668b4a10e5d7fcecd0840d7595a307fca7448c4b",
+    "sizeLines": 55,
+    "lastModified": "2026-05-06T03:55:24.165Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/prompts/rows/jumping.md": {
+    "hash": "88da91df535bbe03691fc03f4737c502abd6713e73c09df61323fb7f05fe6f20",
+    "sizeLines": 52,
+    "lastModified": "2026-05-06T03:55:24.165Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/prompts/rows/review.md": {
+    "hash": "864885c0339945595871ae0bc3d7498cb617abc118aa52745eb6302f2eae2d18",
+    "sizeLines": 51,
+    "lastModified": "2026-05-06T03:55:24.165Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/prompts/rows/waiting.md": {
+    "hash": "d1ea52edebfd647fe370c7af3b81704d986412b4b5a81a55895393bd83928b66",
+    "sizeLines": 47,
+    "lastModified": "2026-05-06T03:55:24.165Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/prompts/rows/waving.md": {
+    "hash": "0a8d62e3a752d066e8169ccf4550d07627f3e0b10be171646270562735cb3965",
+    "sizeLines": 51,
+    "lastModified": "2026-05-06T03:55:24.165Z"
+  },
+  "client/src/assets/copilot/hatch-pet-png-run/run-summary.json": {
+    "hash": "989222536e712ca6733f015968fe197d5838f9d7c474e19ba8093e59866f1224",
+    "sizeLines": 17,
+    "lastModified": "2026-05-06T04:34:24.500Z"
+  },
+  "client/src/components/copilot/AppCopilotPopup.tsx": {
+    "hash": "d609793e29e74a6fa098cb8a46edde0d8eb1c0db58343e47f6de0ba7ce63e118",
+    "sizeLines": 504,
+    "lastModified": "2026-05-06T04:46:38.060Z"
+  },
+  "client/src/components/copilot/AppCopilotProvider.tsx": {
+    "hash": "fb081b225b0688276ce905f76d005495ff0e2247e9115822560341c4dc4f7ede",
+    "sizeLines": 27,
+    "lastModified": "2026-05-02T10:23:53.743Z"
+  },
+  "client/src/components/copilot/config.ts": {
+    "hash": "46283e8f1bd33db10d8f6b4cd422bc22923f36504aeda438ae03bc0821dac014",
+    "sizeLines": 14,
+    "lastModified": "2026-05-02T10:23:53.744Z"
+  },
+  "client/src/components/copilot/evidenceDraft.ts": {
+    "hash": "a71dd95fcb37b158e81a6ac66016544daa34a1c59d01193f133b388e93f91a52",
+    "sizeLines": 49,
+    "lastModified": "2026-05-02T10:23:53.745Z"
+  },
+  "client/src/components/copilot/orgScoreDraft.ts": {
+    "hash": "450aa7225652065567b6b3a112ac8e683478e5b76acd1ff8e42243b47c0633ea",
+    "sizeLines": 62,
+    "lastModified": "2026-05-02T10:23:53.746Z"
+  },
+  "client/src/components/ErrorBoundary.tsx": {
+    "hash": "5eea6212cbf8e74fc47259bb3523a764a0990489d478037190cac7a1dcf2f43f",
+    "sizeLines": 32,
+    "lastModified": "2026-05-05T09:18:05.320Z"
+  },
+  "client/src/components/layout/AppLayout.tsx": {
+    "hash": "82ba6598fcefa4f87196c674540069fa50c591ea37acb090170c8ce12ffc2134",
+    "sizeLines": 47,
+    "lastModified": "2026-05-04T10:29:41.895Z"
+  },
+  "client/src/components/layout/Sidebar.tsx": {
+    "hash": "fa296a0ecf570748e4d7f83e3c4e84b8babdf89c27eb1098e9e98dca5c70b05f",
+    "sizeLines": 137,
+    "lastModified": "2026-05-13T05:47:00.792Z"
+  },
+  "client/src/copilot-override.css": {
+    "hash": "0ca2d884dca04ddb4c52594e250b6dc512608231b9b0b2bffc16bb08bc7626bb",
+    "sizeLines": 161,
+    "lastModified": "2026-05-06T04:47:08.677Z"
+  },
+  "client/src/main.tsx": {
+    "hash": "3c018344006fca3d43ec13daafe6f26bbce668679dc951aaaf29fd67e1d13811",
+    "sizeLines": 59,
+    "lastModified": "2026-05-05T09:18:17.093Z"
+  },
+  "client/src/pages/admin/AdminDataSyncHub.tsx": {
+    "hash": "958083b7f926f680cbc68ef5a275d862f573736276a741b743c1f4d9aeda8010",
+    "sizeLines": 113,
+    "lastModified": "2026-05-05T09:19:36.645Z"
+  },
+  "client/src/pages/admin/AdminScoringHub.tsx": {
+    "hash": "2519e01e665f612b2ad52f16013fdf6e82c9b4f73c7fe164e6d2e2c56d73461b",
+    "sizeLines": 133,
+    "lastModified": "2026-05-05T09:19:21.403Z"
+  },
+  "client/src/pages/admin/DimensionManager.tsx": {
+    "hash": "dd70d2e7157fee5f88bc475c0eeb0d2a511f4af37fcf8ccdb3b6fe6ab3617bf0",
+    "sizeLines": 334,
+    "lastModified": "2026-05-20T14:50:28.311Z"
+  },
+  "client/src/pages/admin/EvidenceReview.tsx": {
+    "hash": "f019f2eebd2639f8eecc54723c3d0c1ebd5124725c22ca2584c7de45f934e0a5",
+    "sizeLines": 269,
+    "lastModified": "2026-05-02T11:27:17.337Z"
+  },
+  "client/src/pages/admin/FeishuManager.tsx": {
+    "hash": "dc87c1b66df03f694059a97842a14f06599019f1fa45379a6cda93e803becdd9",
+    "sizeLines": 1746,
+    "lastModified": "2026-05-02T10:23:53.752Z"
+  },
+  "client/src/pages/admin/MemberManager.tsx": {
+    "hash": "13bdebef25b42d853362aa1e9cf18acf66e7101ffdbfe48b86b0e13b0c028f36",
+    "sizeLines": 618,
+    "lastModified": "2026-05-20T09:28:01.081Z"
+  },
+  "client/src/pages/admin/OrgScoreManager.tsx": {
+    "hash": "dbb2f6f2b16a290462346ed55cb8e6c2b218f51f1e667701d4bb53bfe6636d06",
+    "sizeLines": 502,
+    "lastModified": "2026-05-05T09:19:52.989Z"
+  },
+  "client/src/pages/admin/ScoreEntry.tsx": {
+    "hash": "db47c93ea7f3bf6d584fa3ff785696c332665436c0af89ca27f8a793b8f8b295",
+    "sizeLines": 273,
+    "lastModified": "2026-05-05T09:19:45.442Z"
+  },
+  "client/src/pages/admin/SeasonManager.tsx": {
+    "hash": "1fe783f67c7491e547001402f791b76a6463c149283f3383c6fd72de06258205",
+    "sizeLines": 416,
+    "lastModified": "2026-05-20T04:03:18.735Z"
+  },
+  "client/src/pages/Dashboard.tsx": {
+    "hash": "7407a04c31db9924a65a9576d6a87ac1a859d54f965ceac43eb701878dd9c623",
+    "sizeLines": 583,
+    "lastModified": "2026-05-20T09:28:01.080Z"
+  },
+  "client/src/pages/EvidenceList.tsx": {
+    "hash": "c650b88f8ffec0c5a816e9ece0a4d4f4eeaa4d2bd7e460c78775202a42484e94",
+    "sizeLines": 251,
+    "lastModified": "2026-05-04T10:32:52.290Z"
+  },
+  "client/src/pages/EvidenceSubmit.tsx": {
+    "hash": "6ec7964ace7a21eb43093b31a5505fc104ff05cd81e3cad602d00d579997cc81",
+    "sizeLines": 388,
+    "lastModified": "2026-05-05T07:10:16.805Z"
+  },
+  "client/src/pages/Rankings.tsx": {
+    "hash": "7b62895ee8780bf7dcc5faaf6a62ad1950d5969ce27f9f961af72053553b286b",
+    "sizeLines": 174,
+    "lastModified": "2026-05-04T10:29:28.607Z"
+  },
+  "client/src/store/authStore.ts": {
+    "hash": "a1b61fb63d1c1d460331a288a340c83a4354002f34e797bb292da2accf6c8963",
+    "sizeLines": 25,
+    "lastModified": "2026-05-02T10:23:53.755Z"
+  },
+  "client/src/styles.css": {
+    "hash": "334cae907227d718b48d1617839ca6cd0b7fbe5177a77d98bcb021c2a654f077",
+    "sizeLines": 476,
+    "lastModified": "2026-05-04T10:24:40.131Z"
+  },
+  "client/src/types/models.ts": {
+    "hash": "d45f078cd699c3c57a0495b95adf02104c2b350afdc772aeac8e677c5498cbf6",
+    "sizeLines": 175,
+    "lastModified": "2026-05-13T05:48:37.832Z"
+  },
+  "client/src/utils/datetime.ts": {
+    "hash": "327eb06682b9a3595642a7f76aa983fa94b0f7d63e42c3a635002aeb90984d53",
+    "sizeLines": 44,
+    "lastModified": "2026-05-02T10:23:53.756Z"
+  },
+  "client/src/vite-env.d.ts": {
+    "hash": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5",
+    "sizeLines": 2,
+    "lastModified": "2026-05-02T10:23:53.757Z"
+  },
+  "client/tsconfig.json": {
+    "hash": "eb2b3aaafd3871dc5d76ba611383019461fff3f0f58efaff1a3e09207ec12c68",
+    "sizeLines": 25,
+    "lastModified": "2026-05-02T10:23:53.758Z"
+  },
+  "client/tsconfig.tsbuildinfo": {
+    "hash": "76f385aed70439e710fdbbc862d16f3ea4c12f17b4a5d593a0f0ba36ad5c03bb",
+    "sizeLines": 1,
+    "lastModified": "2026-05-13T05:49:43.254Z"
+  },
+  "client/vite.config.ts": {
+    "hash": "a60f7c029ebffce58da87b4a1961cd30dc87a2f7d600200836f8d13706095315",
+    "sizeLines": 22,
+    "lastModified": "2026-05-02T10:23:53.758Z"
+  },
+  "crown-competition-slides.html": {
+    "hash": "256ef32daad36b6fa014ce69edd4a5f4f8d038c9eb1d8e0d15ef940fabc0d3a1",
+    "sizeLines": 951,
+    "lastModified": "2026-05-03T06:45:41.863Z"
+  },
+  "digital-pet-design.md": {
+    "hash": "3d6e4c4102d76ac4a1e67077a0bc506d8a7c3b5b81677ae24582cc83dd971d8b",
+    "sizeLines": 364,
+    "lastModified": "2026-05-06T02:23:12.657Z"
+  },
+  "docs/competition-rules.md": {
+    "hash": "4f45581c95fa690848515e8e8509977f48b92265b48ec5f994a4954deb0b127e",
+    "sizeLines": 390,
+    "lastModified": "2026-05-02T10:44:32.710Z"
+  },
+  "docs/copilotkit-capabilities.md": {
+    "hash": "207eb42429a1c3a0ad34e0c7788ce71f02afcc555b61a908a31f59cdeee2d65e",
+    "sizeLines": 449,
+    "lastModified": "2026-05-02T10:44:32.712Z"
+  },
+  "docs/copilotkit-setup.md": {
+    "hash": "b3827294b7ec84b26e15452f6632cd063303c01af666ffbe167c8713fe7ad9ee",
+    "sizeLines": 62,
+    "lastModified": "2026-05-02T10:23:53.733Z"
+  },
+  "docs/design.md": {
+    "hash": "fff31cc6d3ba1dcbd76e1f6473d1be7408db4d0abe15a14a84ff48a625ee94f2",
+    "sizeLines": 1109,
+    "lastModified": "2026-05-02T10:44:32.715Z"
+  },
+  "docs/feishu-data-sync-design.md": {
+    "hash": "8bd257a400e34e5f2357bb20b4644d0311af7c8209d1530ab17b6e8275d85ad1",
+    "sizeLines": 568,
+    "lastModified": "2026-05-02T10:23:53.836Z"
+  },
+  "docs/feishu-project-openapi-sync.md": {
+    "hash": "1ff64abed5d10e4ad36f5cbaa66a4c5b93d30cfca6800fe62065f8b28f19ce2a",
+    "sizeLines": 724,
+    "lastModified": "2026-05-02T10:23:53.761Z"
+  },
+  "docs/permission-control.md": {
+    "hash": "a3a6c21f0bdd8a4532cdd0f8b0b04c792f7dec1ae5a11df941388f65e07d6716",
+    "sizeLines": 131,
+    "lastModified": "2026-05-02T10:23:53.762Z"
+  },
+  "docs/scoring-metric-aggregation.md": {
+    "hash": "b331bf77f11ec6b439b9b41a68778b9eedd534221744ba6a4aea997382819d61",
+    "sizeLines": 565,
+    "lastModified": "2026-05-02T10:23:53.762Z"
+  },
+  "docs/scoring-result-model.md": {
+    "hash": "c0bb359ac81322bd28c211585b8f1b3f1e01af22b9013edf64d18c5e78180c5d",
+    "sizeLines": 478,
+    "lastModified": "2026-05-02T10:23:53.762Z"
+  },
+  "docs/scoring-rules.md": {
+    "hash": "681942e64cc9aac7403df078bd91d99c17eba9a61389d74ac995a98d9c82324f",
+    "sizeLines": 154,
+    "lastModified": "2026-05-02T10:44:32.718Z"
+  },
+  "docs/slides.html": {
+    "hash": "256ef32daad36b6fa014ce69edd4a5f4f8d038c9eb1d8e0d15ef940fabc0d3a1",
+    "sizeLines": 951,
+    "lastModified": "2026-05-02T13:30:59.147Z"
+  },
+  "docs/superpowers/plans/2026-05-02-ui-redesign.md": {
+    "hash": "2cbbfa2f4633070e776250c40495ba7d74f32b26365c82fd58bb119669b44d2e",
+    "sizeLines": 645,
+    "lastModified": "2026-05-03T06:34:41.528Z"
+  },
+  "docs/superpowers/specs/2026-05-02-ui-redesign-design.md": {
+    "hash": "19f7f1c5fd83183e67619986a8efdd0b236b9009b64d93f69045ef12785a7232",
+    "sizeLines": 232,
+    "lastModified": "2026-05-03T06:42:49.537Z"
+  },
+  "package.json": {
+    "hash": "c4294ebf00e5455f6c680ddbdbea6f2c9af1ba6060e07dbffe06a371b2c65e35",
+    "sizeLines": 19,
+    "lastModified": "2026-05-02T10:40:39.638Z"
+  },
+  "README.md": {
+    "hash": "2af2b057d8536fc9f13db4e3ceb9ce1cd0ae7ae34b42ee47318ca6184448d486",
+    "sizeLines": 157,
+    "lastModified": "2026-05-02T10:44:32.705Z"
+  },
+  "server/package.json": {
+    "hash": "81f2dcaa9537f68852dc5dc4cc6b61babc65482194fdf1c7025765a42e3c33a8",
+    "sizeLines": 34,
+    "lastModified": "2026-05-05T09:13:08.691Z"
+  },
+  "server/src/agent/scoringAgent.ts": {
+    "hash": "9c80d3ea7438b6eb5311aec89b8cdcf9a592ff6abd95f1ebe51c9ec094b2666c",
+    "sizeLines": 307,
+    "lastModified": "2026-05-02T10:23:53.785Z"
+  },
+  "server/src/config.ts": {
+    "hash": "b34a1ac11861ea50eb96bab451576f7a93ea16084235ad83f08f424a387941c5",
+    "sizeLines": 62,
+    "lastModified": "2026-05-05T09:13:45.168Z"
+  },
+  "server/src/config/admins.json": {
+    "hash": "26143bf0ba24a22378bfd23aafa86410e07339199f07a82af8809e8fc19355ff",
+    "sizeLines": 11,
+    "lastModified": "2026-05-02T10:23:53.789Z"
+  },
+  "server/src/config/feishuProjectFields.json": {
+    "hash": "97b27392bf4bcdfbc9fb5b438e9f002e9e68514abfc1a6404ed85169f20a7332",
+    "sizeLines": 35,
+    "lastModified": "2026-05-02T10:23:53.791Z"
+  },
+  "server/src/config/issueFields.json": {
+    "hash": "a60bbcca8710ec2b9d64f11a55cacbfbf0fa9141c7c2e2088dce2ca6b2a3f47d",
+    "sizeLines": 16,
+    "lastModified": "2026-05-02T10:23:53.793Z"
+  },
+  "server/src/config/projectFields.json": {
+    "hash": "c0069620956b3823dafa5273cb217251556d67f7301ef959c1858e89f748c800",
+    "sizeLines": 16,
+    "lastModified": "2026-05-02T10:23:53.794Z"
+  },
+  "server/src/config/storyFields.json": {
+    "hash": "b1806dfdec4c6cb4a25908ba837a55004cc37bedc117d66ad77b68b940ee6730",
+    "sizeLines": 15,
+    "lastModified": "2026-05-02T10:23:53.796Z"
+  },
+  "server/src/config/workHourFields.json": {
+    "hash": "845fde4ac099f4e3e15852d6b3c1e4acafb11b9681907fb83a5ec914fa500395",
+    "sizeLines": 25,
+    "lastModified": "2026-05-02T10:23:53.797Z"
+  },
+  "server/src/db/index.ts": {
+    "hash": "3e580f948f21bdd3bc9b76982af25f236410d16c4f37a1296f1b65926d2d5b95",
+    "sizeLines": 324,
+    "lastModified": "2026-05-20T06:17:56.042Z"
+  },
+  "server/src/db/schema.mysql.sql": {
+    "hash": "c5293d4d943e0ca21afc8ec849b0086ac8fc98ade650f72cb0f4d50cd2e493ee",
+    "sizeLines": 308,
+    "lastModified": "2026-05-20T04:03:18.740Z"
+  },
+  "server/src/db/seed.ts": {
+    "hash": "f273e3c63f8bc8d877008b5e5beeb4ab8fe74c94518869ea3288cb387c901d44",
+    "sizeLines": 103,
+    "lastModified": "2026-05-02T10:23:53.798Z"
+  },
+  "server/src/index.ts": {
+    "hash": "7136e779e1ad440ae300386dc2f19ab00112ba6fd40bf552884af842fa4f8549",
+    "sizeLines": 130,
+    "lastModified": "2026-05-05T09:13:38.163Z"
+  },
+  "server/src/lib/feishu.ts": {
+    "hash": "d2e97cdbe3924768dd63caae027f3ddfd252f6c3882f1f04ee267d5c20319281",
+    "sizeLines": 246,
+    "lastModified": "2026-05-04T09:33:18.228Z"
+  },
+  "server/src/lib/session.ts": {
+    "hash": "b56700a5393bdb664817602fe248f33355a8f17ef2d2ae72116ec3ec1426c40a",
+    "sizeLines": 40,
+    "lastModified": "2026-05-04T09:52:31.003Z"
+  },
+  "server/src/middleware/asyncHandler.ts": {
+    "hash": "22c805c597244182691e9bd91a88767fc360b8168c3a5be1220729e4262e2970",
+    "sizeLines": 10,
+    "lastModified": "2026-05-02T10:23:53.801Z"
+  },
+  "server/src/middleware/auth.ts": {
+    "hash": "e65129ab66c7b8aef304f35f81e50141ce0ec1fb99ffc0c9e1c7be13d61cb2de",
+    "sizeLines": 83,
+    "lastModified": "2026-05-02T10:23:53.802Z"
+  },
+  "server/src/middleware/errorHandler.ts": {
+    "hash": "b480e92a5e09ce61ed2ca5b8ec62afab2ca292c961de072f0880487949a219df",
+    "sizeLines": 10,
+    "lastModified": "2026-05-05T09:17:44.065Z"
+  },
+  "server/src/routes/auth.ts": {
+    "hash": "b15c3548063f7ace0dcfe7ac843ba35c7b488197b51e540b2d5a1ece3bc4bfe6",
+    "sizeLines": 155,
+    "lastModified": "2026-05-12T10:05:19.556Z"
+  },
+  "server/src/routes/copilotkit.ts": {
+    "hash": "73ce8f962ba9521d7a56f0e985231d07ea372e6d838e23c96dcc4681c3c77380",
+    "sizeLines": 15,
+    "lastModified": "2026-05-02T10:23:53.803Z"
+  },
+  "server/src/routes/dimensions.ts": {
+    "hash": "28c77386595e033ab2d0445ca648919590a8c352bf7fc9e0e56c5506519048bd",
+    "sizeLines": 83,
+    "lastModified": "2026-05-20T14:50:12.324Z"
+  },
+  "server/src/routes/evidence.ts": {
+    "hash": "d1c875900e8f6ba16cb54dd00872239fd18e2eb5ad5d2177b944a61a89fc0b80",
+    "sizeLines": 448,
+    "lastModified": "2026-05-20T04:03:18.742Z"
+  },
+  "server/src/routes/feishu.ts": {
+    "hash": "d5e2a7861de36e11ab67bae51b696b79ad19e45d2bf6d5e104b461996419bf74",
+    "sizeLines": 773,
+    "lastModified": "2026-05-12T10:04:54.393Z"
+  },
+  "server/src/routes/orgScoreAssist.ts": {
+    "hash": "661dcc1a6f6242f5678a35fea2840df83ec3a30c18f3c81ddb13547969e3eac5",
+    "sizeLines": 18,
+    "lastModified": "2026-05-02T10:23:53.805Z"
+  },
+  "server/src/routes/orgScores.ts": {
+    "hash": "636646c0b4d0b54a49b9a4418a83c1140af8c42ecc0d672ca43545a0384a4ee4",
+    "sizeLines": 148,
+    "lastModified": "2026-05-05T09:14:53.348Z"
+  },
+  "server/src/routes/scores.ts": {
+    "hash": "86403e26a0c688989e5adf169cfe6fe92233ec105affab5e3eff486039ce251c",
+    "sizeLines": 107,
+    "lastModified": "2026-05-20T09:28:01.081Z"
+  },
+  "server/src/routes/scoring.ts": {
+    "hash": "42173d672143182ea1c8500665bd8c113d76489692c02ef54a37183b0b043ab9",
+    "sizeLines": 96,
+    "lastModified": "2026-05-02T10:23:53.808Z"
+  },
+  "server/src/routes/seasons.ts": {
+    "hash": "1b38fe38422bc02fb43c59d92a6e53dd445d32ab66b430430b2685ff3c5adadc",
+    "sizeLines": 383,
+    "lastModified": "2026-05-20T07:03:30.247Z"
+  },
+  "server/src/routes/users.ts": {
+    "hash": "f32d3301a7d919e7a0e40c218fafc2bf60b108ca4d13c6d2605c0a15d417ed22",
+    "sizeLines": 96,
+    "lastModified": "2026-05-13T05:48:31.400Z"
+  },
+  "server/src/services/auth.service.ts": {
+    "hash": "5ba48f5ef59ed1f777386c662df0ca65bc6f91b729e792da13225e57c4763073",
+    "sizeLines": 390,
+    "lastModified": "2026-05-20T05:37:20.497Z"
+  },
+  "server/src/services/feishuProject.service.ts": {
+    "hash": "5ab99bb20973c3efff2ba68da7a6ce624ef4988e53d9cf1069e65c4d868b8a67",
+    "sizeLines": 516,
+    "lastModified": "2026-05-02T10:23:53.817Z"
+  },
+  "server/src/services/feishuSync.service.ts": {
+    "hash": "99fd396bd9b7f4a8ecafcb7807fc3c6fcfd12c176db5c8ca456a54473d794d00",
+    "sizeLines": 425,
+    "lastModified": "2026-05-20T15:05:24.241Z"
+  },
+  "server/src/services/feishuWorkHours.service.ts": {
+    "hash": "e30f984db1734ed01dcfd98ded80b71bc6d808ce0e612b5929ed53ea25c6afa8",
+    "sizeLines": 1336,
+    "lastModified": "2026-05-02T10:23:53.821Z"
+  },
+  "server/src/services/issueImport.service.ts": {
+    "hash": "ed85757fcf256ffd19c41132155308b06458d118599c8f77ae5f9c440a727c05",
+    "sizeLines": 372,
+    "lastModified": "2026-05-02T10:23:53.822Z"
+  },
+  "server/src/services/orgScoreMatch.service.ts": {
+    "hash": "23eec773cdb0d3e68a11fc31a4e743e35261ddb593c5106620214c356ffd4554",
+    "sizeLines": 217,
+    "lastModified": "2026-05-02T10:23:53.824Z"
+  },
+  "server/src/services/pdAggregation.service.ts": {
+    "hash": "1193a2e1092e5e9aa9e5c8f18ca10956e830f6b9c0778bb475e46dc90d7b0846",
+    "sizeLines": 237,
+    "lastModified": "2026-05-12T10:06:27.595Z"
+  },
+  "server/src/services/projectImport.service.ts": {
+    "hash": "0f20e90c9e565ec0a204eee355b1b879a71df68f3a5ea4d347fa3066ef7f7672",
+    "sizeLines": 258,
+    "lastModified": "2026-05-02T10:23:53.827Z"
+  },
+  "server/src/services/scoring.service.ts": {
+    "hash": "5d87631744b894b14d555e8ad00e50d28bc2571a8fb04b9f36821164817d00c1",
+    "sizeLines": 148,
+    "lastModified": "2026-05-20T15:03:40.012Z"
+  },
+  "server/src/services/storyImport.service.ts": {
+    "hash": "9fbd9dcc8ac9e520045871c35ce667a0ee4e863d3c0b15417fb9d81cec8238cb",
+    "sizeLines": 388,
+    "lastModified": "2026-05-12T14:51:22.308Z"
+  },
+  "server/src/services/userImport.service.ts": {
+    "hash": "82d9cba17d1c957a206d29bf8a915be8c265b7ca1cb295cdfd7eafda7c06266f",
+    "sizeLines": 131,
+    "lastModified": "2026-05-02T10:23:53.829Z"
+  },
+  "server/src/services/workHourImport.service.ts": {
+    "hash": "839d1a6c85f5a8a94bf6f80750e1f621d932142340b5e8e1c6f0c5df6062954e",
+    "sizeLines": 462,
+    "lastModified": "2026-05-02T10:23:53.830Z"
+  },
+  "server/src/types/entities.ts": {
+    "hash": "1a883896ffe96c274d62f984b7131637ccf7b512d80a2f4a3c0bbe3c6417a995",
+    "sizeLines": 154,
+    "lastModified": "2026-05-20T04:03:18.749Z"
+  },
+  "server/src/types/express.d.ts": {
+    "hash": "8c446707a4ebd8df7fd056a28e21a5dce0143ee9740a690291746f05fadfa79e",
+    "sizeLines": 12,
+    "lastModified": "2026-05-02T10:23:53.831Z"
+  },
+  "server/src/utils/constants.ts": {
+    "hash": "e2fc5a68e062593119b3592721daeb62c17ccb0e3022be83c28f89d58c7e1793",
+    "sizeLines": 22,
+    "lastModified": "2026-05-02T10:23:53.832Z"
+  },
+  "server/src/utils/scoringFormulas.ts": {
+    "hash": "7d0d7a146811999333def9498e89460af20ba47e0a3896ddf3747eb0a9a0299d",
+    "sizeLines": 91,
+    "lastModified": "2026-05-02T10:23:53.833Z"
+  },
+  "server/tests/scoring.test.ts": {
+    "hash": "ebe1091b3fac7a1acf7d848a866e919cf5b9b969b0d520859732537926cba9ad",
+    "sizeLines": 167,
+    "lastModified": "2026-05-02T10:23:53.834Z"
+  },
+  "server/tsconfig.json": {
+    "hash": "cff7dc99b47862560d2df97507f38112e33f15b8658d792160095fff987dda2b",
+    "sizeLines": 15,
+    "lastModified": "2026-05-02T10:23:53.835Z"
+  },
+  "split_sprite.py": {
+    "hash": "e4dbde7a2bab5685d59ea99d0b2b27b13cd7d33a18fe481d6d3db650ecfc81ce",
+    "sizeLines": 58,
+    "lastModified": "2026-05-04T16:55:22.629Z"
+  },
+  "tsconfig.base.json": {
+    "hash": "4afe15397ca7ec809d0e92ba741f8aa5da028067d046e2e7f2904ff75db5aac1",
+    "sizeLines": 16,
+    "lastModified": "2026-05-02T10:23:53.836Z"
+  },
+  "virtual-pet-implementation-guide.md": {
+    "hash": "523d03f9b2ebaf4d0cfe82a8042bf760c53b9ae4275487f734a211814d4a884c",
+    "sizeLines": 657,
+    "lastModified": "2026-05-04T16:11:26.417Z"
+  }
+}

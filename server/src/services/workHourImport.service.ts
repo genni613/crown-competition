@@ -298,7 +298,7 @@ async function fetchWorkHourItems(workItemTypeKey?: string, startDate?: string, 
 
   // 并发拉剩余页
   if (totalPages > 1) {
-    const concurrency = 5
+    const concurrency = 3
     for (let batchStart = 2; batchStart <= totalPages; batchStart += concurrency) {
       const batchEnd = Math.min(batchStart + concurrency - 1, totalPages)
       const pages = []
