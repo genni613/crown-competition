@@ -7,7 +7,7 @@ export interface User {
   department_name: string | null
   title: string | null
   role: 'ADMIN' | 'MEMBER'
-  job_role: 'product' | 'design' | 'tech' | null
+  job_role: 'product' | 'design' | 'tech' | 'test' | null
   sub_role: 'client' | 'frontend' | 'backend' | null
 }
 
@@ -124,7 +124,7 @@ export interface EvidenceReview {
   created_at: string
 }
 
-export type JobRole = 'product' | 'design' | 'tech'
+export type JobRole = 'product' | 'design' | 'tech' | 'test'
 export type SubRole = 'client' | 'frontend' | 'backend'
 
 export interface MemberDirectoryItem {

@@ -20,11 +20,13 @@ import AdminDataSyncHub from './pages/admin/AdminDataSyncHub'
 import DimensionManager from './pages/admin/DimensionManager'
 import MemberManager from './pages/admin/MemberManager'
 import MemberScoreDetail from './pages/admin/MemberScoreDetail'
+import MemberDirectory from './pages/admin/MemberDirectory'
 
 const jobRoleOptions = [
   { label: '产品', value: 'product' },
   { label: '设计', value: 'design' },
   { label: '研发', value: 'tech' },
+  { label: '测试', value: 'test' },
 ]
 
 const subRoleOptions = [
@@ -168,6 +170,7 @@ export default function App() {
             <Route path="/admin/seasons" element={<SeasonManager />} />
             <Route path="/admin/scoring" element={<AdminScoringHub />} />
             <Route path="/admin/members" element={<MemberManager />} />
+            <Route path="/admin/member-directory" element={<MemberDirectory />} />
             <Route path="/admin/scores/:seasonId" element={<ScoreEntry />} />
             <Route path="/admin/evidence" element={<EvidenceReview />} />
             <Route path="/admin/org-scores/:seasonId" element={<OrgScoreManager />} />

@@ -16,7 +16,7 @@ import type { Season, SeasonMember } from '../types/models'
 import {
   distConfig, dimIcons, dimIconBg, scoreColor, dimGradient,
   groupByDimension, resolveEffectiveValue, resolveEffectiveScore,
-  calcDimensionScore, ScoreStatus, sourceTag, ruleText, WorkSummaryCard,
+  calcDimensionScore, sourceTag, ruleText, formatMetricValue,
 } from './dashboardHelpers'
 
 const { Text } = Typography
@@ -358,7 +358,7 @@ export default function Dashboard() {
                       const effectiveValue = resolveEffectiveValue(g.name, item, workSummary)
                       const effectiveScore = resolveEffectiveScore(item, effectiveValue)
                       const displayItem = { ...item, raw_value: effectiveValue }
-                      const hasRawValue = effectiveValue != null && effectiveValue !== 0
+                      const hasRawValue = effectiveValue != null
                       return (
                         <tr key={item.id} style={{ borderBottom: '1px solid #f5f3ff' }}>
                           <td style={{ padding: '8px 8px' }}>
@@ -369,14 +369,12 @@ export default function Dashboard() {
                           </td>
                           <td style={{ padding: '8px 8px', textAlign: 'center' }}>{ruleText(displayItem)}</td>
                           <td style={{ padding: '8px 8px', textAlign: 'center' }}>
-                            {item.score_type === 'threshold' && effectiveScore != null && hasRawValue
-                              ? <ScoreStatus score={effectiveScore} />
-                              : (hasRawValue ? effectiveValue : '-')}
+                            {hasRawValue ? formatMetricValue(effectiveValue) : '-'}
                           </td>
                           <td style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 700, color: '#4f46e5' }}>
                             {item.score_type === 'threshold' && effectiveScore != null && hasRawValue
                               ? (effectiveScore * item.indicator_weight).toFixed(1)
-                              : (hasRawValue && effectiveScore != null ? effectiveScore.toFixed(1) : '-')}
+                              : (effectiveScore != null ? effectiveScore.toFixed(1) : '-')}
                           </td>
                           <td style={{ padding: '8px 8px', textAlign: 'center' }}>{sourceTag(item.data_source)}</td>
                         </tr>
@@ -384,9 +382,6 @@ export default function Dashboard() {
                     })}
                   </tbody>
                 </table>
-                {g.name === '交付效率' && workSummary?.found && workSummary?.people?.[0] && (
-                  <WorkSummaryCard summary={workSummary} />
-                )}
               </>
             ),
           }))}

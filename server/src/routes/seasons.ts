@@ -1,10 +1,13 @@
 import { Router, Request, Response } from 'express'
 import { getDb, withTransaction } from '../db'
+import type { DbExecutor } from '../db'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
 import { asyncHandler } from '../middleware/asyncHandler'
 import { getPerformanceScore } from '../utils/constants'
 
-async function lookupPrevGrades(db: any, userKeys: string[]): Promise<Record<string, string>> {
+const PARTICIPANT_JOB_ROLES = ['product', 'design', 'tech'] as const
+
+async function lookupPrevGrades(db: DbExecutor, userKeys: string[]): Promise<Record<string, string>> {
   if (userKeys.length === 0) return {}
   const lastEndedSeason = await db.queryOne<{ id: number }>(
     'SELECT id FROM seasons WHERE status = ? ORDER BY end_date DESC LIMIT 1',
@@ -184,6 +187,11 @@ seasonsRouter.post('/:id/members/batch', adminMiddleware, asyncHandler(async (re
     const grade = m.performance_grade || prevGrades[m.user_key] || null
     const prevRawScore = grade ? getPerformanceScore(grade) : null
 
+    if (!jobRole || !PARTICIPANT_JOB_ROLES.includes(jobRole as typeof PARTICIPANT_JOB_ROLES[number])) {
+      skipped.push({ user_key: m.user_key, name: feishu.name, reason: '该岗位不参与赛季排名，请在人员目录维护岗位' })
+      continue
+    }
+
     try {
       await withTransaction(async tx => {
         if (m.job_role && m.job_role !== feishu.job_role) {
@@ -275,6 +283,10 @@ seasonsRouter.post('/:id/members/import-prev', adminMiddleware, asyncHandler(asy
       skipped.push({ user_key: pm.user_key, reason: '飞书用户已不存在' })
       continue
     }
+    if (!pm.job_role || !PARTICIPANT_JOB_ROLES.includes(pm.job_role as typeof PARTICIPANT_JOB_ROLES[number])) {
+      skipped.push({ user_key: pm.user_key, reason: '该岗位不参与赛季排名，请在人员目录维护岗位' })
+      continue
+    }
 
     try {
       await withTransaction(async tx => {
@@ -312,6 +324,10 @@ seasonsRouter.post('/:id/members/import-prev', adminMiddleware, asyncHandler(asy
 seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { user_key, job_role, sub_role, performance_grade } = req.body
   if (!user_key) { res.status(400).json({ error: '缺少 user_key' }); return }
+  if (!job_role || !PARTICIPANT_JOB_ROLES.includes(job_role)) {
+    res.status(400).json({ error: '该岗位不参与赛季排名，请在人员目录维护岗位' })
+    return
+  }
 
   const seasonId = parseInt(req.params.id, 10)
   const db = getDb()
@@ -355,6 +371,10 @@ seasonsRouter.post('/:id/members', adminMiddleware, asyncHandler(async (req: Req
 // PUT /api/seasons/:id/members/:mid — 编辑成员
 seasonsRouter.put('/:id/members/:mid', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { job_role, sub_role, performance_grade } = req.body
+  if (job_role !== undefined && job_role !== null && !PARTICIPANT_JOB_ROLES.includes(job_role)) {
+    res.status(400).json({ error: '该岗位不参与赛季排名，请在人员目录维护岗位' })
+    return
+  }
   const db = getDb()
   const existing = await db.queryOne<{ user_key: string }>('SELECT user_key FROM season_members WHERE id = ? AND season_id = ?', [req.params.mid, req.params.id])
   const prevGrades = existing ? await lookupPrevGrades(db, [existing.user_key]) : {}

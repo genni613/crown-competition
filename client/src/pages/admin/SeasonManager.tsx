@@ -24,6 +24,8 @@ const subRoleOptions = [
   { label: '后端', value: 'backend' },
 ]
 
+const participantFeishuUsers = (users: LocalFeishuUser[]) => users.filter(user => user.job_role !== 'test')
+
 export default function SeasonManager() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [members, setMembers] = useState<SeasonMember[]>([])
@@ -288,7 +290,7 @@ export default function SeasonManager() {
                 return <Space><Avatar src={u?.avatar_url} size="small" />{label}</Space>
               }}
             >
-              {feishuUsers.map(u => <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>)}
+              {participantFeishuUsers(feishuUsers).map(u => <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>)}
             </Select>
             <Button type="primary" onClick={onAddMember} disabled={selectedUserKeys.length === 0}>
               批量添加

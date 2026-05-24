@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons'
 import { useAuthStore } from '../../store/authStore'
 
-const jobRoleMap: Record<string, string> = { product: '产品', design: '设计', tech: '研发' }
+const jobRoleMap: Record<string, string> = { product: '产品', design: '设计', tech: '研发', test: '测试' }
 
 export default function Sidebar() {
   const navigate = useNavigate()
@@ -32,20 +32,26 @@ export default function Sidebar() {
   if (isAdmin) {
     items.push(
       { type: 'divider' as const },
-      { label: '管理后台', type: 'group' as const, children: [
-        { key: '/admin/seasons', icon: <SettingOutlined />, label: '赛季管理' },
-        { key: '/admin/members', icon: <TeamOutlined />, label: '成员管理' },
-        { key: '/admin/scoring', icon: <TeamOutlined />, label: '评分管理' },
-        { key: '/admin/data-sync', icon: <CloudServerOutlined />, label: '数据同步' },
-        { key: '/admin/dimensions', icon: <ControlOutlined />, label: '维度规则' },
-        { key: '/admin/evidence', icon: <AuditOutlined />, label: '举证审核' },
-      ]},
+      {
+        label: '管理后台',
+        type: 'group' as const,
+        children: [
+          { key: '/admin/scoring', icon: <TeamOutlined />, label: '评分管理' },
+          { key: '/admin/data-sync', icon: <CloudServerOutlined />, label: '数据同步' },
+          { key: '/admin/evidence', icon: <AuditOutlined />, label: '举证审核' },
+          { key: '/admin/members', icon: <TeamOutlined />, label: '成员管理' },
+          { key: '/admin/seasons', icon: <SettingOutlined />, label: '赛季管理' },
+          { key: '/admin/dimensions', icon: <ControlOutlined />, label: '维度规则' },
+          { key: '/admin/member-directory', icon: <UserOutlined />, label: '同步人员目录' },
+        ],
+      },
     )
   }
 
   function getSelectedKey(pathname: string) {
     if (pathname.startsWith('/admin/scores/') || pathname.startsWith('/admin/org-scores/') || pathname === '/admin/scoring') return '/admin/scoring'
     if (pathname.startsWith('/admin/members')) return '/admin/members'
+    if (pathname.startsWith('/admin/member-directory')) return '/admin/member-directory'
     if (pathname.startsWith('/admin/feishu/') || pathname === '/admin/data-sync') return '/admin/data-sync'
     if (pathname.startsWith('/admin/dimensions')) return '/admin/dimensions'
     if (pathname.startsWith('/admin/seasons')) return '/admin/seasons'

@@ -4,7 +4,7 @@ import type { User } from '../types/entities'
 
 export interface MemberDirectoryFilters {
   seasonId?: number
-  jobRole?: 'product' | 'design' | 'tech'
+  jobRole?: 'product' | 'design' | 'tech' | 'test'
   department?: string
   keyword?: string
   anomalyOnly?: boolean
@@ -20,9 +20,9 @@ export interface MemberDirectoryItem {
   department_name: string | null
   title: string | null
   role: 'ADMIN' | 'MEMBER' | null
-  job_role: 'product' | 'design' | 'tech' | null
+  job_role: 'product' | 'design' | 'tech' | 'test' | null
   sub_role: 'client' | 'frontend' | 'backend' | null
-  system_job_role: 'product' | 'design' | 'tech' | null
+  system_job_role: 'product' | 'design' | 'tech' | 'test' | null
   system_sub_role: 'client' | 'frontend' | 'backend' | null
   selected_season_id: number | null
   selected_season_name: string | null
@@ -304,7 +304,7 @@ export async function getMemberSeasonHistory(userKey: string): Promise<MemberSea
 export async function updateMemberDirectoryJobRole(
   userKey: string,
   data: {
-    job_role?: 'product' | 'design' | 'tech' | null
+    job_role?: 'product' | 'design' | 'tech' | 'test' | null
     sub_role?: 'client' | 'frontend' | 'backend' | null
     syncDraftSeasonMembers?: boolean
   }
@@ -327,7 +327,7 @@ export async function updateMemberDirectoryJobRole(
     [jobRole, subRole, userKey]
   )
 
-  if (data.syncDraftSeasonMembers) {
+  if (data.syncDraftSeasonMembers && jobRole !== 'test') {
     await db.execute(
       `
         UPDATE season_members sm
@@ -371,7 +371,7 @@ function computeMemberAnomalies(
   if (!row.job_role) {
     anomalies.push('未配置岗位')
   }
-  if (row.selected_season_id && !row.selected_season_member_id) {
+  if (row.selected_season_id && !row.selected_season_member_id && row.job_role !== 'test') {
     anomalies.push('当前赛季未参赛')
   }
   if (row.selected_season_member_id && row.selected_total_score == null) {

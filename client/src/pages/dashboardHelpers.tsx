@@ -103,6 +103,12 @@ export function calcDimensionScore(items: any[], workSummary: MyWorkSummaryRespo
   return hasAny ? dimScore - totalDeduction : null
 }
 
+export function formatMetricValue(value: number | null | undefined) {
+  if (value == null) return '-'
+  if (Number.isInteger(value)) return String(value)
+  return value.toFixed(2)
+}
+
 export function ScoreStatus({ score }: { score: number }) {
   const label = score >= 100 ? '满分' : score >= 60 ? '及格' : '不及格'
   const color = score >= 100 ? '#10b981' : score >= 60 ? '#6366f1' : '#f43f5e'
@@ -128,12 +134,41 @@ export function sourceTag(source?: string) {
   return <Tag color={s.color} style={{ margin: 0, color: '#fff', border: 'none' }}>{s.label}</Tag>
 }
 
+function parseProductPdThresholdNotes(notes?: string | null) {
+  if (!notes) return null
+  const totalMatch = notes.match(/总研发(?:测试)?PD:\s*([0-9.]+)/)
+  const t100Match = notes.match(/阈值100:\s*≥([0-9.]+)/)
+  const t60Match = notes.match(/阈值60:\s*≥([0-9.]+)/)
+  if (!totalMatch && !t100Match && !t60Match) return null
+  return {
+    totalRdPd: totalMatch ? Number(totalMatch[1]) : null,
+    threshold100: t100Match ? Number(t100Match[1]) : null,
+    threshold60: t60Match ? Number(t60Match[1]) : null,
+  }
+}
+
 export function ruleText(item: any) {
   if (item.score_type === 'deduction') {
     const parts: string[] = []
     if (item.deduction_per_unit) parts.push(`扣${item.deduction_per_unit}/单位`)
     if (item.deduction_cap) parts.push(`上限${item.deduction_cap}`)
     return parts.length > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>{parts.join('，')}</Text> : '-'
+  }
+  if (item.indicator_name === '产品需求使用研发测试PD数') {
+    const dynamic = parseProductPdThresholdNotes(item.notes)
+    return (
+      <Space size={4} direction="vertical">
+        <Space size={4} wrap>
+          <Tag style={{ margin: 0, fontSize: 11, background: '#eef2ff', color: '#4f46e5', border: 'none' }}>≥1/3总研发测试PD=100</Tag>
+          <Tag style={{ margin: 0, fontSize: 11, background: '#fefce8', color: '#a16207', border: 'none' }}>≥1/4总研发测试PD=60</Tag>
+        </Space>
+        {dynamic && (
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            本赛季总研发测试PD {formatMetricValue(dynamic.totalRdPd)}，100分≥{formatMetricValue(dynamic.threshold100)}，60分≥{formatMetricValue(dynamic.threshold60)}
+          </Text>
+        )}
+      </Space>
+    )
   }
   if (item.threshold_100 != null && item.threshold_60 != null) {
     return (

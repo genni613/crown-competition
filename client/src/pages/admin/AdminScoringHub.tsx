@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Select, Tag, Typography, message } from 'antd'
-import { ArrowRightOutlined, CalculatorOutlined, EditOutlined, TeamOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Progress, Select, Space, Tag, Typography, message } from 'antd'
+import { ArrowRightOutlined, CalculatorOutlined, EditOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
 import { getMembers, getSeasons } from '../../api/seasons'
 import type { Season, SeasonMember } from '../../types/models'
 import { formatDate } from '../../utils/datetime'
@@ -77,40 +77,36 @@ export default function AdminScoringHub() {
     [members],
   )
 
+  const roleCoverage = memberSummary.total > 0
+    ? Math.round((memberSummary.configuredRoleCount / memberSummary.total) * 100)
+    : 0
+
+  const scoringReadiness = memberSummary.missingRoleCount === 0 && memberSummary.missingSubRoleCount === 0
+
   const scoringActions = [
     {
       key: 'role-score',
       title: '岗位分录入',
-      description: '按岗位批量处理管理员录分项，适合统一补录、复核和重算前检查。',
-      details: [
-        { label: '处理对象', value: '产品 / 设计 / 研发' },
-        { label: '推荐场景', value: '批量录入、统一修正、集中复核' },
-        { label: '当前覆盖', value: `${memberSummary.configuredRoleCount} / ${memberSummary.total} 人已配置岗位` },
-      ],
-      note: memberSummary.missingRoleCount > 0
-        ? `还有 ${memberSummary.missingRoleCount} 名成员未配置岗位，建议先补齐。`
-        : '岗位配置已齐，可以直接进入岗位分录入。',
-      icon: <EditOutlined />,
-      iconClassName: 'admin-hub-action-icon-primary',
+      summary: '适合按岗位集中补录、统一复核，再配合规则弹窗快速判断口径。',
+      owner: '按岗位批处理',
+      timing: '先做',
+      destination: '产品 / 设计 / 研发',
       buttonText: '进入岗位分',
       onClick: () => selectedSeasonId && navigate(`/admin/scores/${selectedSeasonId}`),
-      showSetupButton: memberSummary.missingRoleCount > 0 || memberSummary.missingSubRoleCount > 0,
+      icon: <EditOutlined />,
+      iconClassName: 'admin-hub-action-icon-primary',
     },
     {
       key: 'org-score',
       title: '组织分录入',
-      description: '按成员处理组织分加减项，适合补录协作、贡献和特殊事项。',
-      details: [
-        { label: '处理方式', value: '先选成员，再录入具体规则' },
-        { label: '推荐场景', value: '逐人补录、核对额外加扣分' },
-        { label: '成员范围', value: `${memberSummary.total} 名赛季成员` },
-      ],
-      note: '组织分入口更适合按成员逐个处理，不和岗位分混在一起。',
-      icon: <CalculatorOutlined />,
-      iconClassName: 'admin-hub-action-icon-warm',
+      summary: '适合按成员逐个补录协作贡献、专项奖励和特殊扣减，不和岗位分混录。',
+      owner: '按成员逐条处理',
+      timing: '后做',
+      destination: '全体赛季成员',
       buttonText: '进入组织分',
       onClick: () => selectedSeasonId && navigate(`/admin/org-scores/${selectedSeasonId}`),
-      showSetupButton: false,
+      icon: <CalculatorOutlined />,
+      iconClassName: 'admin-hub-action-icon-warm',
     },
   ]
 
@@ -135,6 +131,53 @@ export default function AdminScoringHub() {
 
   return (
     <div className="admin-hub-shell">
+      <section className="admin-hub-hero admin-hub-hero-scoring">
+        <div className="admin-hub-hero-main">
+          <div className="admin-hub-hero-kicker">Scoring Console</div>
+          <Typography.Title level={3} className="admin-hub-hero-title">
+            评分管理工作台
+          </Typography.Title>
+          <Typography.Paragraph className="admin-hub-hero-description">
+            面向管理员的评分入口应先判断赛季范围和配置完整度，再决定先做岗位分还是组织分。这里把当前赛季状态、风险和操作顺序放在同一屏。
+          </Typography.Paragraph>
+          <Space wrap size={10}>
+            <Button type="primary" onClick={() => selectedSeasonId && navigate(`/admin/scores/${selectedSeasonId}`)} disabled={!selectedSeasonId}>
+              进入岗位分录入
+            </Button>
+            <Button onClick={() => selectedSeasonId && navigate(`/admin/org-scores/${selectedSeasonId}`)} disabled={!selectedSeasonId}>
+              进入组织分录入
+            </Button>
+            <Button onClick={() => navigate('/admin/members')}>成员管理</Button>
+          </Space>
+        </div>
+        <div className="admin-hub-hero-side">
+          <div className="admin-hub-readiness-card">
+            <div className="admin-hub-readiness-head">
+              <span>评分准备度</span>
+              <Tag color={scoringReadiness ? 'green' : 'orange'}>
+                {scoringReadiness ? '可开始录分' : '需先补配置'}
+              </Tag>
+            </div>
+            <div className="admin-hub-readiness-value">{roleCoverage}%</div>
+            <Progress percent={roleCoverage} showInfo={false} strokeColor="#6366f1" trailColor="#e2e8f0" />
+            <div className="admin-hub-mini-list">
+              <div className="admin-hub-mini-row">
+                <span>已配置岗位</span>
+                <strong>{memberSummary.configuredRoleCount} / {memberSummary.total}</strong>
+              </div>
+              <div className="admin-hub-mini-row">
+                <span>未配置岗位</span>
+                <strong>{memberSummary.missingRoleCount} 人</strong>
+              </div>
+              <div className="admin-hub-mini-row">
+                <span>未配置研发子岗</span>
+                <strong>{memberSummary.missingSubRoleCount} 人</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="admin-hub-toolbar">
         <div className="admin-hub-toolbar-copy">
           <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>
@@ -182,9 +225,9 @@ export default function AdminScoringHub() {
           <div className="admin-hub-stat-help">当前赛季已加入成员</div>
         </Card>
         <Card className="admin-hub-stat-card" styles={{ body: { padding: 18 } }}>
-          <div className="admin-hub-stat-label">岗位覆盖</div>
-          <div className="admin-hub-stat-value">{memberSummary.configuredRoleCount} / {memberSummary.total}</div>
-          <div className="admin-hub-stat-help">已配置岗位成员</div>
+          <div className="admin-hub-stat-label">岗位覆盖率</div>
+          <div className="admin-hub-stat-value">{roleCoverage}%</div>
+          <div className="admin-hub-stat-help">{memberSummary.configuredRoleCount} / {memberSummary.total} 已配置岗位</div>
         </Card>
         <Card className="admin-hub-stat-card" styles={{ body: { padding: 18 } }}>
           <div className="admin-hub-stat-label">岗位分布</div>
@@ -201,6 +244,17 @@ export default function AdminScoringHub() {
           </div>
         </Card>
       </section>
+
+      {!scoringReadiness && (
+        <Alert
+          showIcon
+          type="warning"
+          icon={<SafetyCertificateOutlined />}
+          className="admin-hub-alert"
+          message="当前赛季还有基础配置未完成"
+          description={`未配置岗位 ${memberSummary.missingRoleCount} 人，未配置研发子岗 ${memberSummary.missingSubRoleCount} 人。建议先去成员管理补齐，再开始岗位分录入，避免管理员反复回退修正。`}
+        />
+      )}
 
       <section className="admin-hub-action-grid">
         {scoringActions.map(action => (
@@ -221,22 +275,32 @@ export default function AdminScoringHub() {
               </div>
 
               <Typography.Paragraph className="admin-hub-action-description">
-                {action.description}
+                {action.summary}
               </Typography.Paragraph>
 
               <div className="admin-hub-detail-list">
-                {action.details.map(detail => (
-                  <div key={detail.label} className="admin-hub-detail-row">
-                    <span>{detail.label}</span>
-                    <strong>{detail.value}</strong>
-                  </div>
-                ))}
+                <div className="admin-hub-detail-row">
+                  <span>处理方式</span>
+                  <strong>{action.owner}</strong>
+                </div>
+                <div className="admin-hub-detail-row">
+                  <span>推荐顺序</span>
+                  <strong>{action.timing}</strong>
+                </div>
+                <div className="admin-hub-detail-row">
+                  <span>适用范围</span>
+                  <strong>{action.destination}</strong>
+                </div>
               </div>
 
               <div className="admin-hub-action-footer">
-                <Typography.Text className="admin-hub-action-note">{action.note}</Typography.Text>
+                <Typography.Text className="admin-hub-action-note">
+                  {action.key === 'role-score'
+                    ? (scoringReadiness ? '岗位配置齐全时，优先从这里开始，能更快完成本轮赛季评分。' : '岗位或子岗未补齐时，这里容易出现口径反复，建议先补配置。')
+                    : '组织分更适合作为第二步补录动作，在岗位分稳定后再逐人核对。'}
+                </Typography.Text>
                 <div className="admin-hub-action-buttons">
-                  {action.showSetupButton ? (
+                  {action.key === 'role-score' && !scoringReadiness ? (
                     <Button onClick={() => navigate('/admin/members')}>先去补配置</Button>
                   ) : null}
                   <Button
@@ -256,36 +320,37 @@ export default function AdminScoringHub() {
         <Card className="admin-hub-side-card" styles={{ body: { padding: 22 } }}>
           <div className="admin-hub-action-head">
             <Typography.Title level={5} style={{ margin: 0, color: '#0f172a' }}>
-              当前赛季检查
+              管理员建议顺序
             </Typography.Title>
             <span className="admin-hub-action-icon admin-hub-action-icon-neutral">
               <TeamOutlined />
             </span>
           </div>
-          <div className="admin-hub-detail-list">
-            <div className="admin-hub-detail-row">
-              <span>产品成员</span>
-              <strong>{memberSummary.productCount} 人</strong>
+          <div className="admin-hub-flow-list">
+            <div className="admin-hub-flow-item">
+              <div className="admin-hub-flow-index">1</div>
+              <div>
+                <div className="admin-hub-flow-title">检查成员配置</div>
+                <div className="admin-hub-flow-copy">先确认岗位与研发子岗完整，减少后续录分回退。</div>
+              </div>
             </div>
-            <div className="admin-hub-detail-row">
-              <span>设计成员</span>
-              <strong>{memberSummary.designCount} 人</strong>
+            <div className="admin-hub-flow-item">
+              <div className="admin-hub-flow-index">2</div>
+              <div>
+                <div className="admin-hub-flow-title">集中处理岗位分</div>
+                <div className="admin-hub-flow-copy">按岗位统一录入和复核，维度规则在录分页弹窗中直接查看。</div>
+              </div>
             </div>
-            <div className="admin-hub-detail-row">
-              <span>研发成员</span>
-              <strong>{memberSummary.techCount} 人</strong>
-            </div>
-            <div className="admin-hub-detail-row">
-              <span>未配置岗位</span>
-              <strong>{memberSummary.missingRoleCount} 人</strong>
-            </div>
-            <div className="admin-hub-detail-row">
-              <span>未配置研发子岗</span>
-              <strong>{memberSummary.missingSubRoleCount} 人</strong>
+            <div className="admin-hub-flow-item">
+              <div className="admin-hub-flow-index">3</div>
+              <div>
+                <div className="admin-hub-flow-title">逐人补录组织分</div>
+                <div className="admin-hub-flow-copy">最后处理协作加减项，更符合管理员核对习惯。</div>
+              </div>
             </div>
           </div>
           <Typography.Paragraph className="admin-hub-side-note">
-            建议先保证成员岗位和研发子岗配置完整，再做岗位分录入；组织分可以按成员逐个补录。
+            评分管理不应该要求管理员自己推导顺序，所以这里直接把推荐流程显式展示出来。
           </Typography.Paragraph>
         </Card>
       </section>

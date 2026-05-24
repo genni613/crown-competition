@@ -124,7 +124,7 @@ async function queryLocalIssuePriorityCounts(userKey: string, startMs: number, e
 async function aggregateProduct(userKey: string, startMs: number, endMs: number, startDate: string, endDate: string): Promise<{ metrics: MetricMap; totalRdPd: number }> {
   const db = getDb()
 
-  // 赛季内所有研发成员的总PD（客户端 ÷3）
+  // 赛季内所有研发/测试成员的总PD（客户端 ÷3）
   const totalRdRows = await db.query<{ total_rd_pd: number }>(`
     SELECT ROUND(SUM(
       CASE WHEN fu.sub_role = 'client'
@@ -133,14 +133,14 @@ async function aggregateProduct(userKey: string, startMs: number, endMs: number,
     ), 2) AS total_rd_pd
     FROM feishu_workitem_gongshi g
     JOIN feishu_user fu ON fu.user_key = g.work_hour_reporter
-    WHERE fu.job_role = 'tech'
+    WHERE fu.job_role IN ('tech', 'test')
       AND ${GONGSHI_TIME} IS NOT NULL
       AND ${GONGSHI_TIME} >= ?
       AND ${GONGSHI_TIME} < ?
   `, [new Date(startMs), new Date(endMs)])
   const totalRdPd = Number(totalRdRows[0]?.total_rd_pd || 0)
 
-  // 该产品经理负责的需求所消耗的研发PD（客户端 ÷3）
+  // 该产品经理负责的需求所消耗的研发/测试PD（客户端 ÷3）
   const rdPdRows = await db.query<{ total_rd_pd: number }>(`
     SELECT ROUND(SUM(
       CASE WHEN fu.sub_role = 'client'
@@ -151,6 +151,7 @@ async function aggregateProduct(userKey: string, startMs: number, endMs: number,
     JOIN feishu_workitem_story s ON s.work_item_id = g.related_requirement
     JOIN feishu_user fu ON fu.user_key = g.work_hour_reporter
     WHERE s.product_owner = ?
+      AND fu.job_role IN ('tech', 'test')
       AND ${GONGSHI_TIME} IS NOT NULL
       AND ${GONGSHI_TIME} >= ?
       AND ${GONGSHI_TIME} < ?
@@ -306,7 +307,7 @@ async function writeIndicatorScores(member: SyncMember, metrics: MetricMap, tota
         `, [member.season_member_id, dimension.id, rawValue,
             dynamicThreshold?.threshold_score ?? null,
             dynamicThreshold?.final_score ?? null,
-            totalRdPd != null ? `总研发PD: ${totalRdPd}, 阈值100: ≥${(totalRdPd / 3).toFixed(1)}, 阈值60: ≥${(totalRdPd / 4).toFixed(1)}` : '飞书同步默认值，用户举证后覆盖'])
+            totalRdPd != null ? `总研发测试PD: ${totalRdPd}, 阈值100: ≥${(totalRdPd / 3).toFixed(1)}, 阈值60: ≥${(totalRdPd / 4).toFixed(1)}` : '飞书同步默认值，用户举证后覆盖'])
         written += 1
       } else {
         await tx.execute(`
@@ -323,7 +324,7 @@ async function writeIndicatorScores(member: SyncMember, metrics: MetricMap, tota
         `, [member.season_member_id, dimension.id, rawValue,
             dynamicThreshold?.threshold_score ?? null,
             dynamicThreshold?.final_score ?? null,
-            totalRdPd != null ? `总研发PD: ${totalRdPd}, 阈值100: ≥${(totalRdPd / 3).toFixed(1)}, 阈值60: ≥${(totalRdPd / 4).toFixed(1)}` : 'synced from local db'])
+            totalRdPd != null ? `总研发测试PD: ${totalRdPd}, 阈值100: ≥${(totalRdPd / 3).toFixed(1)}, 阈值60: ≥${(totalRdPd / 4).toFixed(1)}` : 'synced from local db'])
         written += 1
       }
     }

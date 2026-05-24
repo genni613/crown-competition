@@ -16,6 +16,12 @@ import {
   syncMemberFeishuData,
   syncSeasonFeishuData,
 } from '../services/feishuSync.service'
+import {
+  runSyncWorkflow,
+  cancelWorkflow,
+  getWorkflowReport,
+  isWorkflowRunning,
+} from '../services/syncWorkflow.service'
 
 export const feishuRouter = Router()
 
@@ -320,7 +326,7 @@ feishuRouter.get('/local-users', adminMiddleware, asyncHandler(async (_req, res)
 // PUT /api/feishu/my-job-role — 当前登录用户设置自己的岗位
 feishuRouter.put('/my-job-role', authMiddleware, asyncHandler(async (req, res) => {
   const { job_role, sub_role } = req.body
-  if (!job_role || !['product', 'design', 'tech'].includes(job_role)) {
+  if (!job_role || !['product', 'design', 'tech', 'test'].includes(job_role)) {
     res.status(400).json({ error: '无效的岗位类型' })
     return
   }
@@ -478,6 +484,48 @@ feishuRouter.post('/raw-data-sync-all', adminMiddleware, asyncHandler(async (req
       ? { status: 'fulfilled' as const, result: projects.value }
       : { status: 'rejected' as const, error: projects.reason instanceof Error ? projects.reason.message : String(projects.reason) },
   })
+}))
+
+// POST /api/feishu/sync-workflow — 启动/恢复同步 Workflow（含断点续传 + 限流管理）
+feishuRouter.post('/sync-workflow', adminMiddleware, asyncHandler(async (req, res) => {
+  const seasonId = Number(req.body?.seasonId)
+  if (!seasonId) {
+    res.status(400).json({ error: '缺少 seasonId' })
+    return
+  }
+  try {
+    const report = await runSyncWorkflow(seasonId)
+    res.json({ ok: true, report })
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      report: await getWorkflowReport(seasonId),
+    })
+  }
+}))
+
+// POST /api/feishu/sync-workflow/cancel — 取消进行中的同步
+feishuRouter.post('/sync-workflow/cancel', adminMiddleware, asyncHandler(async (req, res) => {
+  const seasonId = Number(req.body?.seasonId)
+  if (!seasonId) {
+    res.status(400).json({ error: '缺少 seasonId' })
+    return
+  }
+  const cancelled = cancelWorkflow(seasonId)
+  res.json({ ok: true, cancelled })
+}))
+
+// GET /api/feishu/sync-workflow/status — 查询同步状态
+feishuRouter.get('/sync-workflow/status', adminMiddleware, asyncHandler(async (req, res) => {
+  const seasonId = Number(req.query?.seasonId)
+  if (!seasonId) {
+    res.status(400).json({ error: '缺少 seasonId' })
+    return
+  }
+  const running = isWorkflowRunning(seasonId)
+  const report = await getWorkflowReport(seasonId)
+  res.json({ running, report })
 }))
 
 // GET /api/feishu/project/status — 检查飞书项目 OpenAPI 配置

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Select, Tag, Typography, message } from 'antd'
-import { ArrowRightOutlined, CloudSyncOutlined, DatabaseOutlined, TeamOutlined, ThunderboltOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Progress, Select, Space, Tag, Typography, message } from 'antd'
+import { ArrowRightOutlined, CheckCircleOutlined, CloudSyncOutlined, CloseCircleOutlined, DatabaseOutlined, LoadingOutlined, SafetyCertificateOutlined, TeamOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { getMembers, getSeasons } from '../../api/seasons'
 import type { Season, SeasonMember } from '../../types/models'
 import { formatDate } from '../../utils/datetime'
@@ -107,19 +107,24 @@ export default function AdminDataSyncHub() {
     [members],
   )
 
+  const syncReady = memberSummary.missingRoleCount === 0 && memberSummary.missingSubRoleCount === 0
+  const configCoverage = memberSummary.total > 0
+    ? Math.round((memberSummary.configuredRoleCount / memberSummary.total) * 100)
+    : 0
+
   const syncCards = [
     {
       key: 'feishu-sync',
       title: '进入同步执行页',
-      description: '统一处理工时、需求、缺陷、项目、用户同步，以及指标分回写和评分重算。',
+      summary: '需要完整执行飞书数据同步、指标回写和评分重算时，从这里进入专门执行页。',
       details: [
-        { label: '原始数据', value: '工时 / 需求 / 缺陷 / 项目 / 用户' },
-        { label: '评分链路', value: '写入 indicator_scores 后重算' },
-        { label: '推荐顺序', value: '原始数据 → 指标分同步 → 评分重算' },
+        { label: '覆盖链路', value: '原始数据 → 指标分 → 评分结果' },
+        { label: '推荐人群', value: '管理员集中跑批' },
+        { label: '当前范围', value: `${memberSummary.total} 名赛季成员` },
       ],
-      note: memberSummary.total > 0
-        ? `当前赛季同步范围为 ${memberSummary.total} 名成员。`
-        : '当前赛季还没有成员，同步前建议先确认成员范围。',
+      note: syncReady
+        ? '配置已经满足同步前提，可以直接进入执行页跑完整链路。'
+        : '配置还不完整，直接同步容易出现岗位归类错误。',
       icon: <CloudSyncOutlined />,
       iconClassName: 'admin-hub-action-icon-cool',
       buttonText: '进入同步页',
@@ -129,7 +134,7 @@ export default function AdminDataSyncHub() {
     {
       key: 'sync-check',
       title: '执行前检查',
-      description: '同步前先确认成员配置是否完整，避免出现岗位归属不清或研发子岗缺失的问题。',
+      summary: '同步前先确认成员配置是否完整，避免跑完之后再返工处理错误归类。',
       details: [
         { label: '未配置岗位', value: `${memberSummary.missingRoleCount} 人` },
         { label: '未配置研发子岗', value: `${memberSummary.missingSubRoleCount} 人` },
@@ -167,6 +172,58 @@ export default function AdminDataSyncHub() {
 
   return (
     <div className="admin-hub-shell">
+      <section className="admin-hub-hero admin-hub-hero-sync">
+        <div className="admin-hub-hero-main">
+          <div className="admin-hub-hero-kicker">Data Sync Console</div>
+          <Typography.Title level={3} className="admin-hub-hero-title">
+            数据同步工作台
+          </Typography.Title>
+          <Typography.Paragraph className="admin-hub-hero-description">
+            管理员真正关心的是“这次能不能同步”“范围对不对”“跑完下一步去哪”。这里把赛季范围、配置风险和主要动作压缩成一个控制台。
+          </Typography.Paragraph>
+          <Space wrap size={10}>
+            <Button
+              type="primary"
+              icon={batchSyncing ? <LoadingOutlined /> : <ThunderboltOutlined />}
+              loading={batchSyncing}
+              onClick={handleBatchSync}
+            >
+              {batchSyncing ? '同步中...' : '一键同步 4 类数据'}
+            </Button>
+            <Button onClick={() => selectedSeasonId && navigate(`/admin/feishu/${selectedSeasonId}`)} disabled={!selectedSeasonId}>
+              进入同步执行页
+            </Button>
+            <Button onClick={() => navigate('/admin/members')}>成员管理</Button>
+          </Space>
+        </div>
+        <div className="admin-hub-hero-side">
+          <div className="admin-hub-readiness-card">
+            <div className="admin-hub-readiness-head">
+              <span>同步准备度</span>
+              <Tag color={syncReady ? 'green' : 'orange'}>
+                {syncReady ? '可直接执行' : '需先补配置'}
+              </Tag>
+            </div>
+            <div className="admin-hub-readiness-value">{configCoverage}%</div>
+            <Progress percent={configCoverage} showInfo={false} strokeColor="#06b6d4" trailColor="#e2e8f0" />
+            <div className="admin-hub-mini-list">
+              <div className="admin-hub-mini-row">
+                <span>当前赛季成员</span>
+                <strong>{memberSummary.total} 人</strong>
+              </div>
+              <div className="admin-hub-mini-row">
+                <span>岗位已配置</span>
+                <strong>{memberSummary.configuredRoleCount} 人</strong>
+              </div>
+              <div className="admin-hub-mini-row">
+                <span>待补配置</span>
+                <strong>{memberSummary.missingRoleCount + memberSummary.missingSubRoleCount} 项</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="admin-hub-toolbar">
         <div className="admin-hub-toolbar-copy">
           <Typography.Title level={4} style={{ margin: 0, color: '#0f172a' }}>
@@ -214,9 +271,9 @@ export default function AdminDataSyncHub() {
           <div className="admin-hub-stat-help">当前赛季成员数</div>
         </Card>
         <Card className="admin-hub-stat-card" styles={{ body: { padding: 18 } }}>
-          <div className="admin-hub-stat-label">岗位分布</div>
-          <div className="admin-hub-stat-value">{memberSummary.productCount} / {memberSummary.designCount} / {memberSummary.techCount}</div>
-          <div className="admin-hub-stat-help">产品 / 设计 / 研发</div>
+          <div className="admin-hub-stat-label">配置覆盖率</div>
+          <div className="admin-hub-stat-value">{configCoverage}%</div>
+          <div className="admin-hub-stat-help">{memberSummary.configuredRoleCount} / {memberSummary.total} 成员已具备同步前提</div>
         </Card>
         <Card className="admin-hub-stat-card" styles={{ body: { padding: 18 } }}>
           <div className="admin-hub-stat-label">待补配置</div>
@@ -234,6 +291,17 @@ export default function AdminDataSyncHub() {
         </Card>
       </section>
 
+      {!syncReady && (
+        <Alert
+          showIcon
+          type="warning"
+          icon={<SafetyCertificateOutlined />}
+          className="admin-hub-alert"
+          message="当前赛季还不适合直接执行同步"
+          description={`未配置岗位 ${memberSummary.missingRoleCount} 人，未配置研发子岗 ${memberSummary.missingSubRoleCount} 人。建议先补齐成员配置，再跑同步和评分链路，避免指标写入错误岗位。`}
+        />
+      )}
+
       <section className="admin-hub-action-grid">
         <Card className="admin-hub-action-card" styles={{ body: { padding: 22, height: '100%' } }}>
           <div className="admin-hub-action-body">
@@ -247,7 +315,7 @@ export default function AdminDataSyncHub() {
             </div>
 
             <Typography.Paragraph className="admin-hub-action-description">
-              并行同步工时、需求、缺陷、项目 4 类原始数据，同步完成后显示各项新增和更新数量。
+              并行同步工时、需求、缺陷、项目 4 类原始数据。这个入口适合管理员做“先探测一次原始数据是否正常”的快速动作。
             </Typography.Paragraph>
 
             <div style={{ marginBottom: 16 }}>
@@ -321,7 +389,7 @@ export default function AdminDataSyncHub() {
               </div>
 
               <Typography.Paragraph className="admin-hub-action-description">
-                {card.description}
+                {card.summary}
               </Typography.Paragraph>
 
               <div className="admin-hub-detail-list">
@@ -358,28 +426,37 @@ export default function AdminDataSyncHub() {
         <Card className="admin-hub-side-card" styles={{ body: { padding: 22 } }}>
           <div className="admin-hub-action-head">
             <Typography.Title level={5} style={{ margin: 0, color: '#0f172a' }}>
-              同步范围提示
+              管理员建议顺序
             </Typography.Title>
             <span className="admin-hub-action-icon admin-hub-action-icon-neutral">
               <DatabaseOutlined />
             </span>
           </div>
-          <div className="admin-hub-detail-list">
-            <div className="admin-hub-detail-row">
-              <span>成员来源</span>
-              <strong>赛季成员表</strong>
+          <div className="admin-hub-flow-list">
+            <div className="admin-hub-flow-item">
+              <div className="admin-hub-flow-index">1</div>
+              <div>
+                <div className="admin-hub-flow-title">先检查成员配置</div>
+                <div className="admin-hub-flow-copy">确认岗位和研发子岗完整，否则同步结果容易失真。</div>
+              </div>
             </div>
-            <div className="admin-hub-detail-row">
-              <span>时间范围</span>
-              <strong>{selectedSeason ? `${formatDate(selectedSeason.start_date)} ~ ${formatDate(selectedSeason.end_date)}` : '-'}</strong>
+            <div className="admin-hub-flow-item">
+              <div className="admin-hub-flow-index">2</div>
+              <div>
+                <div className="admin-hub-flow-title">先跑原始数据同步</div>
+                <div className="admin-hub-flow-copy">用一键同步快速判断飞书侧数据是否正常落库。</div>
+              </div>
             </div>
-            <div className="admin-hub-detail-row">
-              <span>评分写入</span>
-              <strong>indicator_scores</strong>
+            <div className="admin-hub-flow-item">
+              <div className="admin-hub-flow-index">3</div>
+              <div>
+                <div className="admin-hub-flow-title">再进执行页跑完整链路</div>
+                <div className="admin-hub-flow-copy">包括指标分回写、评分重算和后续复核。</div>
+              </div>
             </div>
           </div>
           <Typography.Paragraph className="admin-hub-side-note">
-            这里不是介绍页，而是同步执行前的检查位。确认成员范围、岗位配置和赛季时间都正确后，再进入同步页执行。
+            管理员需要的是“少判断、少返工”，所以把执行顺序直接做成工作流提示，而不是散在几张说明卡里。
           </Typography.Paragraph>
         </Card>
       </section>

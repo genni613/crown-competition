@@ -92,6 +92,13 @@ export class FeishuProjectService {
   private static readonly MAX_CONCURRENT = 5
   private static readonly MAX_RETRIES = 3
 
+  private _rateLimitRemaining: number = 100
+  private _rateLimitResetAt: number = 0
+  private _rateLimitCancelling = false
+
+  get rateLimitRemaining(): number { return this._rateLimitRemaining }
+  get rateLimitResetAt(): number { return this._rateLimitResetAt }
+
   private async acquire(): Promise<void> {
     if (this._activeCount < FeishuProjectService.MAX_CONCURRENT) {
       this._activeCount++
@@ -107,6 +114,44 @@ export class FeishuProjectService {
     } else {
       this._activeCount--
     }
+  }
+
+  private _parseRateLimitHeaders(response: Response): void {
+    const remaining = response.headers.get('x-ratelimit-remaining')
+      ?? response.headers.get('X-RateLimit-Remaining')
+    if (remaining != null) {
+      this._rateLimitRemaining = Number(remaining)
+    }
+    const reset = response.headers.get('x-ratelimit-reset')
+      ?? response.headers.get('X-RateLimit-Reset')
+    if (reset != null) {
+      const val = Number(reset)
+      this._rateLimitResetAt = val > 1e12 ? val : val * 1000
+    }
+  }
+
+  async waitForBudget(needed: number = 1): Promise<void> {
+    if (this._rateLimitCancelling) {
+      throw new Error('同步已取消')
+    }
+    if (this._rateLimitRemaining >= needed) {
+      this._rateLimitRemaining -= needed
+      return
+    }
+    const waitMs = Math.max(this._rateLimitResetAt - Date.now(), 1000)
+    console.log('[feishu-project] rate budget exhausted, waiting', { waitMs, remaining: this._rateLimitRemaining })
+    await new Promise(r => setTimeout(r, waitMs))
+    this._rateLimitRemaining = 100
+  }
+
+  cancelRateLimitWait(): void {
+    this._rateLimitCancelling = true
+  }
+
+  resetRateLimitState(): void {
+    this._rateLimitCancelling = false
+    this._rateLimitRemaining = 100
+    this._rateLimitResetAt = 0
   }
 
   constructor(private options: ProjectApiOptions = config.feishuProject) {}
@@ -197,6 +242,8 @@ export class FeishuProjectService {
         headers,
         body: init.body == null ? undefined : JSON.stringify(init.body),
       })
+
+      this._parseRateLimitHeaders(response)
 
       if (response.status === 429 && attempt < maxRetries) {
         const retryAfterMs = Number(response.headers.get('Retry-After') || 0) * 1000

@@ -14,7 +14,7 @@ export const usersRouter = Router()
 
 usersRouter.get('/member-directory', adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const seasonId = req.query.seasonId ? Number(req.query.seasonId) : undefined
-  const jobRole = req.query.jobRole ? String(req.query.jobRole) as 'product' | 'design' | 'tech' : undefined
+  const jobRole = req.query.jobRole ? String(req.query.jobRole) as 'product' | 'design' | 'tech' | 'test' : undefined
   const department = req.query.department ? String(req.query.department) : undefined
   const keyword = req.query.keyword ? String(req.query.keyword) : undefined
   const anomalyOnly = ['1', 'true'].includes(String(req.query.anomalyOnly || '').toLowerCase())
@@ -46,7 +46,7 @@ usersRouter.put('/member-directory/:userKey/job-role', adminMiddleware, asyncHan
   }
 
   const { job_role, sub_role, syncDraftSeasonMembers } = req.body
-  if (job_role !== null && job_role !== undefined && !['product', 'design', 'tech'].includes(job_role)) {
+  if (job_role !== null && job_role !== undefined && !['product', 'design', 'tech', 'test'].includes(job_role)) {
     res.status(400).json({ error: '无效的岗位' })
     return
   }
@@ -82,7 +82,7 @@ usersRouter.put('/:id', adminMiddleware, asyncHandler(async (req: Request, res: 
     res.status(400).json({ error: '无效的角色' })
     return
   }
-  if (job_role && !['product', 'design', 'tech'].includes(job_role)) {
+  if (job_role && !['product', 'design', 'tech', 'test'].includes(job_role)) {
     res.status(400).json({ error: '无效的岗位' })
     return
   }

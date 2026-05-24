@@ -11,7 +11,7 @@ export interface User {
   department_name: string | null
   title: string | null
   role: 'ADMIN' | 'MEMBER'
-  job_role: 'product' | 'design' | 'tech' | null
+  job_role: 'product' | 'design' | 'tech' | 'test' | null
   sub_role: 'client' | 'frontend' | 'backend' | null
   created_at: string
   updated_at: string

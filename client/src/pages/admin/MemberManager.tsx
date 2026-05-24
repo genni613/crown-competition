@@ -12,6 +12,7 @@ import {
   Popconfirm,
   Select,
   Space,
+  Spin,
   Table,
   Tag,
   Typography,
@@ -30,9 +31,15 @@ import {
 import { getLocalFeishuUsers, syncMemberSeasonScore } from '../../api/feishu'
 import { getMemberSeasonHistory, updateMemberDirectoryJobRole } from '../../api/users'
 import { getScoreHistory } from '../../api/scores'
+import { getBreakdown } from '../../api/scoring'
 import GrowthCurveChart from '../../components/GrowthCurveChart'
 import type { ScoreHistoryRow } from '../../components/GrowthCurveChart'
 import type { LocalFeishuUser } from '../../api/feishu'
+import {
+  distConfig, scoreColor,
+  groupByDimension, resolveEffectiveValue, resolveEffectiveScore,
+  calcDimensionScore, sourceTag, ruleText, formatMetricValue,
+} from '../dashboardHelpers'
 import type { MemberSeasonHistoryItem, Season, SeasonMember } from '../../types/models'
 import { formatDate, formatDateTime } from '../../utils/datetime'
 
@@ -49,6 +56,7 @@ const subRoleOptions = [
 ]
 
 const gradeOptions = ['A', 'B+', 'B', 'B-', 'C'].map(g => ({ label: g, value: g }))
+const participantFeishuUsers = (users: LocalFeishuUser[]) => users.filter(user => user.job_role !== 'test')
 
 const seasonStatusColor: Record<string, string> = { draft: 'default', active: 'green', ended: 'red' }
 const seasonStatusLabel: Record<string, string> = { draft: '草稿', active: '进行中', ended: '已结束' }
@@ -72,6 +80,7 @@ export default function MemberManager() {
   const navigate = useNavigate()
   const [seasons, setSeasons] = useState<Season[]>([])
   const [selectedSeasonId, setSelectedSeasonId] = useState<number>()
+  const [jobRoleFilter, setJobRoleFilter] = useState<string>()
   const [members, setMembers] = useState<SeasonMember[]>([])
   const [feishuUsers, setFeishuUsers] = useState<LocalFeishuUser[]>([])
   const [prevGradeMap, setPrevGradeMap] = useState<Record<string, string>>({})
@@ -99,6 +108,8 @@ export default function MemberManager() {
   const [importing, setImporting] = useState(false)
   const [growthData, setGrowthData] = useState<ScoreHistoryRow[] | null>(null)
   const [growthLoading, setGrowthLoading] = useState(false)
+  const [breakdown, setBreakdown] = useState<any>(null)
+  const [breakdownLoading, setBreakdownLoading] = useState(false)
 
   useEffect(() => {
     void loadSeasons()
@@ -122,6 +133,11 @@ export default function MemberManager() {
   const existingUserKeys = useMemo(
     () => new Set(members.map(m => m.user_key)),
     [members],
+  )
+
+  const filteredMembers = useMemo(
+    () => jobRoleFilter ? members.filter(member => member.job_role === jobRoleFilter) : members,
+    [members, jobRoleFilter],
   )
 
   async function loadSeasons() {
@@ -220,6 +236,7 @@ export default function MemberManager() {
     setDrawerOpen(true)
     setHistoryLoading(true)
     setGrowthLoading(true)
+    setBreakdownLoading(true)
     try {
       if (record.user_key) {
         const [historyRes, growthRes] = await Promise.all([
@@ -232,12 +249,23 @@ export default function MemberManager() {
         setHistory([])
         setGrowthData(null)
       }
+      if (record.season_id && record.id) {
+        getBreakdown(record.season_id, Number(record.id))
+          .then(r => setBreakdown(r.data))
+          .catch(() => setBreakdown(null))
+          .finally(() => setBreakdownLoading(false))
+      } else {
+        setBreakdown(null)
+        setBreakdownLoading(false)
+      }
     } catch {
       setHistory([])
       setGrowthData(null)
+      setBreakdown(null)
     } finally {
       setHistoryLoading(false)
       setGrowthLoading(false)
+      setBreakdownLoading(false)
     }
   }
 
@@ -310,7 +338,6 @@ export default function MemberManager() {
           <Avatar src={r.user_avatar_url} icon={<UserOutlined />} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600, color: '#0f172a' }}>{r.user_name}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{r.user_key}</div>
           </div>
         </Space>
       ),
@@ -388,7 +415,7 @@ export default function MemberManager() {
     ) },
     { title: '时间', render: (_: unknown, r: MemberSeasonHistoryItem) => `${formatDate(r.start_date)} ~ ${formatDate(r.end_date)}` },
     { title: '岗位', render: (_: unknown, r: MemberSeasonHistoryItem) => renderRole(r.job_role, r.sub_role) },
-    { title: '绩效', dataIndex: 'performance_grade', render: (v: string | null) => v || '-' },
+    { title: '带入绩效', dataIndex: 'performance_grade', render: (v: string | null) => v || '-' },
     { title: '总分', dataIndex: 'total_score', render: renderScore },
     { title: '岗位分', dataIndex: 'final_position_score', render: renderScore },
     { title: '组织分', dataIndex: 'total_org_score', render: renderScore },
@@ -413,6 +440,14 @@ export default function MemberManager() {
             options={seasons.map(item => ({ label: item.name, value: item.id }))}
             placeholder="选择赛季"
           />
+          <Select
+            allowClear
+            value={jobRoleFilter}
+            onChange={value => setJobRoleFilter(value)}
+            style={{ width: 140 }}
+            options={jobRoleOptions}
+            placeholder="按岗位筛选"
+          />
           <Button icon={<ImportOutlined />} onClick={handleImportPrev} loading={importing} disabled={!selectedSeasonId}>
             导入上赛季成员
           </Button>
@@ -431,7 +466,7 @@ export default function MemberManager() {
             <Space wrap>
               <Tag color={seasonStatusColor[selectedSeason.status]}>{seasonStatusLabel[selectedSeason.status]}</Tag>
               <Tag>{formatDate(selectedSeason.start_date)} ~ {formatDate(selectedSeason.end_date)}</Tag>
-              <Tag>{members.length} 人</Tag>
+              <Tag>{filteredMembers.length} 人{jobRoleFilter ? '（筛选后）' : ''}</Tag>
             </Space>
             <Space>
               <Button onClick={() => navigate(`/admin/scores/${selectedSeason.id}`)}>岗位分录入</Button>
@@ -448,7 +483,7 @@ export default function MemberManager() {
           <Table
             rowKey="id"
             loading={loading}
-            dataSource={members}
+            dataSource={filteredMembers}
             columns={columns}
             scroll={{ x: 1300 }}
             pagination={{ pageSize: 20, showSizeChanger: true }}
@@ -493,7 +528,7 @@ export default function MemberManager() {
               return <Space><Avatar src={u?.avatar_url} size="small" />{label}</Space>
             }}
           >
-            {feishuUsers.filter(u => !existingUserKeys.has(u.user_key)).map(u => (
+            {participantFeishuUsers(feishuUsers).filter(u => !existingUserKeys.has(u.user_key)).map(u => (
               <Select.Option key={u.user_key} value={u.user_key} label={u.name}>{u.name}</Select.Option>
             ))}
           </Select>
@@ -575,6 +610,71 @@ export default function MemberManager() {
                 <Descriptions.Item label="271">{selectedMember.distribution || '-'}</Descriptions.Item>
               </Descriptions>
             </Card>
+
+            {breakdownLoading ? (
+              <Card size="small" style={{ borderRadius: 12 }}><Spin /></Card>
+            ) : breakdown?.scores?.length > 0 ? (
+              <Card size="small" title="得分明细" style={{ borderRadius: 12 }}>
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  {(() => {
+                    const dimensions = groupByDimension(breakdown.scores)
+                    return dimensions.map((g: any) => {
+                      const dimScore = calcDimensionScore(g.items, null, g.name)
+                      const normalized = dimScore != null ? dimScore / g.weight : 0
+                      return (
+                        <div key={g.name}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <Typography.Text strong style={{ fontSize: 13 }}>{g.name}</Typography.Text>
+                            <Typography.Text style={{ fontSize: 13, fontWeight: 600, color: scoreColor(normalized) }}>
+                              {dimScore?.toFixed(1) ?? '-'} <Typography.Text type="secondary" style={{ fontSize: 11 }}>/ {(g.weight * 100).toFixed(0)}%</Typography.Text>
+                            </Typography.Text>
+                          </div>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                <th style={{ padding: '4px 6px', textAlign: 'left', fontWeight: 600, color: '#8c8c8c' }}>指标</th>
+                                <th style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#8c8c8c' }}>规则</th>
+                                <th style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#8c8c8c' }}>原始值</th>
+                                <th style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#8c8c8c' }}>得分</th>
+                                <th style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#8c8c8c' }}>来源</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.items.map((item: any) => {
+                                const effectiveValue = resolveEffectiveValue(g.name, item, null)
+                                const effectiveScore = resolveEffectiveScore(item, effectiveValue)
+                                const displayItem = { ...item, raw_value: effectiveValue }
+                                const hasRawValue = effectiveValue != null
+                                return (
+                                  <tr key={item.id || item.indicator_name} style={{ borderBottom: '1px solid #fafafa' }}>
+                                    <td style={{ padding: '4px 6px' }}>
+                                      {item.indicator_name}
+                                      <Typography.Text type="secondary" style={{ fontSize: 10, marginLeft: 3 }}>
+                                        {(item.indicator_weight * 100).toFixed(0)}%
+                                      </Typography.Text>
+                                    </td>
+                                    <td style={{ padding: '4px 6px', textAlign: 'center' }}>{ruleText(displayItem)}</td>
+                                    <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                                      {hasRawValue ? formatMetricValue(effectiveValue) : '-'}
+                                    </td>
+                                    <td style={{ padding: '4px 6px', textAlign: 'center', fontWeight: 600, color: '#4f46e5' }}>
+                                      {item.score_type === 'threshold' && effectiveScore != null && hasRawValue
+                                        ? (effectiveScore * item.indicator_weight).toFixed(1)
+                                        : (effectiveScore != null ? effectiveScore.toFixed(1) : '-')}
+                                    </td>
+                                    <td style={{ padding: '4px 6px', textAlign: 'center' }}>{sourceTag(item.data_source)}</td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })
+                  })()}
+                </Space>
+              </Card>
+            ) : null}
 
             <Card size="small" title="岗位维护" style={{ borderRadius: 12 }}
               extra={<Button size="small" icon={<SyncOutlined />} loading={syncingMemberKey === selectedMember.user_key} onClick={() => handleSyncMember(selectedMember)}>同步</Button>}
