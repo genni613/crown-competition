@@ -490,6 +490,7 @@ export function AppCopilotPopup() {
   return (
     <CopilotPopup
       agentId={copilotConfig.agent}
+      defaultOpen={false}
       clickOutsideToClose
       labels={{
         modalHeaderTitle: '皇冠赛助手',

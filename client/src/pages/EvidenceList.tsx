@@ -197,7 +197,7 @@ export default function EvidenceList() {
   }
 
   return (
-    <div className="anim-fade-in-up">
+    <div style={{ maxWidth: 960, width: '100%' }} className="anim-fade-in-up">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
